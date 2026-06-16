@@ -557,6 +557,15 @@ These standards shape the WP set's *shape*, not just the content:
     error, fix the INDEX, and re-run lint. Only proceed to Step 10
     (Report) when lint exits 0.
 
+    **Re-run the lint after ANY later INDEX amend (#307).** The gate
+    covers the initial emit, but if you hand-edit the table or re-emit it
+    after this point (a mid-session WP addition, a header tweak), re-run
+    `wpx-index lint` before returning — a drifted header reintroduced on
+    an amend is just as invisible to run-all. (`wpx-index add-wp` now also
+    validates the header on every amend, so an amend through the tooling
+    fails surgically rather than silently — but a raw hand-edit is only
+    caught by re-running the lint.)
+
     The gate runs two checks. First it checks the WP table's **header
     shape** — a list-shape or drifted-header INDEX (the #103 class) is
     invisible to the run-all loop and would otherwise surface as a

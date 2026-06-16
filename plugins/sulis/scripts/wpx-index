@@ -682,6 +682,18 @@ def cmd_add_wp(args: argparse.Namespace) -> None:
     paths = paths_from_args(args)
     text = _read_index(args)
 
+    # #307 — refuse to amend an INDEX whose WP-table header has drifted from
+    # canonical. The decompose-time lint (plan-work Step 9.5 / #103) covers the
+    # INITIAL emit, but an architect that hand-edits or re-emits the table can
+    # reintroduce a non-canonical header (`| WP | Purpose | Delta | ... |`)
+    # that the run-all loop can't parse. Validating here turns the "and amends"
+    # path into a surgical amend-time error naming the canonical header, rather
+    # than a cryptic "Could not find WP table" mid-run. (add-wp appends into an
+    # existing canonical table, so this never blocks a legitimate first row.)
+    header_err = validate_wp_index_header(text)
+    if header_err is not None:
+        emit_error(header_err)
+
     # Reject duplicates
     if _index_has_wp(text, args.wp):
         emit_error(

@@ -231,6 +231,25 @@ resolves to a foreign change's `feat/wp-{nnn}-*` branch. The bare `feat/`
 glob survives one release only for legacy callers that supply no change
 scope; its removal is a tracked follow-up.
 
+### WP id labels (MUST)
+
+A WP's *id label* is `{CH-HANDLE}-WP-NNN` (e.g., `CH-5DMB1N-WP-001`) — the
+id-label twin of the branch-ref scoping above. The per-change `NNN` sequence is
+unchanged (still the human-friendly 1/2/3 within a change); the `CH-HANDLE`
+prefix makes the id globally unique across changes, so two changes can no longer
+both mint a colliding bare `WP-001`. This closes for the *id* the same collision
+class #283 closed for the *branch* — the two together retire cross-change WP
+collisions for good.
+
+Legacy bare `WP-NNN` ids minted before this change stay **understood for one
+release**: the WP-id matcher recognises the prefixed shape, the legacy bare
+shape, and the existing source-tagged `WP-{SOURCE}-{NNN}` shape from the same
+parse, and there is **no migration pass** rewriting any existing committed id.
+Dropping bare-id support is a tracked follow-up — the back-compat window closes
+deliberately once the in-flight bare ids have drained, mirroring how the bare
+`feat/` branch glob's removal is tracked above. See `WORK_PACKAGE_STANDARD.md`
+WP-01 (the `id` row) and ADR-002 (change `unique-wp-ids`).
+
 ### What this means for the executor
 
 The executor's `wpx-pipeline` and `wpx-train` are unchanged in
@@ -333,6 +352,37 @@ Rebases the change branch onto latest `dev`. Merges (or opens a PR;
 configurable). On clean merge, removes the worktree, deletes the
 local branch, optionally archives metadata.
 
+### Completion is owned by a recorded verdict, enforced in the ship mechanism (MUST — #118)
+
+A change MUST NOT be **merged** (and therefore released) without a recorded
+observed verdict. Enforcement is **pre-merge, with a post-merge backstop**
+(#122): `sulis-change verify-verdict` runs as a hard gate **before the
+squash-merge** and refuses the merge unless the Definition-of-Done verdict is
+met; `sulis-change mark-shipped` re-checks the same verdict **after** the merge
+as the backstop (a sibling of the #111 merge guard), refusing to flip to
+`shipped` if it's somehow unmet. The only escape at either point is a
+conscious, logged `--force` / founder override. Pre-merge placement matters:
+#118 first wired the check at `mark-shipped` (post-merge), which gated the
+`shipped` *flag* but let unverified work merge + release first; #122 moved the
+primary gate ahead of the merge so the *merge itself* is gated.
+
+This is the structural fix for false-completions: completion stops being
+*self-asserted by the builder against a prose bar* and becomes *owned by the
+recorded verdict the ship mechanism checks*. The observed-or-blocked logic
+itself is unchanged (it already existed as `gate_decision` / `_verify_requirements`,
+#83/#95/#98); what changed is that its invocation at ship moved from a
+skippable SKILL.md instruction (gates 4.8/4.9) into the mechanism — so an agent
+that skips the prose, or a hand-merge that bypasses the skill, still cannot
+ship unverified work. The gate is the mandate; agent-body prose only points at
+it. See ADR-001 (`gate-done-on-verdict`) for the full decision, including why
+the verdict is read from deposited brain evidence (not a self-stampable
+frontmatter field). The gate covers **two routes**, blocked if either blocks:
+the **SRD route** (every touched Requirement has a passing `TestResult`) and
+the **scenario route** (every emitted Scenario the change authored is observed
+green — a passing `TestResult` back-links to it). The per-WP done-transition
+sibling (so the mid-flight board can't show `done` without the verdict) remains
+the captured follow-on.
+
 ### Trivial-change carve-out (SHOULD)
 
 For changes too small to justify a branch — a typo fix, a one-line
@@ -399,6 +449,19 @@ If real practice surfaces routine inter-change dependencies (e.g.,
 Change B is consistently blocked on Change A landing), CW-07 becomes
 wrong and a future v0.2.0 adds a change-level dependency layer.
 That's a deferred concern.
+
+**Partial breakage observed (#123).** A recurring case did surface: a change
+started *from inside another change's session* (an idea spun out, or a
+dependency) lost the link + context, forcing a human to relay between the two
+sessions. The first coordination primitive is now in: `sulis-change start`,
+when launched with a parent `SULIS_CHANGE_ID`, records a **durable link**
+(`parent_change` + `relationship: builds_on | depends_on`) on the new change
+and carries the parent's Working-Set context into its `CONTEXT.md`. This is
+deliberately **durable shared state, not live inter-session messaging** (a
+critical-thinking spiral found Agent Teams a topology mismatch — ephemeral,
+lead-fixed, no resumption — for independent human-paced change peers). The full
+change-level dependency DAG (blocked-on edges, absorb-vs-spawn) remains the
+v0.2 concern (#97).
 
 ---
 
@@ -649,3 +712,4 @@ change, and what CW-NN rule(s) it exercised or stressed.
 | 0.2.0 | 2026-05-25 | **CW-04 amended (additive).** Auto back-integration subsection added — codifies the merge-not-rebase mechanism with two trigger points (post-WP-merge active driver + pre-WP-start safety net) and structured conflict handling (interactive resolve / defer / abort options). Operationalises what CW-04's two-level worktree hierarchy makes possible. Phase 4 of the change-as-primitive build; pairs with lifecycle.md Step 0 + Step 12.5 amendments. Backwards-compatible — existing change branches without auto back-integration continue to work; the new mechanism activates only via the Phase 5 executor implementation. |
 | 0.4.0 | 2026-06-10 | **CW-09 added (SHOULD, calibrating).** Names three rigour tiers — Methodical / Batched / Bounded-fix — as presets over orthogonal dials (design depth, decomposition granularity, verification timing, isolation), declared up front so the operator picks a pre-designed risk trade-off instead of improvising under deadline pressure. The verification floor (real bundled verification + observed-or-blocked) is explicitly tier-invariant (MUST). Bounded-fix is *not* zero-planning — it carries a written-plan floor (plan mode → write the plan down → build), the cheap anti-anxiety step that keeps the fast path safe under pressure. Deliberately describes the pattern in prose rather than encoding conditional workflow steps — promotion + hard-coding waits on a ~5-change calibration window (only n=2 at authoring, both moved dials in lockstep). Synthesised from two converged critical-thinking spirals on fast-vs-methodical change handling; CW-05 trivial carve-out is the smallest instance of the Bounded-fix tier. |
 | 0.3.0 | 2026-06-10 | **CW-04 amended (additive).** Added the **WP branch refs (MUST)** subsection — a WP's branch ref is `wp/{primitive}-{slug}/wp-{nnn}-{slug}`, nesting under `wp/` (not under the `change/{primitive}-{slug}` prefix, which would be a git directory/file ref conflict). Scopes the train resolver's branch glob per-change so it cannot match a foreign change's recycled WP number (change `wp-branch-collision`, root cause of #105/#106; see ADR-001). Backwards-compatible — legacy bare `feat/wp-{nnn}-{slug}` branches still resolve via the executor journal + a one-release glob fallback for no-scope callers; fallback removal is a tracked follow-up. |
+| 0.4.0 | 2026-06-10 | **CW-04 amended (additive).** Added the **WP id labels (MUST)** subsection — the id-label twin of the WP branch-ref scoping: a WP's id label is `{CH-HANDLE}-WP-NNN`, the `CH-HANDLE` prefix making the id globally unique across changes while the per-change `NNN` sequence is unchanged. Closes for the id label the same cross-change collision class #283 closed for branches (change `unique-wp-ids`, CH-5DMB1N; see ADR-002). Backwards-compatible — legacy bare `WP-NNN` and source-tagged `WP-{SOURCE}-{NNN}` ids stay understood for one release (no migration); bare-id-support removal is a tracked follow-up. |

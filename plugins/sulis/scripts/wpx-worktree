@@ -11,6 +11,7 @@ Exit codes: 0 success, 1 user/data error, 2 internal error.
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -21,6 +22,7 @@ from _wpxlib import (  # noqa: E402
     cli_main,
     emit_error,
     emit_ok,
+    git_worktree_remove,
     paths_from_args,
 )
 
@@ -94,7 +96,18 @@ def _normalise_base_branch(raw: str) -> str:
 
 def cmd_create(args: argparse.Namespace) -> None:
     paths = paths_from_args(args)
-    worktree_path = Path(args.worktree_path).resolve()
+    # #309 — resolve a RELATIVE --worktree-path against --repo-root (the TARGET
+    # change's repo), NOT the process cwd. A run-all executor passes a relative
+    # `../wp-NNN-worktree`; `Path(...).resolve()` would anchor it to the
+    # CALLING SESSION's cwd (which may be bound to a DIFFERENT change), landing
+    # the worktree under the wrong change's parent. Anchoring to repo_root
+    # makes the relative path land beside the target change regardless of where
+    # the session's cwd is. Absolute paths are honoured as-is.
+    wt_arg = Path(args.worktree_path)
+    worktree_path = (
+        wt_arg.resolve() if wt_arg.is_absolute()
+        else (paths.repo_root / wt_arg).resolve()
+    )
     base_branch = _normalise_base_branch(
         getattr(args, "base_branch", None) or "main"
     )
@@ -181,13 +194,21 @@ def cmd_remove(args: argparse.Namespace) -> None:
     if not worktree_path.exists() and not args.tolerate_missing:
         emit_error(f"Worktree path does not exist: {worktree_path}")
 
+    # #130 — SCOPE-GUARDED removal. The change-id (explicit, else the bound
+    # session's SULIS_CHANGE_ID) keys the guard: the target MUST be within that
+    # change's own dir, or the removal is refused. This makes the destructive
+    # cross-change glob-sweep (`git worktree list | grep wp-006` matching another
+    # change's worktree) structurally impossible — route through the guarded
+    # primitive, never raw `git worktree remove`.
+    change_id = getattr(args, "change_id", None) or os.environ.get("SULIS_CHANGE_ID")
     if worktree_path.exists():
-        cmd = ["git", "worktree", "remove", str(worktree_path)]
-        if args.force:
-            cmd.insert(-1, "--force")
-        rc, _, err = _run(cmd, cwd=paths.repo_root)
-        if rc != 0:
-            emit_error(f"git worktree remove failed: {err}")
+        ok, msg = git_worktree_remove(
+            paths.repo_root, worktree_path,
+            force=bool(getattr(args, "force", False)),
+            change_id=change_id,
+        )
+        if not ok:
+            emit_error(msg)
 
     # Clean up sidecar
     sidecar = paths.wp_dir / f".executor-{args.wp}-dev-sha"
@@ -219,6 +240,10 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_args(p_remove)
     p_remove.add_argument("--wp", required=True)
     p_remove.add_argument("--worktree-path", required=True)
+    p_remove.add_argument("--change-id", default=None,
+                          help="The owning change (#130 scope guard); defaults to "
+                               "SULIS_CHANGE_ID. The target must be within this "
+                               "change's dir or removal is refused.")
     p_remove.add_argument("--force", action="store_true",
                           help="Force-remove (passes --force to git worktree remove)")
     p_remove.add_argument("--tolerate-missing", action="store_true",

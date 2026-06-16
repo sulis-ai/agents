@@ -1,0 +1,15 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "change-lifecycle",
+  "id": "dna:step:ER717SYCKRBYK1B7PXVK6F2241",
+  "input_artifacts": [
+    "CONTEXT.md"
+  ],
+  "mechanism": "mixed",
+  "name": "specify",
+  "output_artifacts": [
+    "SPEC.md"
+  ],
+  "state": "active",
+  "sys_status": "active"
+}

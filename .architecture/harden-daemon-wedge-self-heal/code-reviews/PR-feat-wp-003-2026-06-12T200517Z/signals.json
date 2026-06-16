@@ -1,0 +1,22 @@
+{
+  "pr": "feat/wp-003-grace-window-wedge-detection",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0, "ruff": "clean", "mypy_new_errors": 0, "mypy_preexisting_on_base": 32 },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["feat"], "severity": "none" },
+    "size": { "lines_added": 663, "lines_removed": 51, "files_changed": 4, "severity": "low" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none" },
+    "completeness": { "new_source_without_test": 0, "new_tests": 2, "api_change_without_schema": false, "severity": "none" }
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 3, "low_addressed_inline": 3 },
+    "in_neighbours": { "total": 0 }
+  },
+  "lenses": {
+    "architecture": { "findings": 1, "note": "fail-closed stderr+return-1 duplicated x2 in _handle_lost_race -> extracted _fail_closed_retry (EP-03); ADR-001 frozen engine unmodified; ADR-003 import-graph green; WPB-07 single composition root via _boot_and_serve" },
+    "security": { "findings": 0, "note": "reclaim kills only after _is_our_daemon fail-closed verify (cmdline+start-token); no new secrets/auth/injection surface" },
+    "quality": { "findings": 2, "note": "2 dead-surface (unused _CMDLINE_MARKER const; unused manager binding) -> both removed inline; tests present for all new behaviour; no CR-10 perf anti-patterns" }
+  },
+  "deltas_drafted": 0,
+  "resolution": "3 low findings all addressed inline; re-ran /code-review-equivalent checks: ruff clean, full daemon suite 73 passed"
+}

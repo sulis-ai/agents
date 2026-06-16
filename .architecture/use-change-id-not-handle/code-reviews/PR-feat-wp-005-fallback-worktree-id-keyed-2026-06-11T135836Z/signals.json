@@ -1,0 +1,25 @@
+{
+  "pr": "feat/wp-005-fallback-worktree-id-keyed",
+  "base": "change/fix-use-change-id-not-handle",
+  "timestamp": "2026-06-11T135836Z",
+  "build_verification": {
+    "errors_introduced": 0,
+    "compileall": "pass",
+    "ruff_delta": "0 new (2 pre-existing E402 at _wpxlib.py:4154-4155, outside edit region)"
+  },
+  "hygiene": {
+    "scope": {"commit_type_spread": ["refactor"], "module_fan_out": 1, "severity": "none"},
+    "size": {"lines_added": 19, "lines_removed": 3, "files_changed": 1, "new_test_files": 1, "severity": "none"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+    "completeness": {"new_source_without_test": 0, "api_change_without_schema": false, "severity": "none"}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "note": "lazy import mirrors existing pattern at _wpxlib.py:5113; no new coupling direction; backward-compat preserved"},
+    "security": {"findings": 0, "note": "no untrusted input; new param dormant (no caller passes change_id yet); recreate validates ULID upstream when wired"},
+    "quality": {"findings": 0, "note": "both branches tested (5 new tests); optional kwarg defaults None — call sites unchanged; no CR-10 anti-patterns"}
+  },
+  "findings": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+  "draft_deltas": 0,
+  "verdict": "PASS",
+  "auto_downgrade_triggers": []
+}

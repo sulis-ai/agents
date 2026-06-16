@@ -1,0 +1,23 @@
+id: ARCH-harden-agent-execution-boundary
+status: designed
+change_id: 01KTZVX7RBE22SX6DNHA4Y6Y7B
+change_handle: CH-E22SX6
+primitive: harden
+slug: agent-execution-boundary
+sourced_from:
+  spec: .changes/harden-agent-execution-boundary.SPEC.md
+  yaml: .changes/harden-agent-execution-boundary.yaml
+scope:
+  designed_now: [L1, L2]      # the universal, no-regret pair (SPEC build-seq 1)
+  deferred: [L3]              # per-OS sandbox + remote substrate — next phase
+tier: M                       # sFPC ≈ 13, ASR ≈ 10; see SIZING.md
+adrs:
+  - ADR-001-l1-enforcement-vs-l3-dependency
+  - ADR-002-secret-scrub-mechanism-and-what-is-a-secret
+  - ADR-003-content-as-untrusted-data-framing
+  - ADR-004-file-tool-scope-resolver-and-allowlist-source
+  - ADR-005-honest-confinement-in-tests-without-l3
+upstream:
+  scope_guard: "#130 within_change_scope (_worktree_safety.py) — EXTENDED, not forked"
+  scrub_engine: "_anonymiser.py secret-pattern catalogue — shared primitive extracted"
+  session_spawn: "_session_manager.manager._spawn_process — the proxy-env injection seam"

@@ -122,6 +122,29 @@ def test_returns_done_when_merge_sha_on_branch(tmp_path):
     assert args[2] == "dev"
 
 
+def test_returns_done_for_prefixed_id(tmp_path):
+    """WP-001 (CH-5DMB1N): compute_wp_status works on a prefixed id.
+
+    A prefixed `CH-…-WP-NNN` WP file resolves status correctly (the WP-file
+    glob `{wp_id}-*.md` follows the id; the branch path routes the NNN tail
+    through the shared `wp_nnn_suffix`). Retained alongside the legacy bare-id
+    `test_returns_done_when_merge_sha_on_branch`.
+    """
+    paths = _make_paths(tmp_path)
+    _make_wp_file(paths.wp_dir, "CH-5DMB1N-WP-001")
+    _write_yaml_record(
+        paths.train_runs_dir, "train-001",
+        [{"wp": "CH-5DMB1N-WP-001", "merge_sha_on_dev": "abc12345"}],
+    )
+    with patch("_wpxlib.is_sha_on_branch") as mock_on_branch:
+        mock_on_branch.return_value = True
+        result = compute_wp_status(
+            "CH-5DMB1N-WP-001", paths, "acme/repo", "dev",
+            stored_status="step-7-complete",
+        )
+    assert result == "done"
+
+
 def test_does_not_return_done_when_merge_sha_not_on_branch(tmp_path):
     """Case 1 negative: merge SHA recorded but is_sha_on_branch returns
     False (revert / never landed on dev). Falls through to step-7-complete

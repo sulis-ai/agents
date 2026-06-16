@@ -36,16 +36,22 @@ export type RecreateOutcome =
   | { ok: false; reason: RecreateFailureReason; detail: string };
 
 /**
- * Drive `sulis-change recreate --handle <handle>` (or its in-memory
+ * Drive `sulis-change recreate --change-id <changeId>` (or its in-memory
  * twin). The implementation owns the subprocess discipline; this
- * interface owns only the contract: given a change handle, return a
+ * interface owns only the contract: given a change's UNIQUE id, return a
  * typed outcome — never throw across the boundary.
+ *
+ * The seam is keyed by the unique `change_id`, NOT the 6-char display
+ * handle (ADR-001). The handle is shared by 2–4 changes in live data;
+ * driving recreate by it is the cockpit half of "session works on the
+ * wrong change". The cockpit already reads the record by its id, so it
+ * carries that id straight across this seam.
  */
 export interface RecreateRunner {
   /**
-   * Re-materialise the worktree for the change identified by `handle`.
-   * Idempotent: an already-present worktree is reported as
+   * Re-materialise the worktree for the change identified by its unique
+   * `changeId`. Idempotent: an already-present worktree is reported as
    * `{ ok: true, alreadyPresent: true }`, not an error.
    */
-  recreate(handle: string): Promise<RecreateOutcome>;
+  recreate(changeId: string): Promise<RecreateOutcome>;
 }

@@ -4,6 +4,8 @@
 repo: sulis-ai/agents
 owner: iainn
 
+# Brain location is the user-level central default (dogfood: behave like installed users). See ADR-001.
+
 # --- Profile + contribution model (RC v0.3.0) --------------------------------
 # This is a Claude Code plugin MARKETPLACE — a published artifact, not a
 # deployable web product. The dev branch IS the installable surface (consumers

@@ -67,6 +67,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent))
 import _change_session  # noqa: E402
+import _prune_cache  # noqa: E402
+import _version_pick  # noqa: E402
 from _wpxlib import validate_change_ulid  # noqa: E402
 
 logger = logging.getLogger("sulis.terminal_launcher")
@@ -118,6 +120,67 @@ _PRE_PROMPT_MAX_BYTES = 50_000
 # to the change's shared session over the daemon's stable socket — instead of a
 # standalone `claude` (change CH-01KTKB ADR-003). Co-located with this module.
 _VIEWER_SCRIPT = "session_viewer.py"
+
+# Dev-escape override env var for the spawned-scripts resolver (WP-001 / DD-1).
+# Deliberately NOT `SULIS_SCRIPTS_DIR`: that name is already an OUTPUT of this
+# launcher (the origin-hook `export SULIS_SCRIPTS_DIR=...` line), so reusing it
+# as an INPUT here would be ambiguous (one name, two roles) and risk an
+# inherited output value silently steering resolution. `SPAWN` names the intent:
+# "what scripts dir to bake into the spawn".
+_SPAWN_SCRIPTS_DIR_ENV = "SULIS_SPAWN_SCRIPTS_DIR"
+
+
+# ─── Installed-scripts-dir resolver (WP-001 / CH-3FNT33) ───────────────────
+
+
+def _resolve_installed_scripts_dir() -> Path:
+    """Scripts dir to bake into the spawned launch script (viewer exec + hooks).
+
+    The spawned window's sibling scripts (``session_viewer.py``, the origin
+    hook) must come from the INSTALLED plugin, not the spawning worktree — when
+    ``sulis-change start`` runs from a change worktree, ``__file__`` is the
+    worktree copy, so self-locating from it forks the running (worktree) code
+    into the spawn. This resolver redirects both launcher call sites at the
+    install.
+
+    Resolution order (DESIGN §2 / DD-2):
+
+      1. ``SULIS_SPAWN_SCRIPTS_DIR`` (dev escape hatch, DD-1) — when set AND it
+         points at an existing directory, return it resolved. A developer
+         intentionally exercising launcher/viewer/daemon changes from a worktree
+         wins over the cache. A set-but-missing value falls through (it does not
+         hard-fail the spawn). The var is ``SULIS_SPAWN_SCRIPTS_DIR``, NOT
+         ``SULIS_SCRIPTS_DIR`` (that name is already an output of this launcher).
+      2. Newest cached install — ``_prune_cache.default_cache_root()`` joined
+         with ``_prune_cache._SULIS_SUBPATH`` ("sulis-ai-agents", "sulis"), then
+         the ``_version_pick.max_version(...)`` version (NUMERIC newest, never
+         lexical, #49-safe), then ``"scripts"`` — returned only when that
+         ``scripts`` dir exists (a mid-install version dir without it falls
+         through, so a non-existent path is never baked into the spawn).
+      3. Fallback — ``Path(__file__).resolve().parent`` (today's behaviour), so
+         a pure-dev machine with no install still spawns successfully (AC-5).
+         Never crashes, never returns an empty path.
+
+    Composition only (EP-03 / NFR-5): reuses the stdlib-only leaf helpers
+    ``_prune_cache`` + ``_version_pick`` rather than re-deriving the cache path
+    or re-implementing version ordering.
+    """
+    override = os.environ.get(_SPAWN_SCRIPTS_DIR_ENV, "").strip()
+    if override:
+        override_path = Path(override)
+        if override_path.is_dir():
+            return override_path.resolve()
+
+    sulis_dir = _prune_cache.default_cache_root().joinpath(*_prune_cache._SULIS_SUBPATH)
+    if sulis_dir.is_dir():
+        names = [p.name for p in sulis_dir.iterdir() if p.is_dir()]
+        newest = _version_pick.max_version(names)
+        if newest is not None:
+            scripts = sulis_dir / newest / "scripts"
+            if scripts.is_dir():
+                return scripts.resolve()
+
+    return Path(__file__).resolve().parent
 
 
 # ─── OS-window override knob ────────────────────────────────────────────────
@@ -298,9 +361,10 @@ def _build_launch_script(
         # daemon's interactive pty adapter reads the sidecar and briefs the
         # session's claude on its first turn. The viewer line is path-/flag-
         # shaped, so it is built outside the chat-style whitelist with each arg
-        # shlex.quote-d (like the sidecar `cat`). scripts_dir is resolved from
-        # this module's location — session_viewer.py is co-located here.
-        scripts_dir = Path(__file__).resolve().parent
+        # shlex.quote-d (like the sidecar `cat`). scripts_dir is resolved at the
+        # INSTALLED plugin (WP-001) so the spawned window execs the installed
+        # session_viewer.py, not the spawning worktree copy.
+        scripts_dir = _resolve_installed_scripts_dir()
         exec_line = _build_viewer_exec_line(change_id, worktree_path, scripts_dir)
     elif pre_prompt is not None:
         # Chat-style path with a brief: deliver the pre_prompt via a SIDECAR
@@ -347,7 +411,10 @@ def _build_launch_script(
         # `_origin_stamp`. The hook itself is a no-op unless SULIS_ORIGIN is set
         # at commit time (the run-ulid + confidence the executor supplies for
         # the autonomous stamp), so wiring it is harmless when no origin is set.
-        scripts_dir = Path(__file__).resolve().parent
+        # scripts_dir is resolved at the INSTALLED plugin (WP-001) so the hook
+        # (and the _origin_stamp it locates) come from the install, not the
+        # spawning worktree copy.
+        scripts_dir = _resolve_installed_scripts_dir()
         hooks_dir = scripts_dir / "hooks"
         lines.append(f"export SULIS_SCRIPTS_DIR={shlex.quote(str(scripts_dir))}")
         lines.append("export GIT_CONFIG_COUNT=1")

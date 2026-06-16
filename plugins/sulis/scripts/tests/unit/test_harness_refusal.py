@@ -24,6 +24,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from _brain_location import brain_base_dir
 from _platform_contract import parse_contract_claims
 
 # tests/unit/ -> tests/ -> scripts/ -> sulis/ -> plugins/ -> repo-root
@@ -36,9 +39,12 @@ _CONTRACT = (
     / "platform-contracts"
     / "github-actions.md"
 )
-_LIFECYCLERUN_DIR = (
-    _REPO_ROOT / ".brain" / "instances" / "product-development" / "lifecyclerun"
-)
+# Provenance records (LifecycleRuns) are no longer committed in-repo — they live
+# in the user-level central brain (de-branch-scope-the-brain / dogfood-central).
+# The repo's durable footprint is the ULID *pointer* in the committed contract;
+# the record itself resolves under the central captures root, which a fresh
+# checkout / CI / the test-isolated state dir will not contain.
+_LIFECYCLERUN_DIR = brain_base_dir(_REPO_ROOT) / "product-development" / "lifecyclerun"
 
 
 def test_refusal_output_carries_no_fabricated_source() -> None:
@@ -58,8 +64,12 @@ def test_refusal_output_carries_no_fabricated_source() -> None:
 
 
 def test_refusal_run_was_persisted() -> None:
-    """The harness run that produced the contract persisted a LifecycleRun —
-    the refusal verdict has durable provenance, not just prose (A-8)."""
+    """The harness run that produced the contract has durable provenance: the
+    committed contract carries a ULID *pointer* to a persisted LifecycleRun
+    (A-8). Post de-branch-scope, the record itself lives in the user-level
+    central brain, not committed in-repo — so its physical presence is verified
+    only when that brain is reachable (a fresh checkout / CI / the test-isolated
+    state dir will not contain it; the durable repo footprint is the pointer)."""
     text = _CONTRACT.read_text(encoding="utf-8")
     import re
 
@@ -67,7 +77,9 @@ def test_refusal_run_was_persisted() -> None:
     assert m, "Contract must carry a ULID-shaped harness-run reference."
     run_id = m.group(1)
     run_file = _LIFECYCLERUN_DIR / f"{run_id}.jsonld"
-    assert run_file.is_file(), (
-        f"Expected the LifecycleRun for harness-run {run_id} persisted at "
-        f"{run_file} — provenance must be durable, not asserted."
-    )
+    if not run_file.is_file():
+        pytest.skip(
+            f"LifecycleRun {run_id} lives in the user-level central brain "
+            f"({run_file}); not present in this environment. The durable "
+            "in-repo footprint is the ULID pointer asserted above."
+        )

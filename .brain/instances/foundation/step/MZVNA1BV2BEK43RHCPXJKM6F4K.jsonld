@@ -1,0 +1,16 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "change-lifecycle",
+  "id": "dna:step:MZVNA1BV2BEK43RHCPXJKM6F4K",
+  "input_artifacts": [
+    "SPEC.md"
+  ],
+  "mechanism": "mixed",
+  "name": "design",
+  "output_artifacts": [
+    "work-packages",
+    "TDD.md"
+  ],
+  "state": "active",
+  "sys_status": "active"
+}

@@ -94,6 +94,37 @@ def test_find_eligible_uses_computed_status_when_paths_provided(tmp_path):
     assert results[0].eligible is True
 
 
+def test_find_eligible_for_prefixed_id(tmp_path):
+    """WP-001 (CH-5DMB1N): eligibility computes correctly for a prefixed id.
+
+    A prefixed `CH-…-WP-NNN` WP whose origin branch exists with green CI
+    becomes a candidate — the WP-file glob and branch resolution route the
+    NNN tail through the shared `wp_nnn_suffix`. Retained alongside the legacy
+    bare-id `test_find_eligible_uses_computed_status_when_paths_provided`.
+    """
+    paths = _make_paths(tmp_path)
+    _make_wp_file(paths.wp_dir, "CH-5DMB1N-WP-001", "ready")
+
+    wps = [WPRow(id="CH-5DMB1N-WP-001", title="Ready", primitive="extend",
+                 status="step-7-complete")]
+
+    with patch("_wpxlib.is_sha_on_branch") as mock_on_branch, \
+         patch("_wpxlib._gh_branch_exists") as mock_branch_exists, \
+         patch("_wpxlib._gh_branch_ci_green") as mock_ci:
+        mock_on_branch.return_value = False
+        mock_branch_exists.return_value = True
+        mock_ci.return_value = True
+
+        results = find_eligible_branches(
+            wps, "acme/repo", paths.wp_dir,
+            paths=paths, base_branch="dev",
+        )
+
+    assert len(results) == 1
+    assert results[0].wp == "CH-5DMB1N-WP-001"
+    assert results[0].eligible is True
+
+
 def test_find_eligible_uses_computed_status_for_dep_check(tmp_path):
     """A WP's dependency whose stored cell says `done` but whose
     computed value is `step-7-complete` (reverted) blocks the

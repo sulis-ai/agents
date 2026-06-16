@@ -192,6 +192,25 @@ one session, always in sync. Closing the desktop window just **detaches**
 that view — the session keeps running, and you can reopen it (or pick it up
 in the cockpit) any time. Closing a window never ends the work.
 
+**Context-carry when started FROM another change (#123).** If you run `start`
+from inside a change-bound session (the env has a parent `SULIS_CHANGE_ID` —
+e.g. an idea surfaced mid-change, or a dependency), the tool **automatically**
+(a) records a durable link on the new change (`parent_change` +
+`relationship: builds_on | depends_on`, in both the manifest and the global
+record) and (b) seeds the new change's `CONTEXT.md` with a **"Carried from
+{parent}"** section drawn from the parent's Working Set — so the spawned
+session *discovers* the link + the parent's reasoning through the CONTEXT.md it
+already reads at startup, with no manual relaying between the two sessions. For
+a change **more than one hop deep**, the section also walks the chain to the
+**origin** and lists the full **lineage** (each ancestor + link) plus the
+origin's Working-Set excerpt — so context two-plus changes back is reachable,
+not lost (#124). Use
+`--relationship depends_on` for the dependency case (default `builds_on`). This
+is durable carry, not a live wire (the critical-thinking call: a state gap, not
+a transport gap). It's best-effort — a carry failure never blocks `start` — and
+the carry is only as rich as the parent's Working Set, so keep that populated
+as you work.
+
 **6. Report (Rule 1 + Rule 2).** Parse the JSON on stdout. Lead with the
 outcome; carry the handle in parentheses:
 
@@ -808,6 +827,30 @@ the founder always owns the proceed-anyway decision. Block-by-default
 applies only to verdict=fail (zero coverage), which is genuinely
 broken state.
 
+**4.9.5. Observed-verdict gate — the hard PRE-merge check (MUST, #122).**
+Gates 4.8/4.9 above *produce* the verdict (drive scenarios / check
+requirements, depositing TestResults). This step *enforces* it at the merge
+boundary: run `sulis-change verify-verdict`, which reads the **recorded**
+verdict (deposited TestResults — both the SRD route and the scenario route,
+no re-drive) and **refuses the merge** if it's unmet. This is what makes the
+verdict gate the *merge* (and therefore the release the robot cuts on merge),
+not just the post-merge `shipped` flag — `mark-shipped` keeps the same check
+as the post-merge backstop (defense-in-depth).
+
+```bash
+"$SCRIPTS_DIR/sulis-change" verify-verdict --handle CH-01HQ8X \
+  --repo-root <main-repo-root>
+```
+
+- **Exit 0** → the verdict is met; proceed to the squash-merge.
+- **Exit 1** → STOP. Do **not** squash-merge. Surface the reason in plain
+  English (the unverified requirements/scenarios) and route back to driving
+  the verification — mirrors the review gate's block. A genuinely conscious
+  override is the founder's call (the same shape as a review CONCERN), never
+  an automatic `--force`.
+- **Exit 3** → resolution/tooling error; treat as advisory (like 4.9's
+  WORST=error) — the founder owns proceed-anyway.
+
 **5. Squash-merge** (only after green + confirmation):
 
 ```bash
@@ -848,6 +891,26 @@ a change marked shipped + branch deleted while the merge never landed). For a
 **manual** merge with no PR, pass `--merge-sha <the merge commit on main>` (it's
 verified to be an ancestor of `origin/main`). Only for genuine edge cases,
 `--force` overrides the guard and records the override on the change record.
+
+**6.5. Confirm the release the robot cut — by the merge commit, never "the
+latest run" (#121).** Merging to `main` fires the release robot
+(`release-on-merge.yml`), which bumps the version + tags. Before reporting a
+release, confirm it landed — but the run for THIS merge is **not created the
+instant the merge lands**, so `gh run list --workflow=release-on-merge
+--limit 1` *races*: it can return the PREVIOUS merge's run and report success
+against a stale release (caught only by noticing no new `release:` commit
+appeared on `main`). Use the race-free helper, which polls for the run whose
+`headSha` IS this merge commit:
+
+```bash
+MERGE_SHA=$(gh pr view <PR#> --json mergeCommit -q .mergeCommit.oid)
+"$SCRIPTS_DIR/wpx-confirm-release" --repo <org/repo> --merge-sha "$MERGE_SHA"
+```
+
+Exit 0 = the version was cut — report it. Exit 2 = no run for this commit
+appeared, so the cut could **not** be confirmed; do NOT report it released
+(cross-check: a fresh `release: sulis v…` commit on `origin/main`). **Never
+confirm a release off `--limit 1`** — match the run to the merge commit.
 
 **7. Report** (include the lessons captured at step 4.6 and the release note
 recorded at step 4.7, if any):
@@ -960,8 +1023,11 @@ footprint before touching anything:
 "$SCRIPTS_DIR/sulis-change" nuke --handle CH-01HQ8X
 ```
 
-(Use `--slug <slug>` instead of `--handle` when you resolved the change by
-slug — the tool accepts either.)
+(Use `--slug <slug>` or `--change-id <full ULID>` instead of `--handle` when
+you resolved the change another way — the tool accepts any of the three. When a
+handle is shared by more than one change, `nuke` **refuses** and lists the
+candidates — each with its readable name + branch — so you pick the right one
+with `--change-id` rather than risking the wrong change.)
 
 **3. Echo the footprint + the irreversible step, and require an explicit
 yes** (MUC-F3 — never act on vague phrasing like "get rid of this"):

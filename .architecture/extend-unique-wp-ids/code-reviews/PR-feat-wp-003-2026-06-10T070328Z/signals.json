@@ -1,0 +1,45 @@
+{
+  "pr": "feat/wp-003-reconcile-standards-supersede-parked",
+  "project": "extend-unique-wp-ids",
+  "timestamp": "2026-06-10T070328Z",
+  "base": "change/extend-unique-wp-ids",
+  "verdict": "PASS",
+  "outcome_plain": "Ready to merge",
+  "diff": {
+    "files_changed": 6,
+    "files_modified": 2,
+    "files_added": 1,
+    "files_deleted": 3,
+    "lines_added": 36,
+    "lines_removed": 284,
+    "all_docs": true
+  },
+  "build_verification": {
+    "errors": 0,
+    "notes": "No typechecker/linter applies to markdown prose. wpx unit suite ran green at Step 6: 4 + 337 passed, 0 failed (confirms parked-stub retirement broke no test)."
+  },
+  "pr_hygiene": {
+    "scope": {"severity": "none"},
+    "size": {"severity": "none", "lines": 320, "files": 6},
+    "safety": {"severity": "none", "migrations": 0, "schemas": 0, "secrets": 0, "infra": 0},
+    "completeness": {"severity": "none"}
+  },
+  "lenses": {
+    "architecture": {"in_changes": 0, "in_neighbours": 0, "surfaced": false},
+    "security": {"in_changes": 0, "in_neighbours": 0, "surfaced": false},
+    "quality": {"in_changes": 0, "in_neighbours": 0, "surfaced": false}
+  },
+  "findings": [],
+  "draft_deltas": [],
+  "auto_downgrade_triggers": [],
+  "self_attestation": {
+    "CR-01": "n/a (docs); mechanical gate = wpx suite, green at Step 6",
+    "CR-02": "single-reader pass justified (within carve-out)",
+    "CR-03": "full-file reads",
+    "CR-04": "evidence discipline",
+    "CR-05": "severity rubric applied; 0 findings",
+    "CR-06": "verdict computed PASS; no downgrade fired",
+    "CR-07": "all three lenses produced output",
+    "CR-09": "PR hygiene applied; all primitives none"
+  }
+}

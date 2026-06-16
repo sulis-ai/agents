@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+"""sulis-sandbox-config — emit the Claude Code OS-sandbox settings block (WP-004).
+
+Prints the ``sandbox`` block for ``settings.json`` with ``filesystem.allowWrite``
+GENERATED from the write-roots resolver (``_file_scope.sandbox_write_roots`` /
+WP-002) — so the operator pastes a generated block instead of hand-maintaining a
+path list that would drift from the L2 file-tools scope (ADR-004 single source
+of truth). It carries NO writable-path logic of its own — it marshals the
+resolver's output into the verified sandbox-config shape.
+
+Scope (``SULIS_CHANGE_ID`` / ``SULIS_REPO_ROOT``) comes from the launch
+environment (or ``--change-id`` / ``--repo-root``), never widened by the caller.
+
+Usage:
+    SULIS_CHANGE_ID=<ulid> SULIS_REPO_ROOT=<repo> \\
+        sulis-sandbox-config --proxy-host egress.proxy.internal [--strict]
+
+Honesty (locus iii / OS): closes GAP-α (accidental over-reach) only when the
+sandbox is enabled; GAP-β (TLS-aware egress / deliberate exfil) is DEFERRED;
+operator-proof (SC-E9) needs ``--strict`` applied as a *managed* setting, which
+only a consumer can do. See references/sandbox-enable-recipe.md.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+
+from _sandbox_config import emit_sandbox_config  # noqa: E402
+
+
+def main(argv: "list[str] | None" = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="sulis-sandbox-config",
+        description="Emit the Claude Code OS-sandbox settings block "
+        "(allowWrite generated from the write-roots resolver).",
+    )
+    parser.add_argument(
+        "--proxy-host",
+        required=True,
+        help="The safe-fetch proxy egress host — the ONLY allowed domain. "
+        "A broad allowlist is the GAP-β exfil surface (deferred); pass the "
+        "proxy host only.",
+    )
+    parser.add_argument(
+        "--change-id",
+        default=os.environ.get("SULIS_CHANGE_ID", ""),
+        help="Change ULID (default: $SULIS_CHANGE_ID).",
+    )
+    parser.add_argument(
+        "--repo-root",
+        default=os.environ.get("SULIS_REPO_ROOT", ""),
+        help="Repository root (default: $SULIS_REPO_ROOT).",
+    )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Emit the consumer-managed operator-proof keys "
+        "(failIfUnavailable / allowUnsandboxedCommands:false). These only bind "
+        "as MANAGED settings (SC-E9) — Sulis ships the recipe, not the policy.",
+    )
+    parser.add_argument(
+        "--key",
+        default="sandbox",
+        help="Top-level settings key to nest the block under "
+        "(default: 'sandbox'; pass empty to print the bare block).",
+    )
+    args = parser.parse_args(argv)
+
+    if not args.change_id:
+        parser.error("no change id — set $SULIS_CHANGE_ID or pass --change-id.")
+    if not args.repo_root:
+        parser.error("no repo root — set $SULIS_REPO_ROOT or pass --repo-root.")
+
+    block = emit_sandbox_config(
+        args.change_id,
+        repo_root=Path(args.repo_root),
+        proxy_egress_host=args.proxy_host,
+        strict=args.strict,
+    )
+    payload = {args.key: block} if args.key else block
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

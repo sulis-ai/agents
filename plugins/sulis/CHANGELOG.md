@@ -1,3 +1,207 @@
+## v0.164.1 — 2026-06-14
+
+**Patch — release-train batch.**
+
+- Dogfood the central Brain: Sulis stores its own working memory in the user-level central brain like an installed user (no in-repo forking). Multi-root read (plugin-relative library + central captures); removed the in-repo brain_location pin; migrated existing dogfood records to central and merged duplicate product entities; repo now ships only the foundation library.
+
+## v0.164.0 — 2026-06-14
+
+**Minor — release-train batch.**
+
+- Work Package ids are now globally unique — minted as {CH-HANDLE}-WP-NNN (e.g. CH-5DMB1N-WP-001) — with legacy bare WP-NNN ids understood for one release. A single shared id matcher feeds all callers; the integration train, branch resolution, and INDEX parsing read both shapes.
+
+## v0.163.1 — 2026-06-13
+
+**Patch — release-train batch.**
+
+- Spawned change windows now run the viewer, daemon, and git hooks from the installed plugin (newest cached version) instead of the spawning change worktree copy; adds a SULIS_SPAWN_SCRIPTS_DIR dev override and a graceful no-install fallback.
+
+## v0.163.0 — 2026-06-13
+
+**Minor — release-train batch.**
+
+- Embed the safe tools into the agent governed action-surface: a Python stdio MCP server (safe_fetch/safe_search/scoped_file) the agent uses instead of raw WebFetch/file ops; a PreToolUse governance hook (within_change_scope on Write/Edit/Bash, allow sulis-*/wpx-*, deny raw curl/wget + WebFetch); one write-roots resolver (brain-location-aware, narrowest-root) shared by file-tools + the sandbox; the OS-sandbox enable recipe; and the governed-action-surface standard. Each rule labelled by enforcement-locus; adversarial subprocess egress (GAP-beta) deferred to a TLS-aware proxy.
+
+## v0.162.0 — 2026-06-13
+
+**Minor — release-train batch.**
+
+- Spawned interactive change sessions start with Claude Code Remote Control enabled by default (named after the change), with a SULIS_SESSION_REMOTE_CONTROL opt-out.
+
+## v0.161.1 — 2026-06-13
+
+**Patch — release-train batch.**
+
+- De-branch-scope the brain: its default home moves to the user-level settings store so captures made inside a change survive the change shipping, instead of being trapped in the throwaway workspace.
+
+## v0.161.0 — 2026-06-13
+
+**Minor — release-train batch.**
+
+- Safe-fetch proxy now returns clean extracted content (trafilatura) instead of raw HTML: a format parameter (raw|text|markdown|structured, default markdown) with a structured JSON contract {url,title,content,links,fetched_at}. Active/hidden content (scripts/comments/hidden nodes) stripped as defence-in-depth; visible-prose injection honestly survives (the control stays treat-as-data + no-raw-egress). Content stays framed as untrusted data.
+
+## v0.160.0 — 2026-06-13
+
+**Minor — release-train batch.**
+
+- Agent execution-boundary hardening, layers 1-2: a mediated safe-fetch/search proxy (no raw agent egress; content returned as untrusted data; outbound secret-scrub via detect-secrets + the in-house catalogue) and scoped file-tools (read/write/move/remove refused outside the per-change scope, fail-closed, extending within_change_scope). 14 scenarios; L3 OS-sandbox is the next phase.
+
+## v0.159.1 — 2026-06-12
+
+**Patch — release-train batch.**
+
+- Close 4 WP/CI tooling-friction items surfaced by the daemon-wedge change: branch-ci triggers on canonical wp/** branches; executor + architect emit/lint the canonical names + INDEX header; wpx-step12 force-removes worktrees. Plus harden the daemon grace/idle parsers against non-finite (inf) overrides.
+
+## v0.159.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Self-heal a wedged session daemon: detect a wedged (vs mid-boot) singleton-lock holder, PID-reuse-safely verify and kill it, reclaim the lock and boot fresh — so a wedged daemon no longer blocks every change spawn.
+
+## v0.158.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Bounded spiral-back on the change-lifecycle Workflow (tracker task #96 / B4, completes Phase B): the Workflow now carries reverse edges (each stage can step BACK one, [via spiral-back]); is_transition_allowed encodes the checkable rule (forward any distance / same / single-stage back allowed; a bigger backward jump is not a spiral-back); sulis-change stage consults it against the trace-derived current stage (B3) and WARNS on a graph-jumping transition (advisory, not a hard gate). The change-lifecycle is now a real graph the stage-machine reasons over.
+
+## v0.157.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Derive a change current-stage + history from the run-trace (#129 B3): ChangeService.stage_history/current_stage read the change-stage:* LifecycleRuns the change produced (B2), time-ordered — the run-sequence IS the authoritative progress, not a hand-written stage string. sulis-change stage --show reads it. The dashboard/status consumer-switch (retire the stage-string as source-of-truth) is the fast-follow.
+
+## v0.156.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- DaemonStartError now surfaces the CAUSE (#131): the daemon stderr log tail + the spawned process exit code are folded into the error, instead of a bare 30s timeout. Root cause of the founder incident: a wedged-but-alive daemon holds the singleton flock (flock only auto-releases on death) so spawns defer + time out — the real reason (singleton lock held but no live socket) sat only in a log. Now it is in the error itself, so the next occurrence is diagnosable. The wedge self-heal (kill the wedged holder + retry) is a captured follow-on.
+
+## v0.155.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- The session executing a change leaves a durable per-stage trace (#129 B2): every change links to the change-lifecycle Workflow (Change.journey defaults to it on emit), and each stage transition (sulis-change stage) emits a LifecycleRun (step_name=change-stage:<stage>) — auto-stamped produced_by_change via the #67 stamping seam, written to the MAIN repo brain (resolved from the worktree) so it co-locates with the Change entity. The run-sequence IS the change progress; the cockpit can read it instead of a stage-string. B3 (derive stage/history from the trace) + B4 (#96 spiral-back) next.
+
+## v0.154.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Tool-level guard against cross-change worktree removal (#130, SAFETY). within_change_scope refuses any removal path outside the named change dir (cross-change/out-of-scope/path-traversal/symlink-escape/cwd/missing-change-id all blocked, fail-closed). Wired into git_worktree_remove (the primitive) + wpx-worktree remove (the per-WP tool, now --change-id-scoped). The prior prose warning (#211) failed twice — this makes the destructive glob-sweep structurally impossible on the sanctioned path. Hypothesis property pins the safety invariant: no out-of-scope path is ever allowed.
+
+## v0.153.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- User-configurable brain location (#127): one brain_base_dir resolver honoured by every call site — explicit > SULIS_BRAIN_BASE_DIR env > repo-contract brain_location field > default <repo>/.brain/instances (unchanged, non-disruptive). Closes the gap where emitters honoured the env but the change-entity wiring hard-coded <repo>/.brain. The brain is the user data; they set where it lives (a dir or their own repo). Server-side stays deferred (the spiral call).
+
+## v0.152.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- The change-lifecycle is now a first-class Workflow (#129 B1): authored the canonical change-lifecycle Workflow instance (six Steps recon→specify→design→implement→review→ship, initial=recon, terminal=ship, forward transitions; each Step mechanism=mixed — the session is the human+agent executor) + added the additive Change.journey → Workflow link (the Scenario.journey precedent; no new entity). The Workflow is the durable definition; a session executes it; the per-stage LifecycleRuns (B2) become its progress trace.
+
+## v0.151.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Change-as-transaction (#67 slice 3c, closes #67): ChangeService.produced/evolved query the change transaction set; rollback SOFT-deletes the entities a change produced (sys_status=deleted, record kept as audit) leaving evolved-only + other changes untouched; ship=commit leaves them live. Wired into nuke (state->nuked + rollback). Adds iter_entities to the EntityRepository port + LocalFileEntityAdapter + the stamping wrapper.
+
+## v0.150.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Stamp-on-emit (#67 slice 3b): when a change is active (SULIS_CHANGE_ID), every entity emitted is tagged with the change that produced it (produced_by_change) or, when a different change revises it, appended to evolved_by_change. A ProvenanceStampingRepository decorator over the EntityRepository port, wired at the single _try_adapter choke point so all design-stage + event emissions stamp through one seam. No change active -> plain adapter, unchanged. Now what a change produced is queryable.
+
+## v0.149.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Provenance edges on every product-development entity (#67 slice 3a): produced_by_change (prov:wasGeneratedBy) + evolved_by_change (prov:wasRevisionOf), both optional + additive. The reverse side of Change — what a change produced/revised becomes queryable (the transaction set for ship=commit / nuke=rollback). Uniform across all 18 PD entities; Change itself excluded (its lineage is parent_change). Pre-existing instances stay valid.
+
+## v0.148.1 — 2026-06-12
+
+**Patch — release-train batch.**
+
+- Property-based (hypothesis) test on compose_change: for ANY well-formed input across the 22-primitive x 3-state x optional-field space, the composed Change entity is schema-valid and the invariants hold (in-flight has no shipped_at; a parent link always carries a relationship; id reuses the ULID; absent for_product omitted not null). The regression guard for the defect class proving caught by hand. Folds under #119.
+
+## v0.148.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- ChangeService — a programmatic handler owning the Change-entity lifecycle (open/ship/nuke/get) over the EntityRepository port, importable as the SDK and called by the CLI. sulis-change start now routes through it (open=in-flight); mark-shipped transitions the entity to shipped; nuke transitions it to nuked. Moves the lifecycle from scattered prose to one code path.
+
+## v0.147.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- for_product is now an OPTIONAL link on the Change entity — a change can precede or sit outside a product (infra/methodology work, or the change that creates the first product) and still become a Change entity in the brain. Schema drops for_product from required; emission + start-wiring emit product-less changes.
+
+## v0.146.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Change is now a first-class brain entity (prov:Activity, sibling to LifecycleRun). Adds the compiled change.schema.json, the _change_emission helper + sulis-emit-change CLI (backfill), and wires sulis-change start to emit a Change node into the brain (best-effort, non-fatal). Mint admitted (DR-031). Provenance edges + transaction commit/rollback ride on #67.
+
+## v0.145.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Version-skew nudge: a SessionStart hook detects when a session loaded a Sulis plugin version older than the newest in the cache (stale code) and prompts a reload. New sulis-version-skew detector (pure version_skew() in _version_pick + CLI). Catches every fresh/resumed/spawned session; documents the honest limit that an already-running session is only caught at its next boundary (#125).
+
+## v0.144.0 — 2026-06-12
+
+**Minor — release-train batch.**
+
+- Reframe Sulis's Brevity Discipline as Progressive Disclosure, grounded in the Cognitive Load Standard (CL-01/02/04): default to a minimal payload, OFFER depth as a one-line pointer rather than dumping it, and expand freely on demand — the discipline must never block getting more. Length targets become the default payload (lift on request), not a cap; brevity governs extraneous bloat, never requested/intrinsic depth.
+
+## v0.143.0 — 2026-06-11
+
+**Minor — release-train batch.**
+
+- Carry the full ancestry chain to origin, not just one hop (#124). When a change is started two-plus hops deep, the 'Carried from' section now walks parent_change to the origin and lists the full lineage (each ancestor + link) plus the origin's Working-Set excerpt — so context from changes further back than the immediate parent is surfaced + navigable, not lost. Cycle/depth-bounded; extends #123.
+
+## v0.142.0 — 2026-06-11
+
+**Minor — release-train batch.**
+
+- Carry link + context when a change is started from another (#123). When `sulis-change start` runs from inside a parent change session, it records a durable link (parent_change + builds_on/depends_on) and seeds the new change's CONTEXT.md with a 'Carried from {parent}' section from the parent's Working Set — so the spawned session discovers the context it already reads, with no manual relaying between sessions. Durable carry, not a live wire (Agent Teams was a topology mismatch). Best-effort; never blocks start.
+
+## v0.141.0 — 2026-06-11
+
+**Minor — release-train batch.**
+
+- Gate the merge on the observed verdict, not just the shipped flag (#122). #118 checked the verdict at mark-shipped (post-merge), so unverified work could merge + release before the flag was refused. New sulis-change verify-verdict runs as a hard PRE-merge gate in the ship flow (refusing the merge on an unmet verdict, read-only); mark-shipped keeps the check as the post-merge backstop. Now the verdict gates the merge/release itself.
+
+## v0.140.2 — 2026-06-11
+
+**Patch — release-train batch.**
+
+- Identify a change by its unique id, not the non-unique 6-char handle, across recreate/focus/ship/nuke (with safe disambiguation); add a Hypothesis property-test layer.
+
+## v0.140.1 — 2026-06-11
+
+**Patch — release-train batch.**
+
+- Fix the release-confirm race (#121): confirming a release by 'the latest release-on-merge run' (--limit 1) can grab the PREVIOUS merge's run and report success against a stale release. New wpx-confirm-release matches the run by the merge commit's sha (race-free), reporting an honest 'unconfirmed' if no run for the commit appeared yet — never a stale-run false success.
+
+## v0.140.0 — 2026-06-11
+
+**Minor — release-train batch.**
+
+- Ship-time verdict gate gains the scenario route (#118 Phase 2). mark-shipped now blocks if EITHER the SRD route (touched Requirements verified) OR the scenario route (every emitted Scenario the change authored observed green) is unmet — covering founder-facing changes whose verification lives in Scenarios rather than an SRD. The authored scenarios file records each scenario's emitted brain id directly, so the check reads the ids and confirms a passing TestResult for each. Conscious --force escape unchanged.
+
+## v0.139.0 — 2026-06-11
+
+**Minor — release-train batch.**
+
+- Gate ship on a recorded observed verdict, not prose (#118). mark-shipped now enforces the Definition-of-Done verdict (every touched Requirement backed by a passing TestResult) as a hard precondition in the script — refusing to mark a change shipped without it (conscious --force escape). Moves the completion gate from skippable SKILL prose into the ship mechanism: completion is owned by the recorded verdict, not self-asserted. Root-cause fix for work reported 'completed' when it wasn't.
+
+## v0.138.0 — 2026-06-11
+
+**Minor — release-train batch.**
+
+- Gate scenarios at the specify->design boundary (#301): a founder-facing SPEC can no longer reach design without verifiable scenarios. The scenario-required gate now triggers on the SPEC's founder_facing flag (not just touched UI paths), and /sulis:design hard-stops on a founder-facing spec with none — mirroring the #45 visual-contract gate. Completes the specify-side of #103.
+
 ## v0.137.1 — 2026-06-10
 
 **Patch — release-train batch.**

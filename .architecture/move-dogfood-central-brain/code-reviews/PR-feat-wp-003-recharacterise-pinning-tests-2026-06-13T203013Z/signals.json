@@ -1,0 +1,41 @@
+{
+  "pr": "feat/wp-003-recharacterise-pinning-tests",
+  "base": "change/move-dogfood-central-brain",
+  "timestamp": "2026-06-13T203013Z",
+  "verdict": "PASS",
+  "verdict_plain": "Ready to merge",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "ruff_check": "pass",
+    "ruff_format": "pass",
+    "compileall": "pass",
+    "type_check": "n/a (repo-contract type_check empty; stdlib-only tooling)"
+  },
+  "hygiene": {
+    "scope": {"severity": "none", "commit_type_spread": ["test"], "module_fan_out": 1},
+    "size": {"severity": "none", "lines_added": 96, "lines_removed": 3, "files_changed": 2},
+    "safety": {"severity": "none", "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0},
+    "completeness": {"severity": "none", "new_source_without_test": 0}
+  },
+  "lenses": {
+    "architecture": {"in_changes": 0, "in_neighbours": 0, "status": "nothing surfaced"},
+    "security": {"in_changes": 0, "in_neighbours": 0, "status": "nothing surfaced"},
+    "quality": {"in_changes": 1, "in_neighbours": 0, "status": "1 low finding, resolved inline"}
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "lens": "quality",
+      "severity": "low",
+      "ring": "changes",
+      "file": "plugins/sulis/scripts/tests/unit/test_dogfood_resolves_central.py",
+      "line": 77,
+      "summary": "Test-isolation convention drift: hardcoded /tmp/sulis-dogfood-home instead of pytest tmp_path fixture used by sibling tests.",
+      "rule": "CR-05 (quality) + CP-01 (convention)",
+      "resolution": "resolved-inline",
+      "delta": null
+    }
+  ],
+  "draft_deltas": [],
+  "auto_downgrade_triggers": []
+}

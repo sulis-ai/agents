@@ -1,0 +1,46 @@
+{
+  "wp": "WP-008",
+  "project": "use-change-id-not-handle",
+  "branch": "feat/wp-008-stateful-model-based-test",
+  "base": "change/fix-use-change-id-not-handle",
+  "timestamp": "2026-06-11T150218Z",
+  "verdict": "PASS",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "ruff": "clean",
+    "py_compile": "ok",
+    "pytest_file": "5 passed",
+    "pytest_unit_suite": "2612 passed, 9 skipped"
+  },
+  "pr_hygiene": {
+    "scope": {"commit_types": ["test"], "module_fan_out": 1, "severity": "clean"},
+    "size": {"added": 486, "removed": 0, "files_changed": 1, "severity": "low"},
+    "safety": {"migrations": 0, "schema_idl": 0, "secrets": 0, "infra": 0, "severity": "clean"},
+    "completeness": {"new_source_without_test": 0, "severity": "clean"}
+  },
+  "findings": {
+    "in_changes": [
+      {
+        "id": "F-01",
+        "severity": "low",
+        "lens": "quality",
+        "file": "tests/unit/test_change_lifecycle_stateful.py",
+        "line": 99,
+        "summary": "Cryptic lambda generator-throw idiom for raising _Refused",
+        "resolution": "fixed-inline",
+        "detail": "Replaced with named _raise_refused() helper matching the example-based suites' convention; ruff + tests re-run green."
+      }
+    ],
+    "in_neighbours": []
+  },
+  "draft_deltas": [],
+  "lenses": {
+    "architecture": {"findings": 0, "note": "test-only; no domain/infra imports, no network/timeouts/secrets; change_worktree_dir verified pure path computation"},
+    "security": {"findings": 0, "note": "synthetic ULID constants; no auth/injection/secret surface; test-only diff"},
+    "quality": {"findings": 1, "note": "1 low readability finding, fixed inline; CR-10 perf scan clean (dict .get() not DB/RPC/FS); dead-surface clean"}
+  },
+  "self_attestation": {
+    "CR-01": true, "CR-02": true, "CR-03": true, "CR-04": true,
+    "CR-05": true, "CR-06": true, "CR-07": true, "CR-09": true
+  }
+}

@@ -30,7 +30,7 @@ def test_missing_contract_returns_empty_shape(tmp_path):
     assert c == {
         "profile": None, "contribution_model": None,
         "artifacts": [], "deploy_target": None,
-        "branch_convention": None,
+        "branch_convention": None, "brain_location": None,
     }
 
 

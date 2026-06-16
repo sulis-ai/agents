@@ -1,0 +1,23 @@
+{
+  "pr": "feat/wp-002-nuke-safe-matcher",
+  "base": "change/fix-use-change-id-not-handle",
+  "kind": "backend",
+  "build_verification": { "lint_new_errors": 0, "tests_passed": 42, "tests_failed": 0 },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["wp-002 single concern"], "severity": "low" },
+    "size": { "lines_added": 414, "lines_removed": 102, "files_changed": 3, "severity": "low" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none" },
+    "completeness": { "new_source_without_test": 0, "new_tests": 1, "severity": "none" }
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+    "in_neighbours": { "total": 1, "note": "pre-existing per-branch list_all_changes scan; bounded-N benign" }
+  },
+  "lenses": {
+    "architecture": "nothing surfaced",
+    "security": "nothing surfaced",
+    "quality": "nothing surfaced (7/7 outputs)"
+  },
+  "verdict": "PASS",
+  "draft_deltas": 0
+}

@@ -1,0 +1,16 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "change-lifecycle",
+  "id": "dna:step:C46Q6J7AJX16RA0J6VEX1T5X4R",
+  "input_artifacts": [
+    "code",
+    "tests"
+  ],
+  "mechanism": "mixed",
+  "name": "review",
+  "output_artifacts": [
+    "review-verdict"
+  ],
+  "state": "active",
+  "sys_status": "active"
+}

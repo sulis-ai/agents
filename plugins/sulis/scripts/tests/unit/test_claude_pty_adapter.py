@@ -114,10 +114,15 @@ def test_spawn_argv_is_interactive(adapter):
     assert "stream-json" not in argv
 
 
-def test_spawn_argv_omits_positional_when_no_brief_change_id(adapter):
+def test_spawn_argv_omits_positional_when_no_brief_change_id(adapter, monkeypatch):
     """With ``spec.brief_change_id is None`` (the frozen-caller default) there
     is no sidecar to resolve — the argv is the bare interactive invocation, no
-    positional."""
+    positional.
+
+    Remote Control (default-ON) is opted out here so this test stays focused on
+    the positional/brief concern; the default-on flag is covered by
+    test_pty_remote_control.py."""
+    monkeypatch.setenv("SULIS_SESSION_REMOTE_CONTROL", "0")
     argv = adapter.spawn_argv(_spec(brief_change_id=None))
     assert not any("cat " in token for token in argv)
     assert argv[-1] == "sulis"
@@ -134,6 +139,9 @@ def test_spawn_argv_omits_positional_when_sidecar_absent(
     import _change_session as cs
 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    # Opt Remote Control out so the trailing-token assertion stays focused on
+    # the session-id pin (the default-on flag is covered separately).
+    monkeypatch.setenv("SULIS_SESSION_REMOTE_CONTROL", "0")
     argv = adapter.spawn_argv(_spec(brief_change_id=_CHANGE_ID))
     assert not any("cat " in token for token in argv)
     # No brief positional: the trailing token is the pinned session id, which is
@@ -193,6 +201,9 @@ def test_spawn_argv_rejects_malformed_change_id(adapter, monkeypatch, tmp_path):
     a path from it — ULID validation is retained as defence-in-depth before the
     path join."""
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    # Opt Remote Control out so this stays focused on malformed-id rejection
+    # (the default-on flag is covered by test_pty_remote_control.py).
+    monkeypatch.setenv("SULIS_SESSION_REMOTE_CONTROL", "0")
     # 26 chars but not Crockford-base32 (contains 'I', 'L', 'O', 'U') -> not a
     # valid ULID, yet it has no leading '-' and no control chars so it passes
     # __post_init__ and reaches the resolver.

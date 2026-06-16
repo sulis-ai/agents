@@ -27,6 +27,7 @@ from _scenario_required_gate import (
     exemption_reason_for_change,
     scenario_gate,
     scenarios_present_for_change,
+    spec_declares_founder_facing,
 )
 
 
@@ -71,11 +72,13 @@ def main(argv: list[str] | None = None) -> int:
     touched = _touched_paths(repo_root, args.base)
     present = scenarios_present_for_change(repo_root, args.stem)
     exemption = args.exempt_reason or exemption_reason_for_change(repo_root, args.stem)
+    spec_ff = spec_declares_founder_facing(repo_root, args.stem)
 
     v = scenario_gate(
         touched_paths=touched,
         scenarios_present=present,
         exemption_reason=exemption,
+        spec_founder_facing=spec_ff,
     )
     print(json.dumps({
         "verdict": v.verdict,
@@ -86,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
         "exemption_reason": v.exemption_reason,
         "reason": v.reason,
         "touched_path_count": len(touched),
+        "spec_founder_facing": spec_ff,
     }, indent=2))
     return 1 if v.verdict == "required_missing" else 0
 

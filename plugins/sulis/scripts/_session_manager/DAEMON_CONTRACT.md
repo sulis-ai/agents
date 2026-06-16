@@ -18,6 +18,17 @@ against in parallel.
 |---|---|---|
 | **Socket** (stable, `0o600`, one per user) | `~/.sulis/session-manager.sock` | env `SULIS_SESSION_MANAGER_SOCKET` |
 | **Lock** (singleton arbiter) | `~/.sulis/session-manager.lock` | the daemon's `--lock` flag (CI/test isolation) |
+| **Pidfile** (identity record) | `~/.sulis/session-manager.pid` | the daemon's `--pidfile` flag (CI/test isolation) |
+
+The **pidfile** is the daemon's durable on-disk identity (HD-001): once it holds
+the flock and binds the socket, it writes `{"pid", "start_token",
+"cmdline_marker"}` — where `start_token` is the OS process start-time (via `ps
+-o lstart=`, portable across macOS + Linux), the value a recycled PID cannot
+reproduce. It is removed on a clean shutdown, so the file's presence names a
+*live* daemon. This is the identity a later PID-reuse-safe reclaim verifies a
+kill target against (both `start_token` **and** `cmdline_marker` must match).
+Writing/removing it is **best-effort**: a failed write degrades the reclaim to
+the fail-closed path, it never crashes the daemon's boot.
 
 The parent directory (`~/.sulis/`) is created `0o700` if absent. The socket is
 chmod `0o600` by the engine's `SocketServer.start` (the established local-IPC
@@ -88,6 +99,33 @@ would otherwise open.
 > What the *caller* contract (this WP) guarantees is the matching half:
 > probe-first, spawn-at-most-once-per-caller, and poll-until-live when another
 > caller's daemon wins the race.
+
+### Mid-boot vs wedged (grace-window self-heal, HD-003)
+
+A process that loses the lock race does **not** give up the instant the socket
+is dark. It polls up to a **grace window** (`SULIS_DAEMON_WEDGE_GRACE_SECS`,
+default `10s` — deliberately longer than the legacy 5s mid-boot poll so a slow-
+but-legitimate boot is never mistaken for a wedge) for the holder's socket to
+come live:
+
+- **Mid-boot holder** — the socket comes live *within* the window: reuse it,
+  print `READY`, exit `0` (the normal race-loser path, just generously
+  windowed). The holder is **never** touched.
+- **Wedged holder** — the window elapses with the lock still held and no live
+  socket: the holder is declared **wedged** and escalated to the PID-reuse-safe
+  reclaim. The reclaim reads the holder's identity pidfile, verifies it is
+  *still our daemon* (cmdline marker **and** start-token match — fail-closed),
+  and only then `SIGTERM`→bounded-wait→`SIGKILL`s it, clears the stale
+  pidfile + socket, re-acquires the flock, and boots a fresh daemon through the
+  same composition root. A recycled PID whose identity cannot be proven is
+  **never** killed — verification failing closed degrades to today's exact
+  behaviour: the *"singleton lock held but no live socket … ensure-daemon will
+  retry"* line and `exit 1`.
+
+This makes a wedged daemon **self-recover** on the spawn that hits it, rather
+than blocking every spawn until the wedged process happens to die. The reclaim
+lives entirely in the daemon-presence layer; the frozen engine is unmodified
+(ADR-001), and the daemon stays stdlib-only / terminal-only (ADR-003).
 
 ## Lifecycle: idle-empty auto-exit
 

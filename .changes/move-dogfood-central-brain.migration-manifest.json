@@ -1,0 +1,1002 @@
+[
+  {
+    "id": "dna:decision:01KT1884HS4M8W1YAVK8R3RDJR",
+    "rel_path": "product-development/decision/01KT1884HS4M8W1YAVK8R3RDJR.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/decision/01KT1884HS4M8W1YAVK8R3RDJR.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/decision/01KT1884HS4M8W1YAVK8R3RDJR.jsonld",
+    "src_sha256": "675cbe21b0c3e9a82c2ae20a5b01cf0cf5c5815c431574cfb2e1e3d205825318",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:decision:01KT1884R3PVTK7SW3Y5K1EEJ2",
+    "rel_path": "product-development/decision/01KT1884R3PVTK7SW3Y5K1EEJ2.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/decision/01KT1884R3PVTK7SW3Y5K1EEJ2.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/decision/01KT1884R3PVTK7SW3Y5K1EEJ2.jsonld",
+    "src_sha256": "6bad089c93a23f887d6f70cc33a4c0f2b500d1ce694b16950744bb9de19698f9",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:decision:01KT1884YMF97VVWMRQV9RTRR8",
+    "rel_path": "product-development/decision/01KT1884YMF97VVWMRQV9RTRR8.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/decision/01KT1884YMF97VVWMRQV9RTRR8.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/decision/01KT1884YMF97VVWMRQV9RTRR8.jsonld",
+    "src_sha256": "3d199bd2a6b2435b7fa31555bc8275a107c4d344368e07a382085ec675ef0626",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:decision:01KT18855TDGZFEKE29A86539G",
+    "rel_path": "product-development/decision/01KT18855TDGZFEKE29A86539G.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/decision/01KT18855TDGZFEKE29A86539G.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/decision/01KT18855TDGZFEKE29A86539G.jsonld",
+    "src_sha256": "e59a503a390a3d1158c0aa3cc87a775b7ecf1b768a7f01bada1ca91a142a3abd",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:decision:01KTPZ0HP73S9G3Y5CPHG7MHNF",
+    "rel_path": "product-development/decision/01KTPZ0HP73S9G3Y5CPHG7MHNF.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/decision/01KTPZ0HP73S9G3Y5CPHG7MHNF.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/decision/01KTPZ0HP73S9G3Y5CPHG7MHNF.jsonld",
+    "src_sha256": "58a3c8e2f6ade3ac6b23013f307ea9ebdb2111b042b12cc2af2d3cbcc64354bb",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:decision:01KTPZ0HXRA1ZW2KZPC3G60QPM",
+    "rel_path": "product-development/decision/01KTPZ0HXRA1ZW2KZPC3G60QPM.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/decision/01KTPZ0HXRA1ZW2KZPC3G60QPM.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/decision/01KTPZ0HXRA1ZW2KZPC3G60QPM.jsonld",
+    "src_sha256": "cc8b4bcb868b6756ae4e2ec8191c597de78c2a982ce85c21c8d75223450730c5",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:decision:01KTPZ0J5E3R4JAZMMH67VAMRK",
+    "rel_path": "product-development/decision/01KTPZ0J5E3R4JAZMMH67VAMRK.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/decision/01KTPZ0J5E3R4JAZMMH67VAMRK.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/decision/01KTPZ0J5E3R4JAZMMH67VAMRK.jsonld",
+    "src_sha256": "04cf9b5a93578274747d13bd992662ddf214952003c16a7b2e2b69b1d0d79771",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:decision:01KTPZ0JCTNRPCS9AP41BNGF0F",
+    "rel_path": "product-development/decision/01KTPZ0JCTNRPCS9AP41BNGF0F.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/decision/01KTPZ0JCTNRPCS9AP41BNGF0F.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/decision/01KTPZ0JCTNRPCS9AP41BNGF0F.jsonld",
+    "src_sha256": "907b794988ed6414103de27b5ad68fcd5d4a08f6f7ef7640e791f2a4c997ef8c",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:decision:01KTPZ0JM6GMTPP2FHXR7B66YK",
+    "rel_path": "product-development/decision/01KTPZ0JM6GMTPP2FHXR7B66YK.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/decision/01KTPZ0JM6GMTPP2FHXR7B66YK.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/decision/01KTPZ0JM6GMTPP2FHXR7B66YK.jsonld",
+    "src_sha256": "14f70a2b19aec5c6f22784f2184c17a3610d641579fd8f59f291b979a96a0bd5",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:decision:01KTPZ0JVCMBAPT56AHCW1KB8Z",
+    "rel_path": "product-development/decision/01KTPZ0JVCMBAPT56AHCW1KB8Z.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/decision/01KTPZ0JVCMBAPT56AHCW1KB8Z.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/decision/01KTPZ0JVCMBAPT56AHCW1KB8Z.jsonld",
+    "src_sha256": "3056603e7525087b413991830a825531415af637e581c8aa444472295ebbb70a",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:decision:01KTPZ0K3CH1PSNRMD639VJ0ZZ",
+    "rel_path": "product-development/decision/01KTPZ0K3CH1PSNRMD639VJ0ZZ.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/decision/01KTPZ0K3CH1PSNRMD639VJ0ZZ.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/decision/01KTPZ0K3CH1PSNRMD639VJ0ZZ.jsonld",
+    "src_sha256": "56e46c7f831f4f806708ddd117c112a67755c1238f2576820ca1ee5001d29d73",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:decision:01KTPZ0KBYY5WPGH96NVAWV4XH",
+    "rel_path": "product-development/decision/01KTPZ0KBYY5WPGH96NVAWV4XH.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/decision/01KTPZ0KBYY5WPGH96NVAWV4XH.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/decision/01KTPZ0KBYY5WPGH96NVAWV4XH.jsonld",
+    "src_sha256": "0086f137bb0a618fc7f80600c1a7fcd050061a00e432a932c1a47c2beb7cecaf",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:decision:01KTPZ0KK2C7Z8JFJJQH0V9NNN",
+    "rel_path": "product-development/decision/01KTPZ0KK2C7Z8JFJJQH0V9NNN.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/decision/01KTPZ0KK2C7Z8JFJJQH0V9NNN.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/decision/01KTPZ0KK2C7Z8JFJJQH0V9NNN.jsonld",
+    "src_sha256": "9a481084832b23395ec131192e33da7b54d3ed41a4c58269ef31b833ce87a7ef",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:design:4SFEN26WYWYMT9D69QSJRM4BEJ",
+    "rel_path": "product-development/design/4SFEN26WYWYMT9D69QSJRM4BEJ.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/design/4SFEN26WYWYMT9D69QSJRM4BEJ.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/design/4SFEN26WYWYMT9D69QSJRM4BEJ.jsonld",
+    "src_sha256": "7c6b5870939a498dfaf714d4ef2068ed6b0891167f77a8f48f123bf38e27970c",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:design:EEDCDTT7F40JPMXZBV2KRP1ARS",
+    "rel_path": "product-development/design/EEDCDTT7F40JPMXZBV2KRP1ARS.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/design/EEDCDTT7F40JPMXZBV2KRP1ARS.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/design/EEDCDTT7F40JPMXZBV2KRP1ARS.jsonld",
+    "src_sha256": "a00215a1900b40ce53a2c14de98171152c86018a6bf5caf002dd296d47eacb73",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:design:QJV8WCP1BQEDNBN90DVCR7CW8B",
+    "rel_path": "product-development/design/QJV8WCP1BQEDNBN90DVCR7CW8B.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/design/QJV8WCP1BQEDNBN90DVCR7CW8B.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/design/QJV8WCP1BQEDNBN90DVCR7CW8B.jsonld",
+    "src_sha256": "5901de0871f5b3d3dd745dbf762254fb97f37e645097e10c8e165e80409c6a1b",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:design:Z7EXP22KE4GRJS7B71WNXQYNPS",
+    "rel_path": "product-development/design/Z7EXP22KE4GRJS7B71WNXQYNPS.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/design/Z7EXP22KE4GRJS7B71WNXQYNPS.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/design/Z7EXP22KE4GRJS7B71WNXQYNPS.jsonld",
+    "src_sha256": "703b87c21c2deba3c46aad4221f25c83b8e81d88e1592e990ebe86dab977353e",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:lifecyclerun:01KT419R8MQBQ6BNZPXDSKZBHZ",
+    "rel_path": "product-development/lifecyclerun/01KT419R8MQBQ6BNZPXDSKZBHZ.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/lifecyclerun/01KT419R8MQBQ6BNZPXDSKZBHZ.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/lifecyclerun/01KT419R8MQBQ6BNZPXDSKZBHZ.jsonld",
+    "src_sha256": "20f980cd96a8e9a275cd09a6dc40d3caf98669fb579977c3fe451d0a28abacfb",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:lifecyclerun:NN879G9QVNH8Q6H0FKBFCYFFTE",
+    "rel_path": "product-development/lifecyclerun/NN879G9QVNH8Q6H0FKBFCYFFTE.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/lifecyclerun/NN879G9QVNH8Q6H0FKBFCYFFTE.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/lifecyclerun/NN879G9QVNH8Q6H0FKBFCYFFTE.jsonld",
+    "src_sha256": "fdedce38ba00adc6851575fdd91d58eeaad34c17ce373bf624cfa5114630c035",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:lifecyclerun:Q0GXFX856ZY9M7W43YCX3KSE4K",
+    "rel_path": "product-development/lifecyclerun/Q0GXFX856ZY9M7W43YCX3KSE4K.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/lifecyclerun/Q0GXFX856ZY9M7W43YCX3KSE4K.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/lifecyclerun/Q0GXFX856ZY9M7W43YCX3KSE4K.jsonld",
+    "src_sha256": "1d896da79fd5cffccce2a1a930569e5daad9301d9624ef740d448bd5717347bc",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:lifecyclerun:TKX0941W3P1XW7HDZ4Z0GMWJGV",
+    "rel_path": "product-development/lifecyclerun/TKX0941W3P1XW7HDZ4Z0GMWJGV.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/lifecyclerun/TKX0941W3P1XW7HDZ4Z0GMWJGV.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/lifecyclerun/TKX0941W3P1XW7HDZ4Z0GMWJGV.jsonld",
+    "src_sha256": "7b97de27dc8e5091ac46c55112d14ba2846879e06bf9847119d01b2026134e47",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:opportunity:KST8MDFYHQHM1W2E92VJ9RGDXK",
+    "rel_path": "product-development/opportunity/KST8MDFYHQHM1W2E92VJ9RGDXK.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/opportunity/KST8MDFYHQHM1W2E92VJ9RGDXK.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/opportunity/KST8MDFYHQHM1W2E92VJ9RGDXK.jsonld",
+    "src_sha256": "545d989d515137c25104d75e2dac3b7508ceb4adffb192cb617f28fcc74005c7",
+    "edge_rewrite": {
+      "field": "for_product",
+      "from": "dna:product:RQ69GG6PEME648EJD1F3D5185J",
+      "to": "dna:product:HHCZZ6RT2GCMZ0BGPH3PKX0Z9M"
+    }
+  },
+  {
+    "id": "dna:opportunity:W8H8B25QX9S4RJ783M0TR7BWW4",
+    "rel_path": "product-development/opportunity/W8H8B25QX9S4RJ783M0TR7BWW4.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/opportunity/W8H8B25QX9S4RJ783M0TR7BWW4.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/opportunity/W8H8B25QX9S4RJ783M0TR7BWW4.jsonld",
+    "src_sha256": "b688a6f53be33a1e60d60d5494799f81e69edef1bcf6ab8db6f015c4d14f7b55",
+    "edge_rewrite": {
+      "field": "for_product",
+      "from": "dna:product:RQ69GG6PEME648EJD1F3D5185J",
+      "to": "dna:product:HHCZZ6RT2GCMZ0BGPH3PKX0Z9M"
+    }
+  },
+  {
+    "id": "dna:requirement:00KSKXT01V648GNXWQFW8V1FRB",
+    "rel_path": "product-development/requirement/00KSKXT01V648GNXWQFW8V1FRB.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/00KSKXT01V648GNXWQFW8V1FRB.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/00KSKXT01V648GNXWQFW8V1FRB.jsonld",
+    "src_sha256": "c69d296b386de473b18d0acb0b45f78d3dba2183d9e0a27ec14874c4770b5fc8",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:08QYK0Z87YGJZ7MWGVHMDZ7GQE",
+    "rel_path": "product-development/requirement/08QYK0Z87YGJZ7MWGVHMDZ7GQE.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/08QYK0Z87YGJZ7MWGVHMDZ7GQE.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/08QYK0Z87YGJZ7MWGVHMDZ7GQE.jsonld",
+    "src_sha256": "505936ee15f80cb4f849aa96cf16995854a7becc305857bea42294a1634bab1b",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:0FV46M3FJP5NY1HZ0Q25J8CJQY",
+    "rel_path": "product-development/requirement/0FV46M3FJP5NY1HZ0Q25J8CJQY.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/0FV46M3FJP5NY1HZ0Q25J8CJQY.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/0FV46M3FJP5NY1HZ0Q25J8CJQY.jsonld",
+    "src_sha256": "c6ed533c4f130bb85e18350f44bdc63a6b7ed5c3946ddc988acf199690a5b7e9",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:0KFX92DMZC7NMGR0A3CFS4JP6B",
+    "rel_path": "product-development/requirement/0KFX92DMZC7NMGR0A3CFS4JP6B.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/0KFX92DMZC7NMGR0A3CFS4JP6B.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/0KFX92DMZC7NMGR0A3CFS4JP6B.jsonld",
+    "src_sha256": "7c4d088a2b27e72d45e98899404c5723fe94f147a3f0a3daeae7630145743442",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:0PATPS61NY26WW9DG8Q67VEAFE",
+    "rel_path": "product-development/requirement/0PATPS61NY26WW9DG8Q67VEAFE.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/0PATPS61NY26WW9DG8Q67VEAFE.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/0PATPS61NY26WW9DG8Q67VEAFE.jsonld",
+    "src_sha256": "121c39ef63364eb4568634d39f67555bdfd323cf9ece18f33ffecffac2d0b8a1",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:147ZXS6RS6RS7M216ZY5C8KNAE",
+    "rel_path": "product-development/requirement/147ZXS6RS6RS7M216ZY5C8KNAE.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/147ZXS6RS6RS7M216ZY5C8KNAE.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/147ZXS6RS6RS7M216ZY5C8KNAE.jsonld",
+    "src_sha256": "2a18d20652b2146967db5402ed42307740a309ac62123998fa31cf12ca6cf06d",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:1YVQ922F7BM2WZDRZQP0MFN2NT",
+    "rel_path": "product-development/requirement/1YVQ922F7BM2WZDRZQP0MFN2NT.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/1YVQ922F7BM2WZDRZQP0MFN2NT.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/1YVQ922F7BM2WZDRZQP0MFN2NT.jsonld",
+    "src_sha256": "d19b6d226f1ac8425c477dfc5d6e4154aff379ee047d0614babc88d71c52dba7",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:2BYH35P1CF5BAA0C1AD2D2WYYZ",
+    "rel_path": "product-development/requirement/2BYH35P1CF5BAA0C1AD2D2WYYZ.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/2BYH35P1CF5BAA0C1AD2D2WYYZ.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/2BYH35P1CF5BAA0C1AD2D2WYYZ.jsonld",
+    "src_sha256": "bfa18c7f6ca2da12621243919961c248f7d6bfccea007395a74d88fa7bad3fe4",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:2CDHZE8EW4B5Z89BABZDK87F83",
+    "rel_path": "product-development/requirement/2CDHZE8EW4B5Z89BABZDK87F83.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/2CDHZE8EW4B5Z89BABZDK87F83.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/2CDHZE8EW4B5Z89BABZDK87F83.jsonld",
+    "src_sha256": "98fb9a67897525fa1289615a90e8834a4e9a4f1b1f4783f992e06b484af94ee0",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:2FZA5EDG60DJZ5Y753XN6S3EV8",
+    "rel_path": "product-development/requirement/2FZA5EDG60DJZ5Y753XN6S3EV8.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/2FZA5EDG60DJZ5Y753XN6S3EV8.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/2FZA5EDG60DJZ5Y753XN6S3EV8.jsonld",
+    "src_sha256": "5a596f0df16b34a4d7aea98dc8f63e627c89a5160db74b3a8eeaa7107edcd3b8",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:3NACHBC9WWFEGS7X7HM4CY5BCT",
+    "rel_path": "product-development/requirement/3NACHBC9WWFEGS7X7HM4CY5BCT.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/3NACHBC9WWFEGS7X7HM4CY5BCT.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/3NACHBC9WWFEGS7X7HM4CY5BCT.jsonld",
+    "src_sha256": "f8d7ee4185d5ae7be71ca678f4555965b0716871798f724a249b3fa9eb3d3242",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:3W9T2N8E32AW12ZBYXWDGZXZZ4",
+    "rel_path": "product-development/requirement/3W9T2N8E32AW12ZBYXWDGZXZZ4.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/3W9T2N8E32AW12ZBYXWDGZXZZ4.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/3W9T2N8E32AW12ZBYXWDGZXZZ4.jsonld",
+    "src_sha256": "38e98e1fa1793c27ab85df0f95e373e5b87d1abf991ed73cee3756393c742adb",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:4AEB908CJKX2PM1Z2X2FH6KFWB",
+    "rel_path": "product-development/requirement/4AEB908CJKX2PM1Z2X2FH6KFWB.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/4AEB908CJKX2PM1Z2X2FH6KFWB.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/4AEB908CJKX2PM1Z2X2FH6KFWB.jsonld",
+    "src_sha256": "546a9c042584acf645e2cb1bd69972430761a4432233a0512000371b3c0ef33c",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:4CD6D4P1F75S5J8DWVY84AVA03",
+    "rel_path": "product-development/requirement/4CD6D4P1F75S5J8DWVY84AVA03.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/4CD6D4P1F75S5J8DWVY84AVA03.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/4CD6D4P1F75S5J8DWVY84AVA03.jsonld",
+    "src_sha256": "3eb8a14799e6bb9a06f827aee89ec60aef23ef985d8e20d53ea14edea5de6c27",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:598EXEKB11TBGK0YY43HKK8V8H",
+    "rel_path": "product-development/requirement/598EXEKB11TBGK0YY43HKK8V8H.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/598EXEKB11TBGK0YY43HKK8V8H.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/598EXEKB11TBGK0YY43HKK8V8H.jsonld",
+    "src_sha256": "bb65b2655f5da7ba8d20b181f87555f1e8b28c54eacb09640a2076584ae31155",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:71QHT9734H66T8JY4D4KKNEX2D",
+    "rel_path": "product-development/requirement/71QHT9734H66T8JY4D4KKNEX2D.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/71QHT9734H66T8JY4D4KKNEX2D.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/71QHT9734H66T8JY4D4KKNEX2D.jsonld",
+    "src_sha256": "a60605e0cc3881bd456464e51642b5a534bbc49c26a715b620aa73385838e774",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:7AZTT8GEH6T4Z1T248RBS5JVRF",
+    "rel_path": "product-development/requirement/7AZTT8GEH6T4Z1T248RBS5JVRF.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/7AZTT8GEH6T4Z1T248RBS5JVRF.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/7AZTT8GEH6T4Z1T248RBS5JVRF.jsonld",
+    "src_sha256": "9987f1c5254f3b337a5a5f1f0a857bc884717558d8eba4fc1a0370d3e1e362f6",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:7QDVYZYB1M1C17B2JSNPDJ30DR",
+    "rel_path": "product-development/requirement/7QDVYZYB1M1C17B2JSNPDJ30DR.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/7QDVYZYB1M1C17B2JSNPDJ30DR.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/7QDVYZYB1M1C17B2JSNPDJ30DR.jsonld",
+    "src_sha256": "286d9264d5fd91205bf3d11c8a0c9588a1f46a20b970bb9398413953b98871dd",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:85ZSH7EWCGD3485RPZR2TPF73E",
+    "rel_path": "product-development/requirement/85ZSH7EWCGD3485RPZR2TPF73E.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/85ZSH7EWCGD3485RPZR2TPF73E.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/85ZSH7EWCGD3485RPZR2TPF73E.jsonld",
+    "src_sha256": "8c2bba7e9c0bb894331266a802ca38a0a28bfd4784a28ff7bdd0e1eafda7917d",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:89MNMDVCMY69CPQPNS0CNW3S32",
+    "rel_path": "product-development/requirement/89MNMDVCMY69CPQPNS0CNW3S32.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/89MNMDVCMY69CPQPNS0CNW3S32.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/89MNMDVCMY69CPQPNS0CNW3S32.jsonld",
+    "src_sha256": "b0100d90363b921be3a7b9bce4f05b595edcb456e830961599aa1214e4b9e397",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:8XCWN8SN48N4FE5FBX9X03SGXY",
+    "rel_path": "product-development/requirement/8XCWN8SN48N4FE5FBX9X03SGXY.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/8XCWN8SN48N4FE5FBX9X03SGXY.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/8XCWN8SN48N4FE5FBX9X03SGXY.jsonld",
+    "src_sha256": "e614a31d4e99a266a419ddc8b8807991cd62c28da10dbaf8b2bc6c0b3e00ed2f",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:A8HJHFZ5CECNGV4V10A5V0HPAF",
+    "rel_path": "product-development/requirement/A8HJHFZ5CECNGV4V10A5V0HPAF.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/A8HJHFZ5CECNGV4V10A5V0HPAF.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/A8HJHFZ5CECNGV4V10A5V0HPAF.jsonld",
+    "src_sha256": "7a954fbb788a6cac9c93651b35cb9d72bb35c5ccf6b156a2722bfa5e26f50e26",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:AK4VBKY3CHF6TPKDSC8H1DZEB1",
+    "rel_path": "product-development/requirement/AK4VBKY3CHF6TPKDSC8H1DZEB1.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/AK4VBKY3CHF6TPKDSC8H1DZEB1.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/AK4VBKY3CHF6TPKDSC8H1DZEB1.jsonld",
+    "src_sha256": "c4490c16dc5e7a02187db1794f0d37ecef1e3004231acca334c4a3e03a09948f",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:AYGSMRN96PT1G0RH1M3DQZP588",
+    "rel_path": "product-development/requirement/AYGSMRN96PT1G0RH1M3DQZP588.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/AYGSMRN96PT1G0RH1M3DQZP588.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/AYGSMRN96PT1G0RH1M3DQZP588.jsonld",
+    "src_sha256": "ef5534a12d018e44cfd767e3e56a7aaf8d3430db1b30dc32b22681eac66d2722",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:BH3DEVG3Y5C0MT95S252ZRC75B",
+    "rel_path": "product-development/requirement/BH3DEVG3Y5C0MT95S252ZRC75B.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/BH3DEVG3Y5C0MT95S252ZRC75B.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/BH3DEVG3Y5C0MT95S252ZRC75B.jsonld",
+    "src_sha256": "942e76ca83037a7b3223ddb380559c2567ea01b0a7ca3bb6524e6f4374b231cf",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:BHPCHJNN9RRWBNZ8S2RX90075T",
+    "rel_path": "product-development/requirement/BHPCHJNN9RRWBNZ8S2RX90075T.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/BHPCHJNN9RRWBNZ8S2RX90075T.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/BHPCHJNN9RRWBNZ8S2RX90075T.jsonld",
+    "src_sha256": "2757f3c74a75bc48b23fa30421361529b258c0e0639abf70586107efaf6cdaaa",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:F370MSC9RCEZ2Q1Q938VVRJJ59",
+    "rel_path": "product-development/requirement/F370MSC9RCEZ2Q1Q938VVRJJ59.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/F370MSC9RCEZ2Q1Q938VVRJJ59.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/F370MSC9RCEZ2Q1Q938VVRJJ59.jsonld",
+    "src_sha256": "91517afa72c12bea6775458f8d65b311492b7859e37d12941cf0ffc2b4528295",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:F43H2MFVGAXR4Y3BYS73QW89BS",
+    "rel_path": "product-development/requirement/F43H2MFVGAXR4Y3BYS73QW89BS.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/F43H2MFVGAXR4Y3BYS73QW89BS.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/F43H2MFVGAXR4Y3BYS73QW89BS.jsonld",
+    "src_sha256": "06089110602ff03c9189a5e97447242e92db101e268237aad89baa7e8a119582",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:FB3TXF89AV7SJJJ4JD1FN067SA",
+    "rel_path": "product-development/requirement/FB3TXF89AV7SJJJ4JD1FN067SA.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/FB3TXF89AV7SJJJ4JD1FN067SA.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/FB3TXF89AV7SJJJ4JD1FN067SA.jsonld",
+    "src_sha256": "7ffdd2039130434c963772da993a74de8193f87e63ec2ee95678dbfdb426685b",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:G6SRJSZWP73P65KS85WMKJHGXK",
+    "rel_path": "product-development/requirement/G6SRJSZWP73P65KS85WMKJHGXK.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/G6SRJSZWP73P65KS85WMKJHGXK.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/G6SRJSZWP73P65KS85WMKJHGXK.jsonld",
+    "src_sha256": "16dd4baa0443ed1d33ac8bb2d9638caf9414a31dfe3682c8f543b627d7d9acdb",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:H3W5QRA5PZ77J9DJPCW7VM2CCA",
+    "rel_path": "product-development/requirement/H3W5QRA5PZ77J9DJPCW7VM2CCA.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/H3W5QRA5PZ77J9DJPCW7VM2CCA.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/H3W5QRA5PZ77J9DJPCW7VM2CCA.jsonld",
+    "src_sha256": "ce592017132376c984a5eee37700ab6ce8876bf06db09c910bf1fe5f8f8ee5fc",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:HB1NP6C7TSBQ4HR0SG0PRBTAXR",
+    "rel_path": "product-development/requirement/HB1NP6C7TSBQ4HR0SG0PRBTAXR.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/HB1NP6C7TSBQ4HR0SG0PRBTAXR.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/HB1NP6C7TSBQ4HR0SG0PRBTAXR.jsonld",
+    "src_sha256": "2d90a73e9d1e7cc94589ba0c93398e0b84704d47ea43cd616391cb3e34cedc56",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:J6G3NF24ZSTZYMQ1FD3H06A3FD",
+    "rel_path": "product-development/requirement/J6G3NF24ZSTZYMQ1FD3H06A3FD.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/J6G3NF24ZSTZYMQ1FD3H06A3FD.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/J6G3NF24ZSTZYMQ1FD3H06A3FD.jsonld",
+    "src_sha256": "52fbf7b4d4f7b684754d2fd29b13519b272b37eab4774116f757e2eaca473a4b",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:JETECCCV4TPZSST2XX25CCJMGE",
+    "rel_path": "product-development/requirement/JETECCCV4TPZSST2XX25CCJMGE.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/JETECCCV4TPZSST2XX25CCJMGE.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/JETECCCV4TPZSST2XX25CCJMGE.jsonld",
+    "src_sha256": "69f8d7b1b031874310f059f4358ba34d4924be985e86725d3ecddaeb846f3a4d",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:K85KHQ9YZJVEM5Y2QX3K2CGBFY",
+    "rel_path": "product-development/requirement/K85KHQ9YZJVEM5Y2QX3K2CGBFY.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/K85KHQ9YZJVEM5Y2QX3K2CGBFY.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/K85KHQ9YZJVEM5Y2QX3K2CGBFY.jsonld",
+    "src_sha256": "45b99780db175f35822ab975a532d8ff87a7d494ee52b01dc0933c28ff828ca4",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:KSCHGX0DEVJTB874BCQRXW7KA8",
+    "rel_path": "product-development/requirement/KSCHGX0DEVJTB874BCQRXW7KA8.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/KSCHGX0DEVJTB874BCQRXW7KA8.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/KSCHGX0DEVJTB874BCQRXW7KA8.jsonld",
+    "src_sha256": "73490c2a802d707c65e67fa33e2b7513673107afbdb4ef9a3285f1ef95391369",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:KXMT8ZDKGPQHAS8HGF3031QSNP",
+    "rel_path": "product-development/requirement/KXMT8ZDKGPQHAS8HGF3031QSNP.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/KXMT8ZDKGPQHAS8HGF3031QSNP.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/KXMT8ZDKGPQHAS8HGF3031QSNP.jsonld",
+    "src_sha256": "c243122cd5e8a480f5e631c21788fc7b4f2c95ab377ca7c5d228b7ff73103927",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:M4DSBEM3TFHN3J5JY12MZ52ZF1",
+    "rel_path": "product-development/requirement/M4DSBEM3TFHN3J5JY12MZ52ZF1.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/M4DSBEM3TFHN3J5JY12MZ52ZF1.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/M4DSBEM3TFHN3J5JY12MZ52ZF1.jsonld",
+    "src_sha256": "603286ef7d5ad02702154eba6fdf8fc9c02e5e58573544da5dccce3862be7466",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:M557CZC7VXSNMR17FZP4MDABGG",
+    "rel_path": "product-development/requirement/M557CZC7VXSNMR17FZP4MDABGG.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/M557CZC7VXSNMR17FZP4MDABGG.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/M557CZC7VXSNMR17FZP4MDABGG.jsonld",
+    "src_sha256": "6f9397e64dafdabf79870d07f67f4daed41ce7a078930fdd756decb34a383d9f",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:MKPK782AJVH0WPZ9NH7XHEQNE4",
+    "rel_path": "product-development/requirement/MKPK782AJVH0WPZ9NH7XHEQNE4.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/MKPK782AJVH0WPZ9NH7XHEQNE4.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/MKPK782AJVH0WPZ9NH7XHEQNE4.jsonld",
+    "src_sha256": "9ea0e4d3f85beb03d0d52e3cf29ff4233591418846dbe563708fc13f0361ee06",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:N6DGEBSABJ47SFHFJDVTJ7KV1V",
+    "rel_path": "product-development/requirement/N6DGEBSABJ47SFHFJDVTJ7KV1V.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/N6DGEBSABJ47SFHFJDVTJ7KV1V.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/N6DGEBSABJ47SFHFJDVTJ7KV1V.jsonld",
+    "src_sha256": "09d097dab736674a680c18a6b24ac596a685c707b0a8b72de9eb81fee3df022d",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:NDVEVYDQAAPZ52NSQ0HS4Z5EAV",
+    "rel_path": "product-development/requirement/NDVEVYDQAAPZ52NSQ0HS4Z5EAV.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/NDVEVYDQAAPZ52NSQ0HS4Z5EAV.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/NDVEVYDQAAPZ52NSQ0HS4Z5EAV.jsonld",
+    "src_sha256": "d92148eb82c90ef3d163eb83a5efb7ad9a6f24d58ad20ea141738c911a25f303",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:NFZZQ0TG3ERDBNK5G0WBP5BYHP",
+    "rel_path": "product-development/requirement/NFZZQ0TG3ERDBNK5G0WBP5BYHP.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/NFZZQ0TG3ERDBNK5G0WBP5BYHP.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/NFZZQ0TG3ERDBNK5G0WBP5BYHP.jsonld",
+    "src_sha256": "8031d372a81c20ff64c8b49059c2133f22078938fdb10a6d9bc51f19a14516a0",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:NH9QQ32ZARP254W24770KBK1W0",
+    "rel_path": "product-development/requirement/NH9QQ32ZARP254W24770KBK1W0.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/NH9QQ32ZARP254W24770KBK1W0.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/NH9QQ32ZARP254W24770KBK1W0.jsonld",
+    "src_sha256": "97321015850350f6d44f7b3ba89652dfe8bb6bc3010c59b528e96f07b8aa80ae",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:P3VTJ8RZ8EJX4VQ5YWD72F32R4",
+    "rel_path": "product-development/requirement/P3VTJ8RZ8EJX4VQ5YWD72F32R4.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/P3VTJ8RZ8EJX4VQ5YWD72F32R4.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/P3VTJ8RZ8EJX4VQ5YWD72F32R4.jsonld",
+    "src_sha256": "2dcde2918f3c8b32287adc19492bff41764790c328a02ece8446fd877c6f2d63",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:PH9JQK4VWHFFV1753VPKHACW9V",
+    "rel_path": "product-development/requirement/PH9JQK4VWHFFV1753VPKHACW9V.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/PH9JQK4VWHFFV1753VPKHACW9V.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/PH9JQK4VWHFFV1753VPKHACW9V.jsonld",
+    "src_sha256": "654b9b14a8ff5de4bec599f07a1e9e483774bbafb0ee3127c1a44396e39fef01",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:QBABG4P5FTXRVJBCNX2QTKGXXQ",
+    "rel_path": "product-development/requirement/QBABG4P5FTXRVJBCNX2QTKGXXQ.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/QBABG4P5FTXRVJBCNX2QTKGXXQ.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/QBABG4P5FTXRVJBCNX2QTKGXXQ.jsonld",
+    "src_sha256": "ded53b3b04ac9aa2ddb81a8861c47576a0d6476bfe6bb26ff881ad27141c7a20",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:QEVAS9866MZ1Y9EDYVAX69F8EZ",
+    "rel_path": "product-development/requirement/QEVAS9866MZ1Y9EDYVAX69F8EZ.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/QEVAS9866MZ1Y9EDYVAX69F8EZ.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/QEVAS9866MZ1Y9EDYVAX69F8EZ.jsonld",
+    "src_sha256": "9d27c033f206765810601874ac4c9698051997cbf8c56e3d9d5031399ea50edc",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:QXFMGQTRP8QHE7BR82YFY8J7YK",
+    "rel_path": "product-development/requirement/QXFMGQTRP8QHE7BR82YFY8J7YK.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/QXFMGQTRP8QHE7BR82YFY8J7YK.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/QXFMGQTRP8QHE7BR82YFY8J7YK.jsonld",
+    "src_sha256": "ec6bfdb6da72cb805c12800571a118e3eb7a7580ab257ae8ec7bea6eb17d4af6",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:QZRC1JJ7ZP7TK9P0QTASS87N7C",
+    "rel_path": "product-development/requirement/QZRC1JJ7ZP7TK9P0QTASS87N7C.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/QZRC1JJ7ZP7TK9P0QTASS87N7C.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/QZRC1JJ7ZP7TK9P0QTASS87N7C.jsonld",
+    "src_sha256": "cc5d708ff2a8cca4e57f7f49a83cf81a4c1423de49bc5d4e99313377ae87afcb",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:RDPXSYKACKXGF786YVF03P3HCA",
+    "rel_path": "product-development/requirement/RDPXSYKACKXGF786YVF03P3HCA.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/RDPXSYKACKXGF786YVF03P3HCA.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/RDPXSYKACKXGF786YVF03P3HCA.jsonld",
+    "src_sha256": "eda9193d37e1e8444cd3a2ce6992614d804f1e1959a10ae9151b6276bbaec5c6",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:S0YQ4SF3691RGTMMCDR8C5D47F",
+    "rel_path": "product-development/requirement/S0YQ4SF3691RGTMMCDR8C5D47F.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/S0YQ4SF3691RGTMMCDR8C5D47F.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/S0YQ4SF3691RGTMMCDR8C5D47F.jsonld",
+    "src_sha256": "3f6f747ac5fb7f8014c188e829480aadd76c6cc3e05621a90c1fce765d5694e1",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:SSRVARSKAMWJH0FHTR63P705YJ",
+    "rel_path": "product-development/requirement/SSRVARSKAMWJH0FHTR63P705YJ.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/SSRVARSKAMWJH0FHTR63P705YJ.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/SSRVARSKAMWJH0FHTR63P705YJ.jsonld",
+    "src_sha256": "c12e9c0a9aaaea769465dd1670252b79fcd906c9926f3ae3995926f048664f05",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:TA6RYW9W28TDV7PQKW233NDPC5",
+    "rel_path": "product-development/requirement/TA6RYW9W28TDV7PQKW233NDPC5.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/TA6RYW9W28TDV7PQKW233NDPC5.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/TA6RYW9W28TDV7PQKW233NDPC5.jsonld",
+    "src_sha256": "3975c4ec418712cc6594feeea3f412d619a486ef791e460159444860738054a5",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:TX0NAJ0F00CXKQNA5F5E0V48M2",
+    "rel_path": "product-development/requirement/TX0NAJ0F00CXKQNA5F5E0V48M2.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/TX0NAJ0F00CXKQNA5F5E0V48M2.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/TX0NAJ0F00CXKQNA5F5E0V48M2.jsonld",
+    "src_sha256": "457308ddc36b05ed70c5432b6a1709454cf3a9f63995c7929cb59c0a1475dab2",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:V2QD6CPZMFVHGQ5YKM1EYCSR9K",
+    "rel_path": "product-development/requirement/V2QD6CPZMFVHGQ5YKM1EYCSR9K.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/V2QD6CPZMFVHGQ5YKM1EYCSR9K.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/V2QD6CPZMFVHGQ5YKM1EYCSR9K.jsonld",
+    "src_sha256": "8ea4dabb27e8b0d89d6051cb709fa0dd6f9d8ca9889f8e8ced2f907b225c828b",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:VFJ0EMVN7ZJBK27J2B4HNFETG9",
+    "rel_path": "product-development/requirement/VFJ0EMVN7ZJBK27J2B4HNFETG9.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/VFJ0EMVN7ZJBK27J2B4HNFETG9.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/VFJ0EMVN7ZJBK27J2B4HNFETG9.jsonld",
+    "src_sha256": "873f050289d6762ab1db8ba1c2d039d41336f8570ad2fbeefbb5476bac346234",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:VHCM9VNF7T3B6EBTZW14GCGXB6",
+    "rel_path": "product-development/requirement/VHCM9VNF7T3B6EBTZW14GCGXB6.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/VHCM9VNF7T3B6EBTZW14GCGXB6.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/VHCM9VNF7T3B6EBTZW14GCGXB6.jsonld",
+    "src_sha256": "7b16be0a0a19464fcf924df88a313ceecaae1cd400df31a76a4aa16ad5866930",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:WP1D55HXWYPQ0QE1JFSJ6R38AW",
+    "rel_path": "product-development/requirement/WP1D55HXWYPQ0QE1JFSJ6R38AW.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/WP1D55HXWYPQ0QE1JFSJ6R38AW.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/WP1D55HXWYPQ0QE1JFSJ6R38AW.jsonld",
+    "src_sha256": "f48adc25d782a3c5026341dbe052613ae72c446cd1980c87620a1c828eda9e5e",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:WYR8SKRZEZTG0VZ7TRNTTV2PYX",
+    "rel_path": "product-development/requirement/WYR8SKRZEZTG0VZ7TRNTTV2PYX.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/WYR8SKRZEZTG0VZ7TRNTTV2PYX.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/WYR8SKRZEZTG0VZ7TRNTTV2PYX.jsonld",
+    "src_sha256": "7db44d856760dc40ec6767f7586c310a2bb51a563347c7d9272d5242af7a68c5",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:X0Z853C9A6ZCR25F5F2H86J8A0",
+    "rel_path": "product-development/requirement/X0Z853C9A6ZCR25F5F2H86J8A0.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/X0Z853C9A6ZCR25F5F2H86J8A0.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/X0Z853C9A6ZCR25F5F2H86J8A0.jsonld",
+    "src_sha256": "e6672929c1fac80c7d63d11d03f61d991a4431118291a65be38b8d5332ebe436",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:X9T8HPQJZ66C2RN87K9T9B413S",
+    "rel_path": "product-development/requirement/X9T8HPQJZ66C2RN87K9T9B413S.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/X9T8HPQJZ66C2RN87K9T9B413S.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/X9T8HPQJZ66C2RN87K9T9B413S.jsonld",
+    "src_sha256": "c8cc1663844c65a8f1b802a6af9ef4e561e93a070895a307444e764c83970027",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:XAGQS26PTRB6R219C72SX1J0YD",
+    "rel_path": "product-development/requirement/XAGQS26PTRB6R219C72SX1J0YD.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/XAGQS26PTRB6R219C72SX1J0YD.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/XAGQS26PTRB6R219C72SX1J0YD.jsonld",
+    "src_sha256": "46c76488625e2e7e49f96113213515fe4b3f0b3d4019c407f2482f003ba66c16",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:XXAQEYE524J6JV7E0N7J6PXVP2",
+    "rel_path": "product-development/requirement/XXAQEYE524J6JV7E0N7J6PXVP2.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/XXAQEYE524J6JV7E0N7J6PXVP2.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/XXAQEYE524J6JV7E0N7J6PXVP2.jsonld",
+    "src_sha256": "69ea42401bbf7247c886795eb79c8057ef75c452ed05933f949a2e1ab851a3a4",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:Y9KFTYBT08BGNVJ1PM7TTZ503A",
+    "rel_path": "product-development/requirement/Y9KFTYBT08BGNVJ1PM7TTZ503A.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/Y9KFTYBT08BGNVJ1PM7TTZ503A.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/Y9KFTYBT08BGNVJ1PM7TTZ503A.jsonld",
+    "src_sha256": "cae0b968db606d1354e6edcfa436153dce7f0483af220481a0f26253b3310d5e",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:YG5CYAF5JFSTRXQNRASMYYTJWZ",
+    "rel_path": "product-development/requirement/YG5CYAF5JFSTRXQNRASMYYTJWZ.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/YG5CYAF5JFSTRXQNRASMYYTJWZ.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/YG5CYAF5JFSTRXQNRASMYYTJWZ.jsonld",
+    "src_sha256": "1a99377f8cf4a779ffd2f0cefb0e4873fd094222d9460c17f2c65a154d831a61",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:YZ92KYMZJ16RWQJJSSDCZJTRH2",
+    "rel_path": "product-development/requirement/YZ92KYMZJ16RWQJJSSDCZJTRH2.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/YZ92KYMZJ16RWQJJSSDCZJTRH2.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/YZ92KYMZJ16RWQJJSSDCZJTRH2.jsonld",
+    "src_sha256": "20c937e91336fe61724e9660f5e08b132b0d5b92ad19681bda39724c0a123669",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:requirement:ZW14SZB4V7KY7RXP2QWSBWAF6S",
+    "rel_path": "product-development/requirement/ZW14SZB4V7KY7RXP2QWSBWAF6S.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/requirement/ZW14SZB4V7KY7RXP2QWSBWAF6S.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/requirement/ZW14SZB4V7KY7RXP2QWSBWAF6S.jsonld",
+    "src_sha256": "7e34a0f8401bac18c1b96ac0edfa306adc2fd9db9224620a30f84e74ab2a38cf",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:00VX23T9WP4T6W7XXN39FMT6YH",
+    "rel_path": "product-development/scenario/00VX23T9WP4T6W7XXN39FMT6YH.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/00VX23T9WP4T6W7XXN39FMT6YH.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/00VX23T9WP4T6W7XXN39FMT6YH.jsonld",
+    "src_sha256": "e8144c88a50139004377e341803aa5b05a1ff64e4862fd240d10492511438da9",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:0GH3F4XP097YPZSQP41FCS2FJZ",
+    "rel_path": "product-development/scenario/0GH3F4XP097YPZSQP41FCS2FJZ.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/0GH3F4XP097YPZSQP41FCS2FJZ.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/0GH3F4XP097YPZSQP41FCS2FJZ.jsonld",
+    "src_sha256": "4a0aa0275f64d4d3a0010b3a2219cc728d8404bf9ff2c7aac21606742485d0db",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:1E5HST68E4EN3XD9VK7DDF65QK",
+    "rel_path": "product-development/scenario/1E5HST68E4EN3XD9VK7DDF65QK.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/1E5HST68E4EN3XD9VK7DDF65QK.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/1E5HST68E4EN3XD9VK7DDF65QK.jsonld",
+    "src_sha256": "986a1ec067296fd5e67c2a0ef3f58fc0cad3d417950b52c64ea1d16c312180bf",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:1PB20WWQY89W9GTE9HKS45YP06",
+    "rel_path": "product-development/scenario/1PB20WWQY89W9GTE9HKS45YP06.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/1PB20WWQY89W9GTE9HKS45YP06.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/1PB20WWQY89W9GTE9HKS45YP06.jsonld",
+    "src_sha256": "d478bd9611650fae8af7894322b8bb99baac6b57230f561d0ea8d16801901a68",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:65JX0VABSE53NJJCVP8NQRTMXH",
+    "rel_path": "product-development/scenario/65JX0VABSE53NJJCVP8NQRTMXH.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/65JX0VABSE53NJJCVP8NQRTMXH.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/65JX0VABSE53NJJCVP8NQRTMXH.jsonld",
+    "src_sha256": "ba5d5121551c453dc97a5a3124a2727783ceb4f90857c4d731dcfa122a4b4092",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:6AXZVZCQ0S17BW4YPA2E556BY8",
+    "rel_path": "product-development/scenario/6AXZVZCQ0S17BW4YPA2E556BY8.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/6AXZVZCQ0S17BW4YPA2E556BY8.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/6AXZVZCQ0S17BW4YPA2E556BY8.jsonld",
+    "src_sha256": "a78c583194ad22e945e5326a0fae8b8c00544e9f233c2c98aa9a93afbc5bbbd4",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:8C0A3WXFT9911KK6RVA0XK1CE0",
+    "rel_path": "product-development/scenario/8C0A3WXFT9911KK6RVA0XK1CE0.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/8C0A3WXFT9911KK6RVA0XK1CE0.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/8C0A3WXFT9911KK6RVA0XK1CE0.jsonld",
+    "src_sha256": "ef2fdad8a8e03ccff7d3e5d72e7e40156c6d2488195d374f41db2044414d94bd",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:9BMD57SCPMW4XTZ31AARAGCGM9",
+    "rel_path": "product-development/scenario/9BMD57SCPMW4XTZ31AARAGCGM9.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/9BMD57SCPMW4XTZ31AARAGCGM9.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/9BMD57SCPMW4XTZ31AARAGCGM9.jsonld",
+    "src_sha256": "939f762e35f8140f92888de832edd5dae3eda1b4937eaff12ee3937bb8b140cf",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:9H2Z4JQMYRMS50659BKJRHZSX4",
+    "rel_path": "product-development/scenario/9H2Z4JQMYRMS50659BKJRHZSX4.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/9H2Z4JQMYRMS50659BKJRHZSX4.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/9H2Z4JQMYRMS50659BKJRHZSX4.jsonld",
+    "src_sha256": "05b50749296e41666a0d8612cfa0d73409ec36f4c4805b4ca9fb5d57dd94e738",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:AVQFDDBK7X9RPZY3DDSF9Q89A1",
+    "rel_path": "product-development/scenario/AVQFDDBK7X9RPZY3DDSF9Q89A1.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/AVQFDDBK7X9RPZY3DDSF9Q89A1.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/AVQFDDBK7X9RPZY3DDSF9Q89A1.jsonld",
+    "src_sha256": "51ce459347f4393b9404710d81a1ddf793d263b6426b0d8ba7a6185434e8966e",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:BXA4FVDX2CKBT3XNWB47PJFYQY",
+    "rel_path": "product-development/scenario/BXA4FVDX2CKBT3XNWB47PJFYQY.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/BXA4FVDX2CKBT3XNWB47PJFYQY.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/BXA4FVDX2CKBT3XNWB47PJFYQY.jsonld",
+    "src_sha256": "677a1ca1543222949408f9ed8796741a3a46623430a75f69dc3fd4c9774f49c1",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:CP3MAX93563W45W7D547T5FJ80",
+    "rel_path": "product-development/scenario/CP3MAX93563W45W7D547T5FJ80.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/CP3MAX93563W45W7D547T5FJ80.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/CP3MAX93563W45W7D547T5FJ80.jsonld",
+    "src_sha256": "08fdef88bf0d7d4bbcc565f9287f806da807f6ebffa9d9ba3ad49e5a7a91dbae",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:DE8EPP45NBSC0ZDYWYFS2RMD1E",
+    "rel_path": "product-development/scenario/DE8EPP45NBSC0ZDYWYFS2RMD1E.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/DE8EPP45NBSC0ZDYWYFS2RMD1E.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/DE8EPP45NBSC0ZDYWYFS2RMD1E.jsonld",
+    "src_sha256": "03e0c844c200b256d49d6510a70b3c688b6729bfb52f19b529543a84c8523330",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:EX6D8RS9VQWAZE34HR5RP016D4",
+    "rel_path": "product-development/scenario/EX6D8RS9VQWAZE34HR5RP016D4.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/EX6D8RS9VQWAZE34HR5RP016D4.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/EX6D8RS9VQWAZE34HR5RP016D4.jsonld",
+    "src_sha256": "cd60c0db52f85ed81ef95a557d88fdcf6784ca996a65ab56aa173529a329b0e4",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:FAJVAYHW1JTDGDGQ1RM9MDJYTK",
+    "rel_path": "product-development/scenario/FAJVAYHW1JTDGDGQ1RM9MDJYTK.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/FAJVAYHW1JTDGDGQ1RM9MDJYTK.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/FAJVAYHW1JTDGDGQ1RM9MDJYTK.jsonld",
+    "src_sha256": "b5c32057e521d7d04ae026b5abaf74bab2d608d29dea9e64f87ae9f637a446c9",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:G9V6QGPERX1Y3DWQ2BXJ201WW4",
+    "rel_path": "product-development/scenario/G9V6QGPERX1Y3DWQ2BXJ201WW4.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/G9V6QGPERX1Y3DWQ2BXJ201WW4.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/G9V6QGPERX1Y3DWQ2BXJ201WW4.jsonld",
+    "src_sha256": "8c34f08aeed1147f0e0f05806ea2e21eb616bd986d5c640c2f4bd8cb02f2e7e3",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:K97R26J92J912SWVAVWE2B5C17",
+    "rel_path": "product-development/scenario/K97R26J92J912SWVAVWE2B5C17.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/K97R26J92J912SWVAVWE2B5C17.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/K97R26J92J912SWVAVWE2B5C17.jsonld",
+    "src_sha256": "661e03ca8c8a52a6b8cfbbd42bff78ca8664905bf71d092c96341b0bf8ba2020",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:MB39R02CTNPMMG1REDS92QSKPS",
+    "rel_path": "product-development/scenario/MB39R02CTNPMMG1REDS92QSKPS.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/MB39R02CTNPMMG1REDS92QSKPS.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/MB39R02CTNPMMG1REDS92QSKPS.jsonld",
+    "src_sha256": "5350a2c003b371ed09f1c803cafa7c93c53ab5157b6567510b0077accd7f5167",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:MB83HHZA4G0BXF2XQCJ3JE5XCQ",
+    "rel_path": "product-development/scenario/MB83HHZA4G0BXF2XQCJ3JE5XCQ.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/MB83HHZA4G0BXF2XQCJ3JE5XCQ.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/MB83HHZA4G0BXF2XQCJ3JE5XCQ.jsonld",
+    "src_sha256": "c3bc96b207398aca4140da299ac4497f4e1b7c52448ba49270087f863d5ed1d9",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:N3M3794XQE67YS5M45YAB6Q75P",
+    "rel_path": "product-development/scenario/N3M3794XQE67YS5M45YAB6Q75P.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/N3M3794XQE67YS5M45YAB6Q75P.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/N3M3794XQE67YS5M45YAB6Q75P.jsonld",
+    "src_sha256": "d50da5f9e9f31e14c214a821f82748e6ac76ad0140e81d4c1b3847f6c2c05c92",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:QJJFFX641J6F7R2RPDX0Z8EQ4K",
+    "rel_path": "product-development/scenario/QJJFFX641J6F7R2RPDX0Z8EQ4K.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/QJJFFX641J6F7R2RPDX0Z8EQ4K.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/QJJFFX641J6F7R2RPDX0Z8EQ4K.jsonld",
+    "src_sha256": "6931a2a6d851cae81d1dd745440c5e7e8f06d4779b9f7d213376f3b5c002db79",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:RF6A2NMRPRTM3TGNY48YXWGK02",
+    "rel_path": "product-development/scenario/RF6A2NMRPRTM3TGNY48YXWGK02.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/RF6A2NMRPRTM3TGNY48YXWGK02.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/RF6A2NMRPRTM3TGNY48YXWGK02.jsonld",
+    "src_sha256": "756e2a6c8039db1a00712c082b67821e0fe38d8922542bca24d4c8dc926fdd29",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:SW5W39JKSWQPXTSGXQCWZY8VTR",
+    "rel_path": "product-development/scenario/SW5W39JKSWQPXTSGXQCWZY8VTR.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/SW5W39JKSWQPXTSGXQCWZY8VTR.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/SW5W39JKSWQPXTSGXQCWZY8VTR.jsonld",
+    "src_sha256": "ae8645d2b1a7f986664a3c57871ac1907b84d007ec74cab0e053d52cc02eff04",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:TT94PR7MJD6ZNPWCJGVAPXSAD3",
+    "rel_path": "product-development/scenario/TT94PR7MJD6ZNPWCJGVAPXSAD3.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/TT94PR7MJD6ZNPWCJGVAPXSAD3.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/TT94PR7MJD6ZNPWCJGVAPXSAD3.jsonld",
+    "src_sha256": "8cdfe676c4ef4fb80dee71149ced91de7944c564c22df485c8714649ed5ef133",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:V60DVNV14T6F4MAGCD7KNCMWGQ",
+    "rel_path": "product-development/scenario/V60DVNV14T6F4MAGCD7KNCMWGQ.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/V60DVNV14T6F4MAGCD7KNCMWGQ.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/V60DVNV14T6F4MAGCD7KNCMWGQ.jsonld",
+    "src_sha256": "ce666aef8a4c083d35008073f585bd1bac77bd6a7c47c6e55f77c0d205607299",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:VR6CJNEFY5AAMKKQ8SQWK63M6M",
+    "rel_path": "product-development/scenario/VR6CJNEFY5AAMKKQ8SQWK63M6M.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/VR6CJNEFY5AAMKKQ8SQWK63M6M.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/VR6CJNEFY5AAMKKQ8SQWK63M6M.jsonld",
+    "src_sha256": "36b613b855242ea700e6a0da5b8f3f222c273d92afb08aeece735d3d7fb8d165",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:WCMRGDK3K8EWYVVK5QEEHJZH7Y",
+    "rel_path": "product-development/scenario/WCMRGDK3K8EWYVVK5QEEHJZH7Y.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/WCMRGDK3K8EWYVVK5QEEHJZH7Y.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/WCMRGDK3K8EWYVVK5QEEHJZH7Y.jsonld",
+    "src_sha256": "7f311203e8ddf178f9c59121cc7f15f4c6fe23791a6b2d58a9ccee57fc95a207",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:WWTP6MD7A19JS09Z2VSGQ848WY",
+    "rel_path": "product-development/scenario/WWTP6MD7A19JS09Z2VSGQ848WY.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/WWTP6MD7A19JS09Z2VSGQ848WY.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/WWTP6MD7A19JS09Z2VSGQ848WY.jsonld",
+    "src_sha256": "91f697e8a020e2d072466c40cafddb30bf462b0934a535a4cf80d70752830fd1",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:Y6Z1EJPF6GY1BAQ96WGA86TDHS",
+    "rel_path": "product-development/scenario/Y6Z1EJPF6GY1BAQ96WGA86TDHS.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/Y6Z1EJPF6GY1BAQ96WGA86TDHS.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/Y6Z1EJPF6GY1BAQ96WGA86TDHS.jsonld",
+    "src_sha256": "beccd76226a03aa5bd43a9ef0db3d5bf45cfae3538c014b7029e949240b162b1",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:YR5R8PV2TTWFVBBG76FR8WMGTG",
+    "rel_path": "product-development/scenario/YR5R8PV2TTWFVBBG76FR8WMGTG.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/YR5R8PV2TTWFVBBG76FR8WMGTG.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/YR5R8PV2TTWFVBBG76FR8WMGTG.jsonld",
+    "src_sha256": "487df529acfc25f19330a108401b7f26d0dc2ea295af67c7fe75cb09b691755d",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:YY4RJ7JS8KT55BS61BD0ER3ZNF",
+    "rel_path": "product-development/scenario/YY4RJ7JS8KT55BS61BD0ER3ZNF.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/YY4RJ7JS8KT55BS61BD0ER3ZNF.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/YY4RJ7JS8KT55BS61BD0ER3ZNF.jsonld",
+    "src_sha256": "1fc43185b6faccbef5e1bf9bc86ed91ead52bdf76c7a154686fe54439495b5f9",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:scenario:Z4RS0ZHMFRZ5J5AP2KZ2D78MNE",
+    "rel_path": "product-development/scenario/Z4RS0ZHMFRZ5J5AP2KZ2D78MNE.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/product-development/scenario/Z4RS0ZHMFRZ5J5AP2KZ2D78MNE.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/product-development/scenario/Z4RS0ZHMFRZ5J5AP2KZ2D78MNE.jsonld",
+    "src_sha256": "3449522839d42e286871e4484a77b647d7c63d062a56593bdf3f887f2210e9ff",
+    "edge_rewrite": null
+  },
+  {
+    "id": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+    "rel_path": "foundation/tenant/7Q5TE6ZK6XMDM63BHNKXCJ46FY.jsonld",
+    "src": "/Users/iain/.sulis/changes/01KV0J7A8PBWAY136HT9EM2SSX/worktree/.brain/instances/foundation/tenant/7Q5TE6ZK6XMDM63BHNKXCJ46FY.jsonld",
+    "dest": "/Users/iain/.sulis/.brain/instances/foundation/tenant/7Q5TE6ZK6XMDM63BHNKXCJ46FY.jsonld",
+    "src_sha256": "abeaba540c4a78a863ce11e1b765be9423d725837e688a8d60fd3692ce3c3b60",
+    "edge_rewrite": null
+  }
+]

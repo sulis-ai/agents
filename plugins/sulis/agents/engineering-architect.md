@@ -678,7 +678,17 @@ A WP has exactly these fields:
 1. **Context** — which TDD section / architecture component this WP touches.
 2. **Contract** — the public interfaces, types, and ports the WP introduces or modifies.
 3. **Definition of Done** — three sub-checklists (Red, Green, Blue) with named tests.
-4. **Sequence ID** — `WP-NNN`, plus `dependsOn: [WP-NNN, ...]` to prevent merge conflicts.
+4. **Sequence ID** — you mint each id as the prefixed, globally-unique shape
+   `{CH-HANDLE}-WP-NNN` (e.g. `CH-5DMB1N-WP-001`): the prefix is the parent
+   change's handle, `NNN` is the per-change `001`/`002`/`003` sequence
+   (sequencing unchanged — only the rendered label gains the prefix, so ids
+   no longer collide across changes). `dependsOn: [{CH-HANDLE}-WP-NNN, ...]`
+   references the same shape. Legacy bare `WP-NNN` ids stay parseable for one
+   release (back-compat per ADR-002 / `WORK_PACKAGE_STANDARD`). **Carve-out:**
+   the id-prefixing change's *own* WPs stay bare `WP-NNN` — the parser and
+   run-all loop can't understand prefixed ids until that change ships
+   (chicken-and-egg); prefixed minting switches on for the next change after
+   it merges.
 5. **Estimated Token Cost** — rough budget (`input: ~Nk / output: ~Nk`) so orchestrators can route to the right model tier.
 6. **Primitive + Group** — `primitive: <one of 22>`, `group: <expand|reorganise|substitute|contract|reinforce>`. Composite WPs also carry `composite_of:`. SUBSTITUTE-Wrap WPs additionally carry `subject_ownership` and (when transitional) `removal_plan`. REORGANISE WPs additionally carry `characterisation_test`. SUBSTITUTE-Strangle WPs carry `removal_plan` with a target date.
 
@@ -689,6 +699,38 @@ specifies the gates.
 WPs are atomic. If a proposed WP cannot be implemented without first
 implementing another change, that other change is a separate WP. Bundle
 nothing. The Sequence ID and `dependsOn` graph express ordering.
+
+### The WP INDEX table MUST use the canonical header (MUST — #60/#335)
+
+The `work-packages/INDEX.md` you produce is read by the run-all tooling
+(`wpx-index` / `parse_index_md`), which only recognises a WP table whose
+header begins **exactly**:
+
+```
+| ID | Title | Primitive | Status | Depends On | Blocks |
+```
+
+First column `ID` (never `WP`); a single `Primitive` column (never a separate
+`kind` column — `kind` aliases to `primitive` and silently wins first-match).
+A drifted header like `| WP | Title | kind | primitive / group | dependsOn | … |`
+is **invisible** to the loop: `flip-status` / `list-ready` fail with "no | ID |
+header", and the failure surfaces mid-run-all, not at decompose. Put any extra
+columns you want (source delta, verification artifact, token cost) in a
+**second** table with a different header — the canonical table must be the
+first WP-shaped table in the file.
+
+**After writing INDEX.md, run the lint and treat a non-zero exit as a blocker
+(MUST).** This is a deterministic gate — do not rely on emitting the header
+correctly by hand:
+
+```bash
+"$WPX_DIR/wpx-index" lint --project {project} --repo-root {repo-root}
+```
+
+Exit 0 → the INDEX parses; decompose may report done. Non-zero → read the
+error (it names the canonical header), fix the table, and re-run until it
+exits 0. An INDEX that fails this lint is **not done** — never report a WP set
+ready for execution while the lint is red.
 
 ---
 

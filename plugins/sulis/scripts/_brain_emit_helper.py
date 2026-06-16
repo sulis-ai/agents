@@ -56,14 +56,18 @@ def _brain_emit_enabled() -> bool:
 
 
 def _brain_base_dir(repo_root: Path) -> Path:
-    """Resolve the brain instances directory.
-
-    `SULIS_BRAIN_BASE_DIR` overrides; otherwise `<repo_root>/.brain/instances`.
-    """
-    explicit = os.environ.get("SULIS_BRAIN_BASE_DIR", "").strip()
-    if explicit:
-        return Path(explicit).resolve()
-    return Path(repo_root) / ".brain" / "instances"
+    """Resolve the brain instances directory via the shared resolver (#127):
+    SULIS_BRAIN_BASE_DIR > repo-contract `brain_location` > the user-level
+    settings home `{sulis_state_base}/.brain/instances` (de-branch-scoped).
+    Best-effort: any import failure degrades to the same user-level default
+    (emission never breaks AND never re-traps the brain in a change worktree)."""
+    try:
+        from _brain_location import brain_base_dir
+        return brain_base_dir(repo_root)
+    except Exception:
+        import os
+        base = os.environ.get("SULIS_STATE_DIR") or (Path.home() / ".sulis")
+        return Path(base) / ".brain" / "instances"
 
 
 def _try_adapter(repo_root: Path, domain: str) -> Any:
@@ -82,9 +86,18 @@ def _try_adapter(repo_root: Path, domain: str) -> Any:
         return None
     try:
         base_dir = _brain_base_dir(repo_root)
-        return LocalFileEntityAdapter(base_dir=base_dir, domain=domain)
+        adapter = LocalFileEntityAdapter(base_dir=base_dir, domain=domain)
     except Exception:
         return None
+    # #67 slice 3b — when a change is active (SULIS_CHANGE_ID), wrap the adapter
+    # so every entity this emits is stamped with the change that produced/revised
+    # it. No active change → the plain adapter, unchanged. Best-effort: a
+    # stamping-import failure degrades to the unwrapped adapter (emission works).
+    try:
+        from _provenance_stamp import stamping_repo
+        return stamping_repo(adapter)
+    except Exception:
+        return adapter
 
 
 def _safely(fn, *args, **kwargs) -> dict | None:

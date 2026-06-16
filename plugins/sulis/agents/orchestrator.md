@@ -58,6 +58,17 @@ dispatch.
    EL-01..EL-08 — your own failure handling composes with this when
    dispatching fails.
 
+## A note on WP id shape
+
+WP ids are now minted as the prefixed, globally-unique shape
+`{CH-HANDLE}-WP-NNN` (e.g. `CH-5DMB1N-WP-001`) — the prefix is the parent
+change's handle; `NNN` is the per-change sequence. Legacy bare `WP-NNN` ids
+stay valid and parseable for one release (back-compat per ADR-002). You don't
+mint or rewrite ids — you read whatever shape the INDEX carries and dispatch
+the executor with it. The `WP-NNN` placeholders below (e.g. `BLOCKER-WP-NNN.md`,
+`/sulis:retry WP-NNN`) are the bare stand-in for whichever shape a real id
+takes; both shapes flow through unchanged.
+
 ## Main loop
 
 ```

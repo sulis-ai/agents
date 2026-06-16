@@ -570,3 +570,52 @@ def test_lint_rejects_missing_wp_table(tmp_project, run_tool):
     result = run_tool("wpx-index", "lint", *_common(tmp_project))
     assert not result.ok
     assert "| ID | Title |" in (result.error or "")
+
+
+# ─── #307: add-wp refuses to amend a drifted-header INDEX ──────────────────
+
+_DRIFTED_HEADER_INDEX = """# Work Package Index
+
+## Work Packages
+
+| WP | Purpose | Delta | Sev | dependsOn | Parallel? |
+|---|---|---|---|---|---|
+| WP-001 | Foundation | new module | high | — | no |
+"""
+
+_CANONICAL_HEADER_INDEX = """# Work Package Index
+
+## Work Packages
+
+| ID | Title | Primitive | Status | Depends On | Blocks |
+|---|---|---|---|---|---|
+| WP-001 | Foundation | create | done | — | — |
+"""
+
+
+def test_add_wp_refuses_drifted_header(tmp_project, run_tool):
+    """#307 — amending an INDEX whose WP-table header has drifted from
+    canonical (the `| WP | Purpose | Delta | ... |` shape SEA emitted in
+    CH-8BP0XN) must fail at add-wp time with the canonical-header error, not
+    survive to a cryptic 'Could not find WP table' mid-run-all."""
+    tmp_project.index_md.write_text(_DRIFTED_HEADER_INDEX, encoding="utf-8")
+    result = run_tool(
+        "wpx-index", "add-wp",
+        "--wp", "WP-002", "--title", "Next", "--primitive", "create",
+        *_common(tmp_project),
+    )
+    assert not result.ok, "add-wp must reject a drifted-header INDEX"
+    assert "canonical" in (result.error or "").lower() or \
+        "| ID | Title |" in (result.error or "")
+
+
+def test_add_wp_accepts_canonical_header(tmp_project, run_tool):
+    """Regression — a canonical-header INDEX still accepts the amend."""
+    tmp_project.index_md.write_text(_CANONICAL_HEADER_INDEX, encoding="utf-8")
+    result = run_tool(
+        "wpx-index", "add-wp",
+        "--wp", "WP-002", "--title", "Next", "--primitive", "create",
+        *_common(tmp_project),
+    )
+    assert result.ok, f"add-wp on a canonical header should succeed: {result.error}"
+    assert "WP-002" in tmp_project.index_md.read_text()

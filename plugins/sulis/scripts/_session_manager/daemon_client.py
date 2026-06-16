@@ -115,6 +115,21 @@ def resolve_daemon_log(socket_path: str) -> str:
     return str(Path(socket_path).resolve().parent / "session-manager-daemon.log")
 
 
+def _daemon_log_tail(socket_path: str, lines: int = 15) -> str:
+    """The last `lines` of the daemon stderr log — the cause of a failed boot
+    (a wedged-singleton message, a traceback). '' if absent/unreadable. Used to
+    fold the cause INTO DaemonStartError (#131) instead of leaving a bare timeout."""
+    try:
+        log = Path(resolve_daemon_log(socket_path))
+        if not log.is_file():
+            return ""
+        return "\n".join(
+            log.read_text(encoding="utf-8", errors="replace").splitlines()[-lines:]
+        ).strip()
+    except OSError:  # pragma: no cover - best-effort diagnostics
+        return ""
+
+
 def _status_reply(socket_path: str, timeout: float) -> "dict | None":
     """One ``status`` round-trip → the parsed reply dict, or ``None`` on any
     transport failure (missing socket, refused connect, timeout, malformed
@@ -420,7 +435,17 @@ def _spawn_and_wait(
     if _poll_until_live(socket_path, deadline, probe_timeout):
         return socket_path
 
+    # Surface WHY (#131 / the #201 'no failure cause captured' class). The daemon
+    # routes its stderr to a log beside the socket; include its tail + the spawned
+    # process's exit status IN the error, so the cause — e.g. "singleton lock held
+    # but no live socket … a daemon is mid-boot or wedged" (a wedged daemon holding
+    # the flock) — is right there, not buried in a log the operator must know to
+    # find. A bare 30s timeout with no cause is what made this undiagnosable.
+    rc = proc.poll()
+    exit_note = f" (the spawned daemon process exited with code {rc})" if rc is not None else ""
+    tail = _daemon_log_tail(socket_path)
+    log_note = f"\n--- daemon log tail ({resolve_daemon_log(socket_path)}) ---\n{tail}" if tail else ""
     raise DaemonStartError(
-        f"daemon did not become live at {socket_path!r} within {ready_timeout}s "
-        f"(spawn argv: {command!r})"
+        f"daemon did not become live at {socket_path!r} within {ready_timeout}s"
+        f"{exit_note} (spawn argv: {command!r}).{log_note}"
     )
