@@ -89,6 +89,14 @@ export interface Change {
    * relative-time label and the working/live split.
    */
   lastActivityAt: string | null;
+  /**
+   * The Product this change is assigned to (`dna:product:<ulid>`), or `null`
+   * when unassigned (shown under the "All" scope). Optional on the wire — a
+   * change without a product is the normal case, and not every Change-builder
+   * carries it; the board feed + detail populate it, the rest may omit it. Set
+   * via the change detail view's product picker; the board filter scopes by it.
+   */
+  forProduct?: string | null;
 }
 
 export interface ChangeDetail extends Change {

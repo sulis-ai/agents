@@ -55,6 +55,9 @@ export interface ChangeEnrichment {
   needsAttention: NeedsAttention;
   health: ChangeHealth;
   lastActivityAt: string | null;
+  /** The change's assigned Product id, or null when unassigned (shown under
+   *  All). Optional — only the board/detail enrichment populates it. */
+  forProduct?: string | null;
 }
 
 /**
@@ -88,5 +91,6 @@ export function toWireChange(
     needsAttention: enrichment.needsAttention,
     health: enrichment.health,
     lastActivityAt: enrichment.lastActivityAt,
+    forProduct: enrichment.forProduct,
   };
 }

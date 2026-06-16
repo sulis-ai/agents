@@ -32,6 +32,7 @@ import { readTestsState } from "./readTestsState";
 import { readRigorForStage } from "./readRigorForStage";
 import { computeHealth } from "./computeHealth";
 import { deriveLastActivityAt } from "./deriveLastActivityAt";
+import { readChangeForProduct } from "./readChangeForProduct";
 
 export type GatherChangeEnrichmentDeps = GatherChangeStatusDeps;
 
@@ -55,9 +56,10 @@ export async function gatherChangeEnrichment(
 
   // The two new best-effort reads → the health verdict (ADR-001). Both
   // never-throw; computeHealth is pure.
-  const [testsState, rigorForStage] = await Promise.all([
+  const [testsState, rigorForStage, forProduct] = await Promise.all([
     readTestsState(record.worktreePath),
     readRigorForStage(record.worktreePath, record.stage),
+    readChangeForProduct(deps.sulisStateDir, record.changeId),
   ]);
   const health = computeHealth({ testsState, rigorForStage });
 
@@ -74,6 +76,7 @@ export async function gatherChangeEnrichment(
       needsAttention: context.status.needsAttention,
       health,
       lastActivityAt,
+      forProduct,
     },
   };
 }
