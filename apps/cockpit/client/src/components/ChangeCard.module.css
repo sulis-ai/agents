@@ -257,3 +257,66 @@
 .openTerminal:hover {
   border-color: var(--primary);
 }
+
+/* ── WP-008 — assign-from-card ──
+ * The card is now wrapped in a positioning shell so the assign affordance can
+ * sit OUTSIDE the card <Link> (interactive content can't nest in an <a>) while
+ * still reading as part of the card. The shell is layout-only — the visual card
+ * frame stays on the inner <Link>.card. */
+.cardShell {
+  position: relative;
+}
+
+/* The unassigned affordance: a quiet row under the card body. ProductControl
+ * owns the trigger's ≥44px target + focus ring + a11y; this only spaces it from
+ * the card foot. Hover EMPHASISES it (opacity lift) but never controls presence
+ * — the affordance is always in the DOM (keyboard/touch parity). */
+.cardProduct {
+  margin-top: 8px;
+  opacity: 0.85;
+  transition: opacity 120ms ease;
+}
+.cardShell:hover .cardProduct,
+.cardProduct:focus-within {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cardProduct {
+    transition: none;
+  }
+}
+
+/* The quiet ASSIGNED chip in the foot-meta — a neutral monogram tile + the
+ * product name. Pushed to the right of the slug; muted, calm, tokens only. The
+ * glyph + name carry the meaning (never colour-alone). */
+.cardProductChip {
+  margin-left: auto;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 50%;
+  min-width: 0;
+  color: var(--muted-foreground);
+}
+.cardProductMono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: var(--radius-interactive);
+  background: var(--muted);
+  border: 1px solid var(--border-muted);
+  font-size: 9px;
+  font-weight: var(--weight-label);
+  letter-spacing: 0.02em;
+  color: var(--foreground);
+}
+.cardProductName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}

@@ -25,6 +25,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Change } from "../../../shared/api-types";
 import { Board } from "../pages/Board";
 import { LIVENESS_POLL_MS } from "../config";
+import { withProductsRoute, boardFetch } from "./_productsFetch";
 
 function makeChange(overrides: Partial<Change> = {}): Change {
   return {
@@ -107,7 +108,7 @@ describe("<Board> — characterisation (preserved Dashboard behaviour)", () => {
   });
 
   it("renders the empty state when zero changes", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, []));
+    vi.spyOn(globalThis, "fetch").mockImplementation(boardFetch([]) as never);
     const { getByText } = renderDashboard(freshClient());
     await waitFor(() =>
       expect(getByText(/nothing in flight/i)).toBeInTheDocument(),
@@ -119,8 +120,8 @@ describe("<Board> — characterisation (preserved Dashboard behaviour)", () => {
       makeChange({ changeId: "01AAA", handle: "CH-01AAA", intent: "Alpha" }),
       makeChange({ changeId: "01BBB", handle: "CH-01BBB", intent: "Beta" }),
     ];
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse(200, changes),
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      boardFetch(changes) as never,
     );
     const { getAllByTestId, getByText } = renderDashboard(freshClient());
     await waitFor(() => expect(getAllByTestId("change-card")).toHaveLength(2));
@@ -134,19 +135,19 @@ describe("<Board> — characterisation (preserved Dashboard behaviour)", () => {
     const changes: Change[] = [
       makeChange({ changeId: "01XYZ", handle: "CH-01XYZ" }),
     ];
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse(200, changes),
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      boardFetch(changes) as never,
     );
     const { getByRole, queryByTestId } = renderDashboard(freshClient());
-    const link = await waitFor(() =>
-      getByRole("link", { name: /CH-01XYZ/i }),
-    );
+    const link = await waitFor(() => getByRole("link", { name: /CH-01XYZ/i }));
     fireEvent.click(link);
-    await waitFor(() => expect(queryByTestId("thread-view")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(queryByTestId("thread-view")).toBeInTheDocument(),
+    );
   });
 
   it("Refresh button invalidates the changes query", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, []));
+    vi.spyOn(globalThis, "fetch").mockImplementation(boardFetch([]) as never);
     const client = freshClient();
     const spy = vi.spyOn(client, "invalidateQueries");
     const { getByRole } = renderDashboard(client);
@@ -154,7 +155,9 @@ describe("<Board> — characterisation (preserved Dashboard behaviour)", () => {
     // RefreshButton disables itself during in-flight fetches, so an
     // immediate click would no-op).
     await waitFor(() => {
-      const btn = getByRole("button", { name: /refresh/i }) as HTMLButtonElement;
+      const btn = getByRole("button", {
+        name: /refresh/i,
+      }) as HTMLButtonElement;
       expect(btn).toBeInTheDocument();
       expect(btn.disabled).toBe(false);
     });
@@ -164,15 +167,20 @@ describe("<Board> — characterisation (preserved Dashboard behaviour)", () => {
 
   it("the underlying query uses LIVENESS_POLL_MS as refetchInterval", async () => {
     vi.useFakeTimers();
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(jsonResponse(200, []));
+    // Count ONLY feed fetches — products is routed by the wrapper and excluded
+    // from this counter, so the poll-interval assertion stays exact (WP-008).
+    const feed = vi.fn(async () => jsonResponse(200, []));
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      withProductsRoute(feed) as never,
+    );
     const client = freshClient();
     renderDashboard(client);
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(feed).toHaveBeenCalledTimes(1));
     // Advance just past the configured interval and assert a refetch fired.
     await vi.advanceTimersByTimeAsync(LIVENESS_POLL_MS + 50);
-    await vi.waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2));
+    await vi.waitFor(() =>
+      expect(feed.mock.calls.length).toBeGreaterThanOrEqual(2),
+    );
     vi.useRealTimers();
   });
 });

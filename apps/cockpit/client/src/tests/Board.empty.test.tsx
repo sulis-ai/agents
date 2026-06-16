@@ -16,6 +16,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { axe } from "jest-axe";
 import type { Change } from "../../../shared/api-types";
 import { Board } from "../pages/Board";
+import { boardFetch } from "./_productsFetch";
 
 function makeChange(overrides: Partial<Change> = {}): Change {
   return {
@@ -47,13 +48,6 @@ function freshClient() {
   });
 }
 
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
-}
-
 function renderBoard(client: QueryClient) {
   return render(
     <QueryClientProvider client={client}>
@@ -75,7 +69,7 @@ describe("<Board> — empty state (WP-010, S-9 / AF-1)", () => {
   });
 
   it("first-run: zero changes + no filter → the EmptyState guide renders and the six-lane board does NOT (S-9)", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, []));
+    vi.spyOn(globalThis, "fetch").mockImplementation(boardFetch([]) as never);
     const { findByTestId, queryByTestId } = renderBoard(freshClient());
 
     // The "start a change" guide renders.
@@ -89,14 +83,14 @@ describe("<Board> — empty state (WP-010, S-9 / AF-1)", () => {
   });
 
   it("an all-shipped store reads as empty (zero in-flight → the guide, not the board) (FR-15 / AF-1)", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse(200, [
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      boardFetch([
         makeChange({
           changeId: "01DONE",
           handle: "CH-01DONE",
           stage: "shipped",
         }),
-      ]),
+      ]) as never,
     );
     const { findByTestId, queryByTestId } = renderBoard(freshClient());
     expect(await findByTestId("dashboard-empty")).toBeInTheDocument();
@@ -109,7 +103,7 @@ describe("<Board> — empty state (WP-010, S-9 / AF-1)", () => {
     // aria-controls to lane-<stage> ids that the empty board legitimately omits
     // — a pre-existing WP-008 a11y defect tracked as SF-36729581 (out of this
     // WP's Contract, which is the SkeletonCard + the Board loading branch).
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, []));
+    vi.spyOn(globalThis, "fetch").mockImplementation(boardFetch([]) as never);
     const { findByTestId } = renderBoard(freshClient());
     const empty = await findByTestId("dashboard-empty");
     const results = await axe(empty);
