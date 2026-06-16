@@ -1,3 +1,9 @@
+## v0.166.0 — 2026-06-16
+
+**Minor — release-train batch.**
+
+- Refined cockpit product experience: one searchable Product control everywhere (replacing the raw select), refined scope switcher with All products / Unassigned / live counts, remove-a-change-from-a-product, and assign-from-card on the board.
+
 ## v0.165.1 — 2026-06-16
 
 **Patch — release-train batch.**
