@@ -170,16 +170,38 @@ export class SpineSettingsAdapter implements SettingsStore {
         "--changes-dir", this.changesDir,
       ],
     );
-    let id = `dna:change:${changeId}`;
-    try {
-      const parsed = JSON.parse(stdout) as { data?: { id?: unknown } };
-      if (typeof parsed.data?.id === "string") id = parsed.data.id;
-    } catch {
-      /* the helper already succeeded (runHelper unwraps non-zero); keep the
-         derived id if the envelope shape ever drifts. */
-    }
+    const id = parseSavedChangeId(stdout, changeId);
     this.logWrite("assign-change-product", { changeId, productId });
     return { id, forProduct: productId };
+  }
+
+  /**
+   * Clear a change's product link back to unassigned (the un-assign seam,
+   * ADR-001). Drives the sanctioned `set-change-product.py --clear` helper — an
+   * explicit flag, never an empty `--for-product`, so the assign path's strict
+   * validation stays unweakened. The change id is validated against the ULID
+   * pattern BEFORE the helper runs (path-confinement parity with assign).
+   * Idempotent: clearing an already-unassigned change is a no-op success.
+   * Returns the change id + the now-null link.
+   */
+  async clearChangeProduct(
+    changeId: string,
+  ): Promise<{ id: string; forProduct: null }> {
+    if (!CHANGE_ULID_RE.test(changeId)) {
+      throw new SettingsStoreError("VALIDATION_FAILED", "invalid change id");
+    }
+    const stdout = await this.runHelper(
+      this.spineScript("set-change-product.py"),
+      [
+        "--base-dir", this.baseDir,
+        "--change-id", changeId,
+        "--clear",
+        "--changes-dir", this.changesDir,
+      ],
+    );
+    const id = parseSavedChangeId(stdout, changeId);
+    this.logWrite("clear-change-product", { changeId });
+    return { id, forProduct: null };
   }
 
   // ─── reads ─────────────────────────────────────────────────────────────
@@ -676,6 +698,22 @@ function parseRepo(
   } catch {
     return null;
   }
+}
+
+/** The saved change id from `set-change-product.py`'s `{data:{id}}` envelope,
+ *  falling back to the derived `dna:change:<ulid>` if the shape ever drifts.
+ *  Shared by assignChangeProduct + clearChangeProduct (the 2-consumer threshold,
+ *  EP-03): both drive the same helper and read the id back the same way. The
+ *  helper already succeeded (runHelper throws on a non-zero exit), so a parse
+ *  miss is non-fatal — the derived id is correct by construction. */
+function parseSavedChangeId(stdout: string, changeId: string): string {
+  try {
+    const parsed = JSON.parse(stdout) as { data?: { id?: unknown } };
+    if (typeof parsed.data?.id === "string") return parsed.data.id;
+  } catch {
+    /* fall through to the derived id */
+  }
+  return `dna:change:${changeId}`;
 }
 
 /** Parse the first emitted entity id from a helper's JSON envelope. */

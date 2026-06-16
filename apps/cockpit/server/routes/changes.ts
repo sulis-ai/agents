@@ -39,21 +39,21 @@ import { listScopedChanges, readProductQuery } from "./_product-scope";
  *  by SpineSettingsAdapter — the single allow-listed brain-write site — so this
  *  route does no I/O itself.
  *
- *  `clearChangeProduct` is the new un-assign seam (ADR-001): it resolves a null
+ *  `clearChangeProduct` is the un-assign seam (ADR-001): it resolves a null
  *  `forProduct`, never an empty string, so the helper's strict validation stays
- *  unweakened. The contract WP (WP-001) pins the method's SHAPE here; the
- *  adapter implementation and the DELETE route wiring land in WP-003. It is
- *  declared OPTIONAL so the existing assign-only call sites (the app wiring and
- *  the PUT route test) keep type-checking until WP-003 supplies the impl — the
- *  return shape is pinned regardless, so WP-003/WP-004 build against an exact
- *  contract (`ClearChangeProductResult` without the `ok` envelope, mirroring
- *  `assignChangeProduct`'s `{ id, forProduct }`). */
+ *  unweakened. The contract WP (WP-001) pinned the method's SHAPE; WP-003
+ *  supplies the adapter impl + the DELETE route wiring, so the method is now
+ *  REQUIRED. Like `assignChangeProduct`, the PORT method returns the bare
+ *  `{ id, forProduct }` (no `ok`); the DELETE route wraps it in the HTTP
+ *  `ClearChangeProductResult`, which DOES carry the `ok` envelope (it extends
+ *  `ChangeProductResultBase`) — the envelope is added at the transport edge,
+ *  not by the port. */
 export interface ChangeProductWriter {
   assignChangeProduct(
     changeId: string,
     productId: string,
   ): Promise<{ id: string; forProduct: string }>;
-  clearChangeProduct?(
+  clearChangeProduct(
     changeId: string,
   ): Promise<{ id: string; forProduct: null }>;
 }
@@ -127,6 +127,24 @@ export function createChangesRouter(deps: ChangesRouterDeps): Router {
         changeId,
         productId,
       );
+      res.json({ ok: true, id: result.id, forProduct: result.forProduct });
+    }),
+  );
+
+  // Un-assign a change from its Product (clear the for_product link back to
+  // null) — DELETE on the relationship sub-resource (ADR-001). Same single
+  // write site + parse-then-delegate shape as PUT; a malformed/blank id is a
+  // 400 that never reaches the writer (guard parity with the assign route).
+  router.delete(
+    "/:id/product",
+    asyncHandler(async (req, res) => {
+      const id = req.params.id;
+      const changeId = typeof id === "string" ? id.trim() : "";
+      if (!changeId) {
+        res.status(400).json({ ok: false, error: "changeId is required" });
+        return;
+      }
+      const result = await deps.changeProductWriter.clearChangeProduct(changeId);
       res.json({ ok: true, id: result.id, forProduct: result.forProduct });
     }),
   );
