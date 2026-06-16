@@ -46,7 +46,7 @@ import {
   useVirtualizer,
   type VirtualizerOptions,
 } from "@tanstack/react-virtual";
-import type { Change } from "../../../shared/api-types";
+import type { Change, Product } from "../../../shared/api-types";
 import type { BoardStage } from "../lib/groupChangesByStage";
 import { ChangeCard } from "./ChangeCard";
 import styles from "./StageColumn.module.css";
@@ -124,6 +124,11 @@ export interface StageColumnProps {
    *  stored on the feed. `null` (the default) → no card in the lane is
    *  selected (the non-change route, or a lane the active change isn't in). */
   activeChangeId?: string | null;
+  /** WP-008 — the founder's products, fetched once at the board and threaded to
+   *  every card so each can render the assign-from-card placement (assigned
+   *  monogram chip + "＋ Product" affordance) without a per-card query. Omitted
+   *  → cards render without the product placement (existing usages unchanged). */
+  products?: Product[];
 }
 
 /**
@@ -137,10 +142,12 @@ function LaneCardList({
   stage,
   changes,
   activeChangeId,
+  products,
 }: {
   stage: BoardStage;
   changes: Change[];
   activeChangeId: string | null;
+  products?: Product[];
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
@@ -204,6 +211,7 @@ function LaneCardList({
               <ChangeCard
                 change={change}
                 selected={change.changeId === activeChangeId}
+                products={products}
               />
             </div>
           );
@@ -217,6 +225,7 @@ export function StageColumn({
   stage,
   changes,
   activeChangeId = null,
+  products,
 }: StageColumnProps) {
   const name = STAGE_NAME[stage];
   return (
@@ -261,6 +270,7 @@ export function StageColumn({
           stage={stage}
           changes={changes}
           activeChangeId={activeChangeId}
+          products={products}
         />
       )}
 

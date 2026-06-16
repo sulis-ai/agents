@@ -28,6 +28,7 @@ import { axe } from "jest-axe";
 import type { Change } from "../../../shared/api-types";
 import { Board } from "../pages/Board";
 import { LIVENESS_POLL_MS } from "../config";
+import { withProductsRoute } from "./_productsFetch";
 
 function makeChange(overrides: Partial<Change> = {}): Change {
   return {
@@ -153,7 +154,9 @@ describe("<Board> — loading state (WP-010, S-34 part 1)", () => {
         ]),
       )
       .mockResolvedValue(jsonResponse(500, { error: "transient" }));
-    vi.spyOn(globalThis, "fetch").mockImplementation(fetchMock as never);
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      withProductsRoute(fetchMock) as never,
+    );
 
     const { getByText, queryByTestId } = renderBoard(freshClient());
     await vi.waitFor(() => expect(getByText("CH-01G")).toBeInTheDocument());
@@ -174,14 +177,14 @@ describe("<Board> — loading state (WP-010, S-34 part 1)", () => {
   });
 
   it("swaps skeletons for real cards in the SAME lane scaffold once data resolves (no restructure)", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(
-        jsonResponse(200, [
-          makeChange({ changeId: "01R", handle: "CH-01R", stage: "recon" }),
-        ]),
-      );
-    vi.spyOn(globalThis, "fetch").mockImplementation(fetchMock as never);
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(200, [
+        makeChange({ changeId: "01R", handle: "CH-01R", stage: "recon" }),
+      ]),
+    );
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      withProductsRoute(fetchMock) as never,
+    );
     const { findByText, getAllByTestId, queryByTestId } =
       renderBoard(freshClient());
 

@@ -22,6 +22,7 @@ import { Board } from "../pages/Board";
 import { ActiveProductProvider, useActiveProduct } from "../api/activeProduct";
 import { ProductSwitcher } from "../components/ProductSwitcher";
 import { UNASSIGNED_SCOPE } from "../lib/productCounts";
+import { withProductsRoute } from "./_productsFetch";
 
 const ACME = "dna:product:01ACME00000000000000000000";
 const HELP = "dna:product:01HELP00000000000000000000";
@@ -87,14 +88,21 @@ describe("Board re-scopes to the active Product (FR-37)", () => {
   });
 
   it("fetches the board scoped to the active Product (?product=<id>)", async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(jsonResponse(200, [makeChange({ changeId: "01A1", intent: "acme work" })]));
+    const feed = vi.fn(async (_input: RequestInfo | URL) =>
+      jsonResponse(200, [
+        makeChange({ changeId: "01A1", intent: "acme work" }),
+      ]),
+    );
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      withProductsRoute(feed) as never,
+    );
 
     const { getByTestId } = renderBoardWithProduct(freshClient(), ACME);
     await waitFor(() => expect(getByTestId("board")).toBeInTheDocument());
 
-    const url = fetchMock.mock.calls[0]![0] as string;
+    // products is routed by the wrapper, so the feed double sees only the
+    // /api/changes call(s) — assert the scope on the first feed fetch.
+    const url = String(feed.mock.calls[0]![0]);
     expect(url).toContain("/api/changes");
     expect(url).toContain(`product=${encodeURIComponent(ACME)}`);
   });
@@ -102,13 +110,23 @@ describe("Board re-scopes to the active Product (FR-37)", () => {
   it("re-scopes when the founder picks another Product in the switcher — the board re-fetches and the first Product's changes disappear (the journey-K round-trip)", async () => {
     // Acme returns one change; Helpdesk returns a DIFFERENT one. Picking
     // Helpdesk in the switcher re-scopes the SAME board to it (ADR-005).
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
-      const url = String(input);
-      if (url.includes(encodeURIComponent(HELP))) {
-        return Promise.resolve(jsonResponse(200, [makeChange({ changeId: "01H1", intent: "help work" })]));
-      }
-      return Promise.resolve(jsonResponse(200, [makeChange({ changeId: "01A1", intent: "acme work" })]));
-    });
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation((input) => {
+        const url = String(input);
+        if (url.includes(encodeURIComponent(HELP))) {
+          return Promise.resolve(
+            jsonResponse(200, [
+              makeChange({ changeId: "01H1", intent: "help work" }),
+            ]),
+          );
+        }
+        return Promise.resolve(
+          jsonResponse(200, [
+            makeChange({ changeId: "01A1", intent: "acme work" }),
+          ]),
+        );
+      });
 
     const products: Product[] = [
       { productId: ACME, name: "Acme Checkout", active: true },
@@ -145,7 +163,9 @@ describe("Board re-scopes to the active Product (FR-37)", () => {
     );
 
     await waitFor(() =>
-      expect(within(getByTestId("board")).getByText("acme work")).toBeInTheDocument(),
+      expect(
+        within(getByTestId("board")).getByText("acme work"),
+      ).toBeInTheDocument(),
     );
 
     // Pick Helpdesk in the switcher — the switch. (WP-005: the switcher now
@@ -157,12 +177,18 @@ describe("Board re-scopes to the active Product (FR-37)", () => {
     );
 
     await waitFor(() =>
-      expect(within(getByTestId("board")).getByText("help work")).toBeInTheDocument(),
+      expect(
+        within(getByTestId("board")).getByText("help work"),
+      ).toBeInTheDocument(),
     );
     // The first Product's change disappears (FR-37 — no other Product's change appears).
-    expect(within(getByTestId("board")).queryByText("acme work")).not.toBeInTheDocument();
     expect(
-      fetchMock.mock.calls.some((c) => String(c[0]).includes(encodeURIComponent(HELP))),
+      within(getByTestId("board")).queryByText("acme work"),
+    ).not.toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some((c) =>
+        String(c[0]).includes(encodeURIComponent(HELP)),
+      ),
     ).toBe(true);
   });
 });
@@ -183,18 +209,22 @@ describe("WP-005 — the Unassigned scope (client-derived, no new endpoint)", ()
   });
 
   it("fetches the FULL list (no ?product=) when the scope is Unassigned — the sentinel never reaches the wire", async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        jsonResponse(200, [
-          makeChange({ changeId: "u1", intent: "orphan work", forProduct: null }),
-        ]),
-      );
+    const feed = vi.fn(async (_input: RequestInfo | URL) =>
+      jsonResponse(200, [
+        makeChange({ changeId: "u1", intent: "orphan work", forProduct: null }),
+      ]),
+    );
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      withProductsRoute(feed) as never,
+    );
 
-    const { getByTestId } = renderBoardWithProduct(freshClient(), UNASSIGNED_SCOPE);
+    const { getByTestId } = renderBoardWithProduct(
+      freshClient(),
+      UNASSIGNED_SCOPE,
+    );
     await waitFor(() => expect(getByTestId("board")).toBeInTheDocument());
 
-    const url = fetchMock.mock.calls[0]![0] as string;
+    const url = String(feed.mock.calls[0]![0]);
     expect(url).toContain("/api/changes");
     // The Unassigned sentinel must NOT be sent as a product scope value.
     expect(url).not.toContain("product=");
@@ -204,19 +234,34 @@ describe("WP-005 — the Unassigned scope (client-derived, no new endpoint)", ()
   it("shows ONLY the unassigned changes (forProduct == null) under the Unassigned scope", async () => {
     // The feed returns a mix (an assigned change + two unassigned); the board
     // narrows to the unassigned ones client-side.
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse(200, [
-        makeChange({ changeId: "a1", intent: "assigned work", forProduct: ACME }),
-        makeChange({ changeId: "u1", intent: "orphan one", forProduct: null }),
-        makeChange({ changeId: "u2", intent: "orphan two" }), // forProduct undefined
-      ]),
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      withProductsRoute(async () =>
+        jsonResponse(200, [
+          makeChange({
+            changeId: "a1",
+            intent: "assigned work",
+            forProduct: ACME,
+          }),
+          makeChange({
+            changeId: "u1",
+            intent: "orphan one",
+            forProduct: null,
+          }),
+          makeChange({ changeId: "u2", intent: "orphan two" }), // forProduct undefined
+        ]),
+      ) as never,
     );
 
-    const { getByTestId } = renderBoardWithProduct(freshClient(), UNASSIGNED_SCOPE);
+    const { getByTestId } = renderBoardWithProduct(
+      freshClient(),
+      UNASSIGNED_SCOPE,
+    );
     await waitFor(() => expect(getByTestId("board")).toBeInTheDocument());
 
     const board = within(getByTestId("board"));
-    await waitFor(() => expect(board.getByText("orphan one")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(board.getByText("orphan one")).toBeInTheDocument(),
+    );
     expect(board.getByText("orphan two")).toBeInTheDocument();
     // The assigned change is filtered out.
     expect(board.queryByText("assigned work")).not.toBeInTheDocument();

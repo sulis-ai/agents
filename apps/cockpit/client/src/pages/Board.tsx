@@ -55,6 +55,7 @@ import { SearchBar } from "../components/SearchBar";
 import { SkeletonCard } from "../components/SkeletonCard";
 import { StageColumn } from "../components/StageColumn";
 import { useActiveProduct } from "../api/activeProduct";
+import { useProducts } from "../api/useProducts";
 import { filterChangesByScope } from "../lib/productCounts";
 import {
   BOARD_STAGES,
@@ -144,6 +145,14 @@ export function Board() {
   // `?product=`, so switching Products re-scopes the SAME board (ADR-005).
   const { activeProductId } = useActiveProduct();
 
+  // WP-008 — the founder's products, fetched ONCE here and threaded to every
+  // board card so each can render the assign-from-card placement (the assigned
+  // monogram chip + the "＋ Product" affordance) WITHOUT a per-card query. The
+  // ["products"] query key is shared with the scope switcher, so this is one
+  // network fetch, not a new one (ADR-002 — inject product data at the edge).
+  const products = useProducts();
+  const productList = products.data?.products;
+
   const searchArgs = { q: query, stages, needsAttention };
   const filtering = hasActiveFilter(searchArgs);
 
@@ -175,7 +184,9 @@ export function Board() {
   // the changes with no product here. For All / a real product scope this is a
   // pass-through (the server already scoped, or there's nothing to narrow), so
   // existing behaviour is unchanged.
-  const scopedData = hasData ? filterChangesByScope(data, activeProductId) : data;
+  const scopedData = hasData
+    ? filterChangesByScope(data, activeProductId)
+    : data;
 
   // Group into the six fixed columns; shipped is excluded (FR-15), so an
   // all-shipped store yields zero in-flight changes → the empty state.
@@ -290,6 +301,7 @@ export function Board() {
               stage={col.stage}
               changes={col.changes}
               activeChangeId={activeChangeId}
+              products={productList}
             />
           ))}
         </div>

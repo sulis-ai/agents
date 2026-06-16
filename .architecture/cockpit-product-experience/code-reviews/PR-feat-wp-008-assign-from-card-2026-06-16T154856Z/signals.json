@@ -1,0 +1,63 @@
+{
+  "pr": "wp/feat-cockpit-product-experience/wp-008-assign-from-card",
+  "base": "change/feat-cockpit-product-experience",
+  "timestamp": "2026-06-16T154856Z",
+  "diff": { "files_changed": 12, "insertions": 592, "deletions": 181 },
+  "build_verification": { "typecheck_delta_errors": 0, "lint_delta_errors": 0 },
+  "hygiene": {
+    "scope": "low",
+    "size": "medium",
+    "safety": "none",
+    "completeness": "low"
+  },
+  "lenses": {
+    "architecture": { "in_changes": 0, "in_neighbours": 3, "note": "F2 no-error-state, F3 no-timeout, F4 no-failure-test all live in the reused ProductControl/useAssignChangeProduct/api-client — pre-existing, neighbour-ring, out of this WP's Contract" },
+    "frontend_a11y": { "in_changes": 0, "note": "all WPF gates pass; tokens-only, always-in-DOM affordance, >=44px, never-colour-alone, no nested-interactive, jest-axe both themes both states" },
+    "quality": { "in_changes": 1, "resolved_inline": 1, "note": "MEDIUM: withProductsRoute/boardFetch duplicated across 5 test files -> extracted to _productsFetch.ts" }
+  },
+  "findings": [
+    {
+      "id": "F-Q1",
+      "lens": "quality",
+      "severity": "medium",
+      "ring": "changes",
+      "file": "client/src/tests/{Board,Board.empty,Board.loading,BoardProductScope,Dashboard}.test.tsx",
+      "evidence": "withProductsRoute / boardFetch helpers defined identically in 5 test files",
+      "resolution": "addressed-inline",
+      "fix": "Extracted to client/src/tests/_productsFetch.ts; all 5 files import it (EP-03)."
+    },
+    {
+      "id": "F-A2",
+      "lens": "architecture",
+      "severity": "medium",
+      "ring": "neighbours",
+      "downgraded_to": "low",
+      "file": "client/src/components/ChangeCard.tsx (via reused useAssignChangeProduct)",
+      "evidence": "saveState maps only idle/saving/saved; no isError branch",
+      "resolution": "out-of-scope",
+      "note": "Assign error surfacing is a property of the shared ProductControl + useAssignChangeProduct (existing ProductPicker has the same behaviour). Not in WP-008 Contract; would be a cross-cutting change to the shared primitive."
+    },
+    {
+      "id": "F-A3",
+      "lens": "architecture",
+      "severity": "medium",
+      "ring": "neighbours",
+      "downgraded_to": "low",
+      "file": "client/src/api/client.ts (shared funnel)",
+      "evidence": "apiPut has no request timeout",
+      "resolution": "out-of-scope",
+      "note": "Affects every mutation through the funnel; not introduced by this WP; not in Contract."
+    },
+    {
+      "id": "F-A4",
+      "lens": "architecture",
+      "severity": "low",
+      "ring": "changes",
+      "file": "client/src/tests/ChangeCard.product.test.tsx",
+      "evidence": "no assignment-failure test case",
+      "resolution": "out-of-scope",
+      "note": "Paired with F-A2/F-A3 (no error surface to assert). The WP Contract's DoD specifies happy-path assign + chip + a11y; failure-path is a follow-on once the shared primitive grows an error surface."
+    }
+  ],
+  "verdict": "Approve with fixes (the one in-changes MEDIUM addressed inline; remaining findings are neighbour-ring/out-of-scope)"
+}
