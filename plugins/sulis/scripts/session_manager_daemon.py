@@ -843,6 +843,12 @@ def main(argv: "list[str] | None" = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    # Defence in depth (ADR-001): clear the daemon's own SULIS_CHANGE_ID before
+    # any server is built, so the daemon can never be the source of a leaked
+    # change binding even if the per-spawn stamp is bypassed. Per-session value
+    # is stamped at the spawn seam from SessionSpec.brief_change_id.
+    os.environ.pop("SULIS_CHANGE_ID", None)
+
     # Singleton arbitration: take the flock BEFORE binding so only the holder
     # reaches SocketServer.start's unlink+bind (closes the race, ADR-001).
     lock_fd = _acquire_singleton_lock(args.lock)
