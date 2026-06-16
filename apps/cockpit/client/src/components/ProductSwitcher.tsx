@@ -133,6 +133,14 @@ export function ProductSwitcher({
   // "× clear" only appears when scoped away from All (there's somewhere to go
   // back to). At the All scope there is nothing to clear.
   const showClear = scope !== null;
+  // The trigger's accessible name always carries the active scope + its count
+  // ("Viewing All products, 23 changes"), so a screen reader announces the
+  // scope even at narrow widths where the visible "Viewing <scope>" text folds
+  // to the monogram tile + chevron (IDEAS.md §5 — the name folds, but stays on
+  // the accessible name).
+  const triggerLabel = `Viewing ${scopeLabel}, ${scopeCount} ${
+    scopeCount === 1 ? "change" : "changes"
+  }`;
 
   return (
     <div className={styles.pswitch}>
@@ -140,6 +148,7 @@ export function ProductSwitcher({
         mode="scope"
         rows={rows}
         selectedId={selectedId}
+        triggerLabel={triggerLabel}
         onSelect={onRowSelect}
         onSetUpNew={onSetUpNew}
         onManageProducts={onManageProducts}
