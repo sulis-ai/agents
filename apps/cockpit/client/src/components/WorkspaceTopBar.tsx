@@ -103,7 +103,7 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
             products={productList}
             activeProductId={activeProductId ?? serverActiveProductId}
             onSelect={setActiveProductId}
-            onSetUpNew={() => navigate("/onboarding")}
+            onSetUpNew={() => navigate("/settings?new=product")}
           />
         </div>
       )}

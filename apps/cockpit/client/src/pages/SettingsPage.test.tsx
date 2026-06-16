@@ -119,6 +119,26 @@ describe("<SettingsPage>", () => {
     expect(results).toHaveNoViolations();
   });
 
+  it("opens_add_product_form_when_arriving_with_new_product_param", async () => {
+    // Arriving at /settings?new=product (where the "Set up a new product"
+    // action now sends the founder) auto-opens the Add-a-product form, so they
+    // land on the form ready to fill — not merely on the settings list.
+    const tree: SettingsTree = { products: [product()] };
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, tree));
+    const { findByRole } = render(
+      <QueryClientProvider client={freshClient()}>
+        <MemoryRouter initialEntries={["/settings?new=product"]}>
+          <SettingsPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    // The Add-a-product form heading is shown without any click.
+    expect(
+      await findByRole("heading", { name: /add a product/i }),
+    ).toBeInTheDocument();
+  });
+
   it("implicit_product_is_read_only_with_add_first", async () => {
     // The synthesised single product is read-only (editable:false): no Rename/
     // Remove affordances, and the prominent "Add your first product" first-run

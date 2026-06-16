@@ -53,7 +53,7 @@ export function Sidebar() {
           products={productList}
           activeProductId={activeProductId ?? serverActiveProductId}
           onSelect={setActiveProductId}
-          onSetUpNew={() => navigate("/onboarding")}
+          onSetUpNew={() => navigate("/settings?new=product")}
         />
       )}
       {/* WP-009 — the concierge front door: the plain-English way to find a
