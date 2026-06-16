@@ -1,0 +1,12 @@
+{
+  "evidence": "scenario-run:dna:scenario:XQ3P3RQK71ZHB72RDF6HYANRND",
+  "id": "dna:testresult:MWNHEJG0YE185CW5QZXHH2TW54",
+  "of_run": "dna:testrun:EGTFXHKY24YNSG7VE50EW1R8MQ",
+  "outcome": "skip",
+  "scenario": "dna:scenario:XQ3P3RQK71ZHB72RDF6HYANRND",
+  "sys_status": "active",
+  "type": "e2e",
+  "verifies": [
+    "dna:requirement:2ZMCJHZR26RBFSX4GX67C41ES6"
+  ]
+}

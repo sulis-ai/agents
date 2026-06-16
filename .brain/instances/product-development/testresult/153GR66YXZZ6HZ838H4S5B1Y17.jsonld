@@ -1,0 +1,12 @@
+{
+  "evidence": "human-attested:Sulis (Playwright, 2026-06-16); observed=['the board shows the six stage lanes (Recon through Ship)', 'each lane fills the full height of the board', 'the card shows the change handle and a relative time on the top line', \"the card foot shows a single status \u2014 either 'Waiting on you' or a health state, never both\"]; not-observed=[]",
+  "id": "dna:testresult:153GR66YXZZ6HZ838H4S5B1Y17",
+  "of_run": "dna:testrun:WRJQMZSTHJJ7SGNKJ2ZBTQGG5Z",
+  "outcome": "pass",
+  "scenario": "dna:scenario:KPJH4824GAK3X3TH27APCXGWZJ",
+  "sys_status": "active",
+  "type": "e2e",
+  "verifies": [
+    "dna:requirement:84WXVP8RH85KMWCX51BJSS4DHC"
+  ]
+}

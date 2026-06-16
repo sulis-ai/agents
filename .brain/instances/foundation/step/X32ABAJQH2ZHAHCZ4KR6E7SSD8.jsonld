@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Open the product switcher and choose 'All products'",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:X32ABAJQH2ZHAHCZ4KR6E7SSD8",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "fv92p5hj-open-the-product-switcher-and-choose-all-1",
+  "output_artifacts": [
+    "fv92p5hj-open-the-product-switcher-and-choose-all-1-result"
+  ],
+  "postconditions": [
+    "the board shows every change regardless of product"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

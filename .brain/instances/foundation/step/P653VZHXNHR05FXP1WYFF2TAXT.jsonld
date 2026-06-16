@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Open the cockpit board",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:P653VZHXNHR05FXP1WYFF2TAXT",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "qv3mcqxy-open-the-cockpit-board-1",
+  "output_artifacts": [
+    "qv3mcqxy-open-the-cockpit-board-1-result"
+  ],
+  "postconditions": [
+    "the board shows the six stage lanes (Recon through Ship)",
+    "each lane fills the full height of the board"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}
