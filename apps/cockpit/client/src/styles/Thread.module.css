@@ -98,29 +98,6 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-/* The change → product picker (assign / change a change's product). A quiet
-   control that sits with the header meta; tokens-only, never a raw colour. */
-.productPicker {
-  font-size: 12px;
-  color: var(--foreground);
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-interactive);
-  padding: 2px 6px;
-  max-width: 180px;
-  cursor: pointer;
-}
-
-.productPicker:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 1px;
-}
-
-.productPicker:disabled {
-  opacity: 0.6;
-  cursor: progress;
-}
-
 /* WP-004 — the coherent "where am I" spine: stage track + read-time status,
  * sitting directly under the header (ADR-005). */
 .spine {

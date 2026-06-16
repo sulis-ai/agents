@@ -86,6 +86,12 @@
   font-weight: 600;
 }
 
+/* The change's Product property — the ProductControl chip + popover, aligned
+ * with the nav's other items (matches the section-label inset). */
+.cnProduct {
+  padding: 0 8px;
+}
+
 /* vertical stage track */
 .vtrack {
   list-style: none;
