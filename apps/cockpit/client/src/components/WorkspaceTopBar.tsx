@@ -51,7 +51,6 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
   const { openChangeIds, closeTab } = useOpenTabs();
 
   const productList = products.data?.products ?? [];
-  const serverActiveProductId = products.data?.activeProductId ?? null;
 
   const byId = new Map<string, Change>(
     (changesQuery.isSuccess ? changesQuery.data : []).map((c) => [
@@ -101,7 +100,7 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
         <div className={styles.brand}>
           <ProductSwitcher
             products={productList}
-            activeProductId={activeProductId ?? serverActiveProductId}
+            activeProductId={activeProductId}
             onSelect={setActiveProductId}
             onSetUpNew={() => navigate("/settings?new=product")}
           />

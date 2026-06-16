@@ -21,10 +21,10 @@ import styles from "./ProductSwitcher.module.css";
 
 export interface ProductSwitcherProps {
   products: Product[];
-  /** The active Product id (the current board scope). */
+  /** The active Product id, or null for the "All" scope (the current board scope). */
   activeProductId: string | null;
-  /** Re-scope to another Product (the switch). */
-  onSelect: (productId: string) => void;
+  /** Re-scope: a Product id filters to it; null selects "All" (every change). */
+  onSelect: (productId: string | null) => void;
   /** Optional "set up a new product" action (deferred surface; UC-07). */
   onSetUpNew?: () => void;
 }
@@ -70,17 +70,20 @@ export function ProductSwitcher({
     };
   }, [open]);
 
-  const active =
-    products.find((p) => p.productId === activeProductId) ??
-    products.find((p) => p.active) ??
-    products[0] ??
-    null;
+  // "All" is the default scope (activeProductId === null): every change shows,
+  // and a Product is a filter layered on top. An activeProductId that matches
+  // no known Product also reads as "All" (safe fallback — never a blank header).
+  const activeProduct =
+    products.find((p) => p.productId === activeProductId) ?? null;
+  const isAll = activeProduct === null;
+  const headerName = activeProduct ? activeProduct.name : "All";
 
-  if (active === null) return null;
+  // Nothing to switch when the Tenant has no Products at all.
+  if (products.length === 0) return null;
 
-  function choose(productId: string) {
+  function choose(productId: string | null) {
     setOpen(false);
-    if (productId !== active?.productId) onSelect(productId);
+    if (productId !== activeProductId) onSelect(productId);
   }
 
   return (
@@ -98,11 +101,11 @@ export function ProductSwitcher({
           aria-hidden="true"
           data-testid="product-switcher-avatar"
         >
-          {monogram(active.name)}
+          {monogram(headerName)}
         </span>
         <span className={styles.pmeta}>
-          <span className={styles.plabel}>Product</span>
-          <span className={styles.pname}>{active.name}</span>
+          <span className={styles.plabel}>Viewing</span>
+          <span className={styles.pname}>{headerName}</span>
         </span>
         <svg
           className={styles.pchev}
@@ -123,9 +126,35 @@ export function ProductSwitcher({
           aria-label="Switch product"
           data-testid="product-switcher-menu"
         >
+          <button
+            type="button"
+            className={isAll ? `${styles.pmitem} ${styles.active}` : styles.pmitem}
+            role="menuitemradio"
+            aria-checked={isAll}
+            data-testid="product-switcher-all"
+            onClick={() => choose(null)}
+          >
+            <span className={styles.pavatar} aria-hidden="true">
+              {monogram("All")}
+            </span>
+            <span className={styles.pmname}>All</span>
+            {isAll && (
+              <svg
+                className={styles.pmcheck}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.5}
+                aria-hidden="true"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            )}
+          </button>
+          <div className={styles.pmsep} role="separator" />
           <div className={styles.pmlabel}>Your products</div>
           {products.map((p) => {
-            const isActive = p.productId === active.productId;
+            const isActive = p.productId === activeProductId;
             return (
               <button
                 key={p.productId}

@@ -115,7 +115,52 @@ describe("<ProductSwitcher>", () => {
     expect(getByText("Sulis")).toBeInTheDocument();
     fireEvent.click(getByTestId("product-switcher-trigger"));
     const menu = getByTestId("product-switcher-menu");
-    expect(within(menu).getAllByRole("menuitemradio")).toHaveLength(1);
+    // The menu always offers "All" (every change) plus each Product: 1 + 1 = 2.
+    expect(within(menu).getAllByRole("menuitemradio")).toHaveLength(2);
+    expect(within(menu).getByText("All")).toBeInTheDocument();
+  });
+
+  it("defaults to the 'All' scope when activeProductId is null — the trigger reads 'All'", () => {
+    const { getByText, getByTestId } = render(
+      <ProductSwitcher
+        products={TWO_PRODUCTS}
+        activeProductId={null}
+        onSelect={() => {}}
+      />,
+    );
+    // Null scope is "All" — every change shows; Products are filters on top.
+    expect(getByText("All")).toBeInTheDocument();
+    fireEvent.click(getByTestId("product-switcher-trigger"));
+    // "All" is the checked option in the menu.
+    expect(getByTestId("product-switcher-all")).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("picking a Product filters to it (onSelect(productId))", () => {
+    const onSelect = vi.fn();
+    const { getByText, getByTestId } = render(
+      <ProductSwitcher
+        products={TWO_PRODUCTS}
+        activeProductId={null}
+        onSelect={onSelect}
+      />,
+    );
+    fireEvent.click(getByTestId("product-switcher-trigger"));
+    fireEvent.click(getByText("Helpdesk"));
+    expect(onSelect).toHaveBeenCalledWith("dna:product:01HELP00000000000000000000");
+  });
+
+  it("picking 'All' from a filtered state clears the filter (onSelect(null))", () => {
+    const onSelect = vi.fn();
+    const { getByTestId } = render(
+      <ProductSwitcher
+        products={TWO_PRODUCTS}
+        activeProductId="dna:product:01HELP00000000000000000000"
+        onSelect={onSelect}
+      />,
+    );
+    fireEvent.click(getByTestId("product-switcher-trigger"));
+    fireEvent.click(getByTestId("product-switcher-all"));
+    expect(onSelect).toHaveBeenCalledWith(null);
   });
 
   it("performs no mutation — selecting fires only onSelect, never a fetch", () => {

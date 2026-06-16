@@ -42,16 +42,13 @@ export function Sidebar() {
   // The switcher reflects the server-resolved active Product until the founder
   // picks another (which updates the context scope the board/sidebar fetch on).
   const productList = products.isSuccess ? products.data.products : [];
-  const serverActiveProductId = products.isSuccess
-    ? products.data.activeProductId
-    : null;
 
   return (
     <aside className={styles.sidebar} data-testid="shell-sidebar">
       {productList.length > 0 && (
         <ProductSwitcher
           products={productList}
-          activeProductId={activeProductId ?? serverActiveProductId}
+          activeProductId={activeProductId}
           onSelect={setActiveProductId}
           onSetUpNew={() => navigate("/settings?new=product")}
         />
