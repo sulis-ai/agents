@@ -78,6 +78,8 @@ const EMPTY_SOURCE = { repo: "", path: "", primary_branch: "" };
  *  runs (path-confinement, CONCERN-1). */
 const PRODUCT_ID_RE = /^dna:product:[0-9A-HJKMNP-TV-Z]{26}$/;
 const PROJECT_ID_RE = /^dna:project:[0-9A-HJKMNP-TV-Z]{26}$/;
+/** A change id is the bare Crockford-base32 ULID (the cockpit's `changeId`). */
+const CHANGE_ULID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 /** A structured log entry the adapter emits per write (and on a write error). */
 export type SettingsLogEntry = Record<string, unknown>;
@@ -87,6 +89,9 @@ export interface SpineSettingsAdapterOptions {
   scriptsDir: string;
   /** The brain instances dir: `<state>/.brain/instances`. */
   baseDir: string;
+  /** The change store dir: `<state>/changes`. Used to compose a Change entity
+   *  for a change that has no brain record yet (per-change product assignment). */
+  changesDir?: string;
   /** Override for the bundled spine helper dir (tests inject a stub here). */
   spineDir?: string;
   /** Per-call timeout (ms). Defaults to 30s. */
@@ -119,6 +124,7 @@ type BrainEntity = Record<string, unknown>;
 export class SpineSettingsAdapter implements SettingsStore {
   private readonly scriptsDir: string;
   private readonly baseDir: string;
+  private readonly changesDir: string;
   private readonly spineDir: string;
   private readonly timeoutMs: number;
   private readonly log: (entry: SettingsLogEntry) => void;
@@ -126,9 +132,54 @@ export class SpineSettingsAdapter implements SettingsStore {
   constructor(opts: SpineSettingsAdapterOptions) {
     this.scriptsDir = opts.scriptsDir;
     this.baseDir = path.resolve(opts.baseDir);
+    // Default the change store to the sibling of the brain home
+    // (`<state>/changes` next to `<state>/.brain/instances`).
+    this.changesDir =
+      opts.changesDir ?? path.resolve(opts.baseDir, "..", "..", "changes");
     this.spineDir = opts.spineDir ?? defaultSpineDir();
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.log = opts.log ?? defaultLog;
+  }
+
+  // ─── change → product assignment ──────────────────────────────────────────
+
+  /**
+   * Assign a change to a Product by setting `for_product` on its brain Change
+   * entity (the authoritative link the board scopes by). Drives the sanctioned
+   * `set-change-product.py` helper — a validated read-modify-save, composing a
+   * Change entity from the change's record when none exists yet. The product id
+   * is validated against the ULID pattern BEFORE the helper runs (path-
+   * confinement parity with the settings writes). Returns the saved id + link.
+   */
+  async assignChangeProduct(
+    changeId: string,
+    productId: string,
+  ): Promise<{ id: string; forProduct: string }> {
+    if (!CHANGE_ULID_RE.test(changeId)) {
+      throw new SettingsStoreError("VALIDATION_FAILED", "invalid change id");
+    }
+    if (!PRODUCT_ID_RE.test(productId)) {
+      throw new SettingsStoreError("VALIDATION_FAILED", "invalid product id");
+    }
+    const stdout = await this.runHelper(
+      this.spineScript("set-change-product.py"),
+      [
+        "--base-dir", this.baseDir,
+        "--change-id", changeId,
+        "--for-product", productId,
+        "--changes-dir", this.changesDir,
+      ],
+    );
+    let id = `dna:change:${changeId}`;
+    try {
+      const parsed = JSON.parse(stdout) as { data?: { id?: unknown } };
+      if (typeof parsed.data?.id === "string") id = parsed.data.id;
+    } catch {
+      /* the helper already succeeded (runHelper unwraps non-zero); keep the
+         derived id if the envelope shape ever drifts. */
+    }
+    this.logWrite("assign-change-product", { changeId, productId });
+    return { id, forProduct: productId };
   }
 
   // ─── reads ─────────────────────────────────────────────────────────────

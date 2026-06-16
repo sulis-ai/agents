@@ -221,6 +221,14 @@ SETTINGS_ADAPTER_REL="server/adapters/SpineSettingsAdapter.ts"
 # a mutation verb is still a violation.
 SETTINGS_ROUTE_REL="server/routes/settings.ts"
 
+# Per-change product assignment — the changes router's PUT /:id/product sets
+# for_product on a change's brain record. Like the settings router it carries a
+# mutation verb BUT starts no process and writes no file itself: the write
+# delegates to the allow-listed SpineSettingsAdapter. Allow-listed BY PATH for
+# the HTTP mutation-verb rule (rule 5) ONLY — no filesystem-write or
+# process-start exception; every OTHER file with a mutation verb still violates.
+CHANGES_ROUTE_REL="server/routes/changes.ts"
+
 # Accumulate per-rule hits across all files.
 declare -a fs_hits=() git_spawn_hits=() git_verb_hits=() kill_hits=() http_hits=() bind_hits=() proc_hits=() ws_hits=()
 
@@ -375,7 +383,7 @@ for f in "${SOURCE_FILES[@]}"; do
       #    WP-006 (ADR-019) also allow-lists settings.ts: the THIRD sanctioned
       #    write surface — its settings CRUD verbs delegate to the one allow-
       #    listed adapter (it starts no process, writes no file itself).
-      if [ "$rel" != "$RELAY_ROUTE_REL" ] && [ "$rel" != "$ADVANCED_ROUTE_REL" ] && [ "$rel" != "$SETTINGS_ROUTE_REL" ]; then
+      if [ "$rel" != "$RELAY_ROUTE_REL" ] && [ "$rel" != "$ADVANCED_ROUTE_REL" ] && [ "$rel" != "$SETTINGS_ROUTE_REL" ] && [ "$rel" != "$CHANGES_ROUTE_REL" ]; then
         while IFS= read -r line; do
           [ -n "$line" ] && http_hits+=("$rel: $line")
         done < <(printf '%s\n' "$stripped" | grep -nE \

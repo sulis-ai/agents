@@ -34,10 +34,21 @@ import { asyncHandler } from "./_async";
 import { toWireChange } from "./_change-lookup";
 import { listScopedChanges, readProductQuery } from "./_product-scope";
 
+/** The sanctioned writer that assigns a change to a Product (sets for_product
+ *  on the change's brain record). Implemented by SpineSettingsAdapter — the
+ *  single allow-listed brain-write site — so this route does no I/O itself. */
+export interface ChangeProductWriter {
+  assignChangeProduct(
+    changeId: string,
+    productId: string,
+  ): Promise<{ id: string; forProduct: string }>;
+}
+
 export interface ChangesRouterDeps {
   changeStore: ChangeStoreReader;
   sulisStateDir: string;
   claudeProjectsDir: string;
+  changeProductWriter: ChangeProductWriter;
 }
 
 export function createChangesRouter(deps: ChangesRouterDeps): Router {
@@ -80,5 +91,31 @@ export function createChangesRouter(deps: ChangesRouterDeps): Router {
       res.json(enriched);
     }),
   );
+
+  // Assign a change to a Product (set its for_product link). The board's
+  // product filter reflects it on the next read. The adapter validates the id
+  // shapes and is the sole write site; this handler only parses + delegates.
+  router.put(
+    "/:id/product",
+    asyncHandler(async (req, res) => {
+      const id = req.params.id;
+      const changeId = typeof id === "string" ? id : "";
+      const body = (req.body ?? {}) as { productId?: unknown };
+      const productId =
+        typeof body.productId === "string" ? body.productId : "";
+      if (!changeId || !productId) {
+        res
+          .status(400)
+          .json({ ok: false, error: "changeId and productId are required" });
+        return;
+      }
+      const result = await deps.changeProductWriter.assignChangeProduct(
+        changeId,
+        productId,
+      );
+      res.json({ ok: true, id: result.id, forProduct: result.forProduct });
+    }),
+  );
+
   return router;
 }
