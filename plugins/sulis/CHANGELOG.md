@@ -1,3 +1,9 @@
+## v0.165.0 — 2026-06-16
+
+**Minor — release-train batch.**
+
+- Cockpit board refresh: full-height lanes, redesigned cards, dark-mode elevation, responsive breakpoints, server-side health/attention, plus the product model — All-scope filtering and per-change product assignment.
+
 ## v0.164.1 — 2026-06-14
 
 **Patch — release-train batch.**
