@@ -6,13 +6,15 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import type { AssignChangeProductResult } from "../../../shared/api-types";
+
 import { apiPut } from "./client";
 
-export interface AssignChangeProductResult {
-  ok: boolean;
-  id: string;
-  forProduct: string;
-}
+// The result shape is pinned ONCE in the shared wire contract (WP-001;
+// shared/api-types.ts) and re-exported here for existing call sites — there is
+// no second copy to drift (CF-02 / DRY). The new un-assign sibling lives next
+// to it as `ClearChangeProductResult`.
+export type { AssignChangeProductResult };
 
 export function assignChangeProduct(
   changeId: string,

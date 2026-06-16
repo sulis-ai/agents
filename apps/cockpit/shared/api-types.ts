@@ -591,6 +591,37 @@ export interface ProjectSource {
   primary_branch: string;
 }
 
+// ─── Change-product writes (assign + the un-assign seam; ADR-001) ─────────────
+//
+// The two results of writing a change's product link, the one cross-kind seam
+// in this change (ADR-001, CONTRACT_FIRST_STANDARD): the contract WP (WP-001)
+// pins these BEFORE the server write (WP-003) and the client hook (WP-004)
+// build against them — both import these shapes, never redeclare them (CF-02).
+//
+//   PUT    /api/changes/:id/product  → AssignChangeProductResult (forProduct: string)
+//   DELETE /api/changes/:id/product  → ClearChangeProductResult  (forProduct: null)
+//
+// The clear result is an EXPLICIT sibling with `forProduct: null`, not a
+// magic-null sentinel on the assign shape (ADR-001 "explicit beats inferred").
+// The two share the `ok`/`id` envelope and diverge only on `forProduct`.
+
+/** The shared envelope both change-product writes return: `ok` + the change id. */
+interface ChangeProductResultBase {
+  ok: boolean;
+  /** The change's brain record id (`dna:change:<ulid>`). */
+  id: string;
+}
+
+/** PUT result — the change is now assigned to `forProduct` (a product id). */
+export interface AssignChangeProductResult extends ChangeProductResultBase {
+  forProduct: string;
+}
+
+/** DELETE result — the change's product link is cleared back to unassigned. */
+export interface ClearChangeProductResult extends ChangeProductResultBase {
+  forProduct: null;
+}
+
 // ─── Discovery — onboarding (cold-start mint; UC-07, ADR-007/008) ─────────────
 
 /** One turn in the cold-start onboarding conversation (UC-07). */
