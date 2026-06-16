@@ -21,6 +21,7 @@ Two surfaces are proven here:
 
 from __future__ import annotations
 
+import os
 import subprocess
 
 import pytest
@@ -204,3 +205,124 @@ def test_spawn_process_passes_explicit_env_excluding_creds_including_proxy(
     assert env.get("PATH") == "/usr/bin"
 
     mgr.shutdown()
+
+
+# ─── 3. per-spawn SULIS_CHANGE_ID stamping (WP-001, this change's ADR-001) ─────
+#
+# The daemon leaked its own launch-time ``SULIS_CHANGE_ID`` into every spawned
+# session because the pure policy passed every non-credential var through
+# unchanged. The fix stamps ``SULIS_CHANGE_ID`` per spawn from
+# ``SessionSpec.brief_change_id`` (override inherited) and removes it when the
+# spawn has no target change (no stale inheritance), plus a daemon-startup clear
+# as defence in depth.
+
+_STALE_DAEMON_CHANGE_ID = "01DAEMON_STALE_0000000000000000"
+_TARGET_CHANGE_ID = "01TARGET_CHANGE_1111111111111111"
+
+
+def test_child_env_stamps_supplied_change_id_overriding_inherited() -> None:
+    """A supplied ``change_id`` overrides any inherited ``SULIS_CHANGE_ID`` in
+    the parent env — the child carries its own target change, not the daemon's
+    launch-time value."""
+    parent = {"PATH": "/usr/bin", "SULIS_CHANGE_ID": _STALE_DAEMON_CHANGE_ID}
+    child = child_spawn_env(parent, proxy_endpoint=None, change_id=_TARGET_CHANGE_ID)
+    assert child["SULIS_CHANGE_ID"] == _TARGET_CHANGE_ID
+
+
+def test_child_env_removes_change_id_when_no_target() -> None:
+    """``change_id=None`` removes any inherited ``SULIS_CHANGE_ID`` — a session
+    with no bound change must not silently adopt the daemon's."""
+    parent = {"PATH": "/usr/bin", "SULIS_CHANGE_ID": _STALE_DAEMON_CHANGE_ID}
+    child = child_spawn_env(parent, proxy_endpoint=None, change_id=None)
+    assert "SULIS_CHANGE_ID" not in child
+
+
+def test_child_env_change_id_default_is_none_removes() -> None:
+    """Back-compat lock: with NO ``change_id`` kwarg the defaulted-None
+    behaviour removes (rather than leaks) any inherited ``SULIS_CHANGE_ID`` —
+    callers must opt in to a target."""
+    parent = {"PATH": "/usr/bin", "SULIS_CHANGE_ID": _STALE_DAEMON_CHANGE_ID}
+    child = child_spawn_env(parent, proxy_endpoint=None)
+    assert "SULIS_CHANGE_ID" not in child
+
+
+def test_spawn_process_stamps_target_change_id(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    """The seam: ``_spawn_process`` stamps the spec's ``brief_change_id`` onto
+    the child env handed to ``Popen``, overriding a stale daemon value in
+    ``os.environ``."""
+    monkeypatch.setenv("SULIS_CHANGE_ID", _STALE_DAEMON_CHANGE_ID)
+    _PopenSpy.captured = None
+    monkeypatch.setattr(subprocess, "Popen", _PopenSpy)
+
+    mgr = SessionManager({"stub": _StubAdapter()}, start_maintenance=False)
+    spec = SessionSpec(
+        provider="stub", cwd=str(tmp_path), brief_change_id=_TARGET_CHANGE_ID
+    )
+    mgr._spawn_process(_StubAdapter(), spec)
+
+    assert _PopenSpy.captured is not None
+    env = _PopenSpy.captured.get("env")
+    assert env is not None
+    assert env["SULIS_CHANGE_ID"] == _TARGET_CHANGE_ID
+
+    mgr.shutdown()
+
+
+def test_spawn_process_no_change_id_when_spec_has_none(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    """A spec with ``brief_change_id=None`` yields no ``SULIS_CHANGE_ID`` in the
+    child env, even when ``os.environ`` carries a stale daemon value."""
+    monkeypatch.setenv("SULIS_CHANGE_ID", _STALE_DAEMON_CHANGE_ID)
+    _PopenSpy.captured = None
+    monkeypatch.setattr(subprocess, "Popen", _PopenSpy)
+
+    mgr = SessionManager({"stub": _StubAdapter()}, start_maintenance=False)
+    spec = SessionSpec(provider="stub", cwd=str(tmp_path), brief_change_id=None)
+    mgr._spawn_process(_StubAdapter(), spec)
+
+    assert _PopenSpy.captured is not None
+    env = _PopenSpy.captured.get("env")
+    assert env is not None
+    assert "SULIS_CHANGE_ID" not in env
+
+    mgr.shutdown()
+
+
+# ─── 4. daemon-startup defence in depth (Armor) ───────────────────────────────
+
+
+def test_daemon_main_clears_own_change_id_at_startup(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    """``session_manager_daemon.main()`` clears its own ``SULIS_CHANGE_ID`` from
+    ``os.environ`` at startup, before any server is built — the belt to the
+    per-spawn brace (ADR-001). The singleton lock + boot are stubbed so no real
+    server starts."""
+    import session_manager_daemon
+
+    monkeypatch.setenv("SULIS_CHANGE_ID", _STALE_DAEMON_CHANGE_ID)
+    # Stub the lock acquisition (return a sentinel fd) and the boot so main()
+    # runs the startup clear without touching a real socket/lock/server.
+    monkeypatch.setattr(
+        session_manager_daemon, "_acquire_singleton_lock", lambda _path: 99
+    )
+    monkeypatch.setattr(
+        session_manager_daemon, "_boot_and_serve", lambda _args, _lock_fd: 0
+    )
+
+    rc = session_manager_daemon.main(
+        [
+            "--socket",
+            str(tmp_path / "sock"),
+            "--lock",
+            str(tmp_path / "lock"),
+            "--pidfile",
+            str(tmp_path / "pid"),
+        ]
+    )
+
+    assert rc == 0
+    assert "SULIS_CHANGE_ID" not in os.environ
