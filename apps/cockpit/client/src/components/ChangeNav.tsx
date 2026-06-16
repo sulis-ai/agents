@@ -16,6 +16,7 @@ import {
 } from "@heroicons/react/24/outline";
 import type { Change, WorkflowStage } from "../../../shared/api-types";
 import { stageLabel } from "./StageBadge";
+import { ProductPicker } from "./ProductPicker";
 import styles from "../styles/ChangeWorkspace.module.css";
 
 export type ChangeView =
@@ -94,6 +95,12 @@ export function ChangeNav({
             </span>
           )}
         </div>
+        {/* Assign (or change) this change's product — the board filter scopes
+            by it. Hidden until the founder has a product to assign to. */}
+        <ProductPicker
+          changeId={change.changeId}
+          currentProductId={change.forProduct}
+        />
       </div>
 
       {/* Views first — this is the primary navigation the founder clicks to

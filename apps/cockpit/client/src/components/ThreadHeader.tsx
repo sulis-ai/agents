@@ -17,7 +17,6 @@
 import type { Change } from "../../../shared/api-types";
 import styles from "../styles/Thread.module.css";
 import { stageLabel } from "./StageBadge";
-import { ProductPicker } from "./ProductPicker";
 
 interface Props {
   change: Change;
@@ -45,12 +44,6 @@ export function ThreadHeader({ change }: Props) {
         />
         {/* The one canonical handle, demoted to a small muted reference. */}
         <span className={styles.handle}>{change.handle}</span>
-        {/* Assign (or change) this change's product — the board filter scopes
-            by it. Hidden until the founder has a product to assign to. */}
-        <ProductPicker
-          changeId={change.changeId}
-          currentProductId={change.forProduct}
-        />
       </div>
     </header>
   );
