@@ -67,6 +67,15 @@ describe("scopeChangesToProduct (the change→Project→Product roll-up; FR-37)"
     expect(scoped.map((c) => c.changeId)).toEqual(["01A1", "01A2"]);
   });
 
+  it("returns ALL changes for the 'All' scope (activeProductId null) even with multiple Products", () => {
+    // The founder's "All" view: no specific Product selected → every change
+    // shows, regardless of which Product it rolls up to (or none). Products are
+    // filters layered on top of All, never a default that hides changes — this
+    // is what stops a second Product from blanking the whole board.
+    const scoped = scopeChangesToProduct(twoProductChanges, null, twoProductRollup());
+    expect(scoped.map((c) => c.changeId)).toEqual(["01A1", "01H1", "01A2", "01H2"]);
+  });
+
   it("re-scopes to the OTHER Product — the first Product's changes disappear (the switch)", () => {
     const scoped = scopeChangesToProduct(twoProductChanges, HELP, twoProductRollup());
     expect(scoped.map((c) => c.changeId)).toEqual(["01H1", "01H2"]);

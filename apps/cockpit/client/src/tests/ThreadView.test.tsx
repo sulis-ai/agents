@@ -57,6 +57,10 @@ const sampleChange: ChangeDetail = {
   updatedAt: "2026-05-21T00:00:00Z",
   stage: "implement",
   liveness: { status: "running", pid: 4242 },
+  // WP-001 widened fields — fixture defaults.
+  needsAttention: { flagged: false, reason: null },
+  health: { state: "unknown", reason: "too early to tell" },
+  lastActivityAt: null,
   transcriptPaths: [],
 };
 

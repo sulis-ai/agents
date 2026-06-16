@@ -30,6 +30,8 @@
 //   this WP's single-page scope (EP-07).
 // RESOLVE_BY: 2026-07-09
 
+import { useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { SettingsProduct } from "../../../shared/api-types";
 import { useSettings } from "../api/useSettings";
 import { ProductRow } from "./settings/ProductRow";
@@ -42,6 +44,20 @@ import styles from "./settings/Settings.module.css";
 export function SettingsPage() {
   const settings = useSettings();
   const actions = useSettingsActions();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // "Set up a new product" (the product switcher action) lands here with
+  // ?new=product — open the Add-a-product form straight away so the founder
+  // arrives on the form ready to fill, not just on the settings list. Clear
+  // the param afterwards so a refresh / back-nav doesn't re-open it.
+  const openAddProduct = actions.handlers.onAddProduct;
+  useEffect(() => {
+    if (searchParams.get("new") !== "product") return;
+    openAddProduct();
+    const next = new URLSearchParams(searchParams);
+    next.delete("new");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, openAddProduct]);
 
   const products: SettingsProduct[] = settings.data?.products ?? [];
   // First-run / empty: a genuinely empty store, OR the synthesised implicit

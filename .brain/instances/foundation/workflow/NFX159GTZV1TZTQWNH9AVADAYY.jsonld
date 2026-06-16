@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:workflow:NFX159GTZV1TZTQWNH9AVADAYY",
+  "initial_steps": [
+    "qv3mcqxy-open-the-cockpit-board-1"
+  ],
+  "name": "The refreshed board renders as a calm triage surface",
+  "state": "draft",
+  "steps": [
+    "qv3mcqxy-open-the-cockpit-board-1",
+    "qv3mcqxy-look-at-a-change-card-in-a-lane-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "qv3mcqxy-look-at-a-change-card-in-a-lane-2"
+  ],
+  "transitions": [
+    "qv3mcqxy-open-the-cockpit-board-1 -> qv3mcqxy-look-at-a-change-card-in-a-lane-2"
+  ],
+  "type": "review"
+}

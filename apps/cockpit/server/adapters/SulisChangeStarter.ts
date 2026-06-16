@@ -207,6 +207,12 @@ function parseStartedChange(stdout: string, input: StartInput): Change | null {
     // The script seeds the initial stage as `recon` — the change lands there.
     stage: "recon",
     liveness: { status: "not-running" },
+    // WP-001 placeholders for a just-started change: nothing waits on the
+    // founder yet, health is honestly `unknown` ("too early to tell" at recon),
+    // and the only recency is the create moment. WP-002 derives these on read.
+    needsAttention: { flagged: false, reason: null },
+    health: { state: "unknown", reason: "too early to tell" },
+    lastActivityAt: now,
   };
 }
 

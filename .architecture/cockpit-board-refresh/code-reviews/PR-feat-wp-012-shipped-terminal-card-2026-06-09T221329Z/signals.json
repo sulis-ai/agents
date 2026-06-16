@@ -1,0 +1,34 @@
+{
+  "review": {
+    "target": "feat/wp-012-shipped-terminal-card",
+    "base": "change/feat-cockpit-board-refresh",
+    "project": "cockpit-board-refresh",
+    "timestamp": "2026-06-09T221329Z",
+    "verdict": "PASS",
+    "outcome_plain": "Ready to merge"
+  },
+  "build_verification": {
+    "typecheck_base_errors": 0,
+    "typecheck_head_errors": 0,
+    "lint_errors": 0,
+    "prettier_clean": true,
+    "pr_introduced_errors": 0
+  },
+  "hygiene": {
+    "scope": { "commit_types": ["feat"], "module_fan_out": 1, "severity": "none" },
+    "size": { "code_loc": 250, "files_changed": 6, "severity": "none" },
+    "safety": { "migrations": 0, "schemas": 0, "secrets": 0, "infra": 0, "severity": "none" },
+    "completeness": { "new_source_without_test": 0, "api_change_without_schema": false, "severity": "none" }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "note": "nothing surfaced — no cross-layer imports, no singletons, no external calls, no I/O" },
+    "security": { "findings": 0, "note": "nothing surfaced — secrets scan clean; presentational React + date helper, no auth/injection/SSRF surface" },
+    "quality": { "findings": 0, "note": "jsx-ident scan resolved {change}/{now}/{NOW} in scope; no dead surface; no contract drift; tests present; CR-10 no anti-pattern matches" }
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+    "in_neighbours": { "total": 0 }
+  },
+  "draft_hardening_deltas": [],
+  "auto_downgrade_triggers": []
+}

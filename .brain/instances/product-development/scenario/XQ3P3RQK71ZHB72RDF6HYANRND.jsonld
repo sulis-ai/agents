@@ -1,0 +1,12 @@
+{
+  "exercises": "dna:design:00000000000000000000000000",
+  "id": "dna:scenario:XQ3P3RQK71ZHB72RDF6HYANRND",
+  "journey": "dna:workflow:4Z00ZFSN6QGJX833NM64S6P5M9",
+  "name": "Switching the board scope by product",
+  "state": "draft",
+  "surface": "ui",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:2ZMCJHZR26RBFSX4GX67C41ES6"
+  ]
+}

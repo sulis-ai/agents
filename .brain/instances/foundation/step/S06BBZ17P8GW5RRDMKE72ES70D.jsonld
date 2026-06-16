@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Look at a change card in a lane",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:S06BBZ17P8GW5RRDMKE72ES70D",
+  "input_artifacts": [
+    "qv3mcqxy-open-the-cockpit-board-1-result"
+  ],
+  "mechanism": "human",
+  "name": "qv3mcqxy-look-at-a-change-card-in-a-lane-2",
+  "output_artifacts": [
+    "qv3mcqxy-look-at-a-change-card-in-a-lane-2-result"
+  ],
+  "postconditions": [
+    "the card shows the change handle and a relative time on the top line",
+    "the card foot shows a single status \u2014 either 'Waiting on you' or a health state, never both"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

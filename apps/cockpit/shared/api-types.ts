@@ -25,7 +25,40 @@ export type WorkflowStage =
 export type Liveness =
   | { status: "running"; pid: number }
   | { status: "not-running" }
+  // `unknown` is first-class: the probe couldn't determine the process state
+  // and renders it distinctly rather than implying not-running (FR-41).
   | { status: "unknown"; reason: string };
+
+/**
+ * Whether a change is waiting on the founder, and why. Lifted from
+ * `ChangeStatus.needsAttention` so both the status read and the board feed
+ * import one shape — never two copies (CF-02 / DRY). `reason` is null when
+ * the change is idle-but-fine (FR-12 — idle is NOT flagged).
+ */
+export interface NeedsAttention {
+  flagged: boolean;
+  reason: "blocked" | "waiting-on-decision" | "stopped-mid-reply" | null;
+}
+
+/**
+ * The board's cheap change-health verdict. `"unknown"` is first-class — a
+ * fresh or degraded change must read honestly ("too early to tell"), not
+ * masquerade as on-track (FR-31). `"worth-a-look"` is carried by the wire but
+ * the producer does not emit it yet — it lands when the scope-drift OODA
+ * signal arrives (ADR-001); additive, no re-layout.
+ */
+export type ChangeHealthState =
+  | "on-track"
+  | "off-track"
+  | "worth-a-look"
+  | "unknown";
+
+export interface ChangeHealth {
+  /** producer emits on/off-track + unknown now; worth-a-look deferred (ADR-001/FR-31). */
+  state: ChangeHealthState;
+  /** plain-English reason from a fixed set — never the reply body (NFR-SEC-03/FR-32). */
+  reason: string;
+}
 
 export interface Change {
   changeId: string;
@@ -47,6 +80,23 @@ export interface Change {
   updatedAt: string;
   stage: WorkflowStage;
   liveness: Liveness;
+  /** Whether the change is waiting on the founder, and why (FR-30; CF-02). */
+  needsAttention: NeedsAttention;
+  /** Cheap on/off-track-or-unknown health read for the board card (FR-30/31). */
+  health: ChangeHealth;
+  /**
+   * ISO 8601 UTC of the last activity; `null` ⇒ no-recency (FR-42). Drives the
+   * relative-time label and the working/live split.
+   */
+  lastActivityAt: string | null;
+  /**
+   * The Product this change is assigned to (`dna:product:<ulid>`), or `null`
+   * when unassigned (shown under the "All" scope). Optional on the wire — a
+   * change without a product is the normal case, and not every Change-builder
+   * carries it; the board feed + detail populate it, the rest may omit it. Set
+   * via the change detail view's product picker; the board filter scopes by it.
+   */
+  forProduct?: string | null;
 }
 
 export interface ChangeDetail extends Change {
@@ -453,10 +503,8 @@ export interface ChangeStatus {
   stage: WorkflowStage;
   /** One human-readable sentence/short paragraph of what's happening. */
   headline: string;
-  needsAttention: {
-    flagged: boolean;
-    reason: "blocked" | "waiting-on-decision" | "stopped-mid-reply" | null;
-  };
+  /** The single `NeedsAttention` shape, reused by the board feed too (CF-02 / DRY). */
+  needsAttention: NeedsAttention;
 }
 
 /** One entity/workflow the agent created for a change (FR-06/07). */

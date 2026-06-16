@@ -1,35 +1,47 @@
-/* WP-003 — StageColumn styles.
+/* WP-004 — StageColumn styles: the FULL-HEIGHT LANE.
  *
- * Matches the SIGNED visual contract (sulis-app.html, board panel): a
- * neutral column on --muted with a hairline border, a header row with the
- * stage-colour dot + uppercase name + a count pill, and a vertical card
- * list. Colour appears ONLY on the stage dot (the board's one colour,
- * ADR-005); everything else is neutral. Consumes tokens.css only — no raw
- * hex. The dot draws on the shared --stage-* scale (one palette, no
- * parallel set). */
+ * Matches the production-approved visual contract
+ * (.design/cockpit-board-refresh/MOCKUP.html — .lane / .laneHead /
+ * .laneList / .laneFoot / .laneEmpty): a neutral lane on --muted with a
+ * hairline border and a 2px top hairline, a STICKY header (dot + uppercase
+ * name + count pill) that stays put while the lane's cards scroll, and an
+ * INTERNAL-SCROLL card list so each lane scrolls on its own (the board no
+ * longer scrolls as one page). An empty lane keeps its full height + header
+ * + count and shows a quiet dashed "Nothing here yet" note. The Recon lane
+ * carries a quiet "Start here" foot. Colour appears ONLY on the stage dot
+ * (the board's one colour, ADR-005); everything else is neutral. Consumes
+ * tokens.css only — no raw hex. The dot draws on the shared --stage-* scale
+ * (one palette, no parallel set). */
 
-.col {
+.lane {
   display: flex;
   flex-direction: column;
+  /* full-height: the lane fills its board-grid row top to bottom; header +
+   * list + foot stack, and the LIST owns the scroll (not the lane, not the
+   * page). No max-height cap — the old ragged short-lane dead space is gone. */
   min-height: 0;
-  /* The list scrolls within the column rather than every card cramming into
-   * one viewport (matches the SIGNED contract's calm board: columns scroll,
-   * the board doesn't sprawl). */
-  max-height: 560px;
   background: var(--muted);
   border: 1px solid var(--border-muted);
-  /* a quiet 2px top hairline gives each column a calm "header band" edge,
-   * exactly as the signed board panel (.col border-top:2px solid border). */
+  /* a quiet 2px top hairline gives each lane a calm "header band" edge,
+   * exactly as the signed contract (.lane border-top: 2px solid border). */
   border-top: 2px solid var(--border);
   border-radius: var(--radius-container);
 }
 
-.colhead {
+/* Sticky header — stays put while the lane's cards scroll. The --muted
+ * background is required so scrolled cards don't bleed through behind it. */
+.laneHead {
+  position: sticky;
+  top: 0;
+  flex: 0 0 auto;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 14px;
+  padding: 13px 14px;
+  background: var(--muted);
   border-bottom: 1px solid var(--border);
+  border-radius: var(--radius-container) var(--radius-container) 0 0;
 }
 
 .sdot {
@@ -41,18 +53,18 @@
   background: var(--muted-foreground);
 }
 
-.colname {
+.laneName {
   flex: 1;
   font-size: 11px;
   font-weight: var(--weight-label);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   /* secondary (not full-strength) text — the calm signed treatment: the
-   * column name is a quiet label, the dot carries the only colour. */
+   * lane name is a quiet label, the dot carries the only colour. */
   color: var(--muted-foreground);
 }
 
-.colcount {
+.laneCount {
   font-size: 11px;
   font-weight: var(--weight-label);
   color: var(--muted-foreground);
@@ -62,20 +74,110 @@
   padding: 1px 8px;
 }
 
-.collist {
+/* The internal-scroll card list — this is the scroll container, so each lane
+ * scrolls independently and the board itself never scrolls as one page. */
+.laneList {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 12px;
-  overflow-y: auto;
 }
 
-.colEmpty {
-  margin: 0;
-  padding: 20px 12px;
+.laneList::-webkit-scrollbar {
+  width: 8px;
+}
+.laneList::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+}
+
+/* WP-013 — virtualised lane list. The spacer is sized to the FULL card count
+ * (so the lane's internal scroll covers all N changes — the header count's
+ * truth) while only the windowed rows mount inside it. It is the one flex
+ * child of .laneList; rows are absolutely positioned within it by transform,
+ * so the list's flex `gap` does not apply to them — the 12px inter-card gap is
+ * folded into each row's padding-bottom so measured row heights include it. */
+.laneVirtualSpacer {
+  position: relative;
+  width: 100%;
+  /* The spacer must not stretch under flex; its height is set inline to the
+   * virtualiser's total size. */
+  flex: 0 0 auto;
+}
+
+.laneVirtualRow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  /* The inter-card gap (matches .laneList's 12px gap) lives on the row so the
+   * measured height the virtualiser records includes it — no overlap, no
+   * cumulative drift. */
+  padding-bottom: 12px;
+}
+
+/* EMPTY LANE — a stage with zero changes inside an otherwise-populated board.
+ * The lane is NOT collapsed or hidden: it keeps its full height, its header
+ * and its count (0), and shows this quiet placeholder so the board's shape
+ * stays stable and the founder can see the stage is simply empty (not
+ * broken). A faint dashed outline reads as "an empty slot". Purely muted — no
+ * status colour, because an empty lane is neither good nor bad. */
+.laneEmpty {
+  margin: 16px 12px;
+  padding: 22px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
   text-align: center;
   font-size: 12px;
   color: var(--muted-foreground);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-container);
+}
+.laneEmpty svg {
+  width: 20px;
+  height: 20px;
+  color: var(--border);
+}
+
+/* Pinned bottom action — RECON ONLY (changes start at Recon). A quiet
+ * outline secondary so it never competes with the top-bar primary. */
+.laneFoot {
+  flex: 0 0 auto;
+  padding: 8px 12px 12px;
+}
+.startHere {
+  width: 100%;
+  height: 34px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-interactive);
+  background: transparent;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.startHere:hover {
+  border-color: var(--stage-recon);
+  color: var(--foreground);
+}
+.startHere:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.startHere svg {
+  width: 14px;
+  height: 14px;
 }
 
 /* Per-stage dot colour — the one shared stage scale (tokens.css). */

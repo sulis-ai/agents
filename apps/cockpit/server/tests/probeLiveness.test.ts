@@ -44,11 +44,10 @@ describe("probeLiveness — TDD §8 behaviour matrix", () => {
     fs.rmSync(stateDir, { recursive: true, force: true });
   });
 
-  it("returns unknown/no-session-record when session.json is missing", async () => {
+  it("returns not-running when session.json is missing (no session = not running, a clean idle read — not unknown)", async () => {
     const result = await probeLiveness(stateDir, changeId);
     expect(result).toEqual({
-      status: "unknown",
-      reason: "no session record",
+      status: "not-running",
     });
   });
 

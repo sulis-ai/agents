@@ -108,6 +108,11 @@ const SETTINGS_ROUTE_BASENAME = "settings.ts";
 //                           `claude` spawn that produces the cached summary.
 const ADVANCED_ROUTE_BASENAME = "advanced.ts";
 const CHANGE_ADVANCED_BASENAME = "changeAdvanced.ts";
+// Per-change product assignment — the changes router's PUT /:id/product sets
+// for_product on a change's brain record. The write itself happens in the
+// allow-listed SpineSettingsAdapter (the route does no I/O); the route file is
+// allow-listed BY PATH like the settings router, same single-audited-site rule.
+const CHANGES_ROUTE_BASENAME = "changes.ts";
 const TURN_SUMMARIES_BASENAME = "turnSummaries.ts";
 
 // WP-004 (ADR-010/ADR-011) — the terminal composition's process-start site:
@@ -297,6 +302,7 @@ describe("read-only inventory (TDD §13.7)", () => {
       RELAY_ROUTE_BASENAME,
       ADVANCED_ROUTE_BASENAME,
       SETTINGS_ROUTE_BASENAME,
+      CHANGES_ROUTE_BASENAME,
     ]);
     const offenders: string[] = [];
     const writeVerbFiles = new Set<string>();
@@ -316,6 +322,7 @@ describe("read-only inventory (TDD §13.7)", () => {
         RELAY_ROUTE_BASENAME,
         ADVANCED_ROUTE_BASENAME,
         SETTINGS_ROUTE_BASENAME,
+        CHANGES_ROUTE_BASENAME,
       ].sort(),
     );
   });
@@ -480,6 +487,7 @@ describe("read-only inventory (TDD §13.7)", () => {
         RELAY_ROUTE_BASENAME,
         ADVANCED_ROUTE_BASENAME,
         SETTINGS_ROUTE_BASENAME,
+        CHANGES_ROUTE_BASENAME,
       ].sort(),
     );
   });
@@ -515,6 +523,7 @@ describe("read-only inventory (TDD §13.7)", () => {
         RELAY_ROUTE_BASENAME,
         ADVANCED_ROUTE_BASENAME,
         SETTINGS_ROUTE_BASENAME,
+        CHANGES_ROUTE_BASENAME,
       ].sort(),
     );
   });

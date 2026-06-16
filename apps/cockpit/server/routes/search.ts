@@ -24,9 +24,9 @@ import { Router } from "express";
 // eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits; the rule's `../../*` pattern is intended to block escapes out of apps/cockpit/, which `import/no-restricted-paths` already enforces correctly)
 import type { Change, WorkflowStage } from "../../shared/api-types";
 import type { ChangeStoreReader, ChangeStoreRecord } from "../ports/ChangeStoreReader";
-import { probeLiveness } from "../lib/probeLiveness";
 import { readBrain } from "../lib/readBrain";
 import { gatherChangeStatus } from "../lib/gatherChangeStatus";
+import { gatherChangeEnrichment } from "../lib/gatherChangeEnrichment";
 import { gatherChangeContent } from "../lib/gatherChangeContent";
 import { searchChanges, type SearchableChange } from "../lib/searchChanges";
 
@@ -77,15 +77,18 @@ export function createSearchRouter(deps: SearchRouterDeps): Router {
 
       const survivors = searchChanges(items, { q, stage, needsAttention });
 
-      // Shape the survivors to the wire Change (with liveness), preserving
-      // the filtered order.
+      // Shape the survivors to the wire Change, preserving the filtered
+      // order. The board and search agree by construction: both shape via
+      // the same `gatherChangeEnrichment` helper (WP-002 / ADR-002), so a
+      // searched row carries the identical liveness + attention + health +
+      // last-activity the board list does.
       const results: Change[] = await Promise.all(
         survivors.map(async (record) => {
-          const liveness = await probeLiveness(
-            deps.sulisStateDir,
-            record.changeId,
+          const { liveness, enrichment } = await gatherChangeEnrichment(
+            deps,
+            record,
           );
-          return toWireChange(record, liveness);
+          return toWireChange(record, liveness, enrichment);
         }),
       );
 

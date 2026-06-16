@@ -40,12 +40,18 @@ export async function listScopedChanges(
   requestedProduct: string | null,
 ): Promise<ChangeStoreRecord[]> {
   const allRecords = await changeStore.listAllChanges();
-  const { list, rollup } = await readProducts({
+  const { rollup } = await readProducts({
     sulisStateDir,
     activeProductId: requestedProduct,
     changes: allRecords,
   });
-  // Scope to the resolved active Product (the requested one when valid, else
-  // the default the Product list resolved to).
-  return scopeChangesToProduct(allRecords, list.activeProductId, rollup);
+  // "All" scope: when no specific Product is requested (`requestedProduct` is
+  // null), show EVERY change — a Product is a filter layered on top of All,
+  // never a default that hides changes. scopeChangesToProduct already returns
+  // the full set for a null scope; we pass the raw request through rather than
+  // the resolved first Product, which previously hid every change the moment a
+  // second Product existed (a change's worktree never lives under a Project's
+  // repo root, so the roll-up could match nothing). A real Product id still
+  // filters to that Product's changes.
+  return scopeChangesToProduct(allRecords, requestedProduct, rollup);
 }

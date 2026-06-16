@@ -5,7 +5,7 @@
 // dozen buckets is hand-rolled, no new dep).
 
 import { describe, it, expect } from "vitest";
-import { formatRelativeTime } from "./relativeTime";
+import { formatRelativeTime, formatShippedRecency } from "./relativeTime";
 
 function isoOffset(ms: number, now: Date): string {
   return new Date(now.getTime() - ms).toISOString();
@@ -74,5 +74,37 @@ describe("formatRelativeTime", () => {
 
   it("renders 'unknown' for invalid ISO strings", () => {
     expect(formatRelativeTime("not-a-date", NOW)).toBe("unknown");
+  });
+});
+
+// WP-012 — the SHIPPED-RECENCY wording (Q-7 default "shipped Nd ago"). The
+// archival phrase REUSES the compact bucket from formatCompactRelativeTime
+// (EP-03 — one bucketing source), so we only assert the wrapping wording + a
+// representative day/week/hour bucket and the defensive "—" fall-through.
+describe("formatShippedRecency (WP-012, Q-7)", () => {
+  const NOW = new Date("2026-06-09T12:00:00Z");
+
+  it("renders 'shipped Nd ago' for a days-old shipped time", () => {
+    expect(
+      formatShippedRecency(isoOffset(5 * 24 * 60 * 60_000, NOW), NOW),
+    ).toBe("shipped 5d ago");
+  });
+
+  it("renders 'shipped Nw ago' for a weeks-old shipped time", () => {
+    expect(
+      formatShippedRecency(isoOffset(14 * 24 * 60 * 60_000, NOW), NOW),
+    ).toBe("shipped 2w ago");
+  });
+
+  it("renders 'shipped Nh ago' for an hours-old shipped time", () => {
+    expect(formatShippedRecency(isoOffset(3 * 60 * 60_000, NOW), NOW)).toBe(
+      "shipped 3h ago",
+    );
+  });
+
+  it("falls through to the defensive '—' token for an invalid shipped time", () => {
+    // A malformed payload must not print a bogus age; the compact formatter's
+    // "—" guard flows through the wrapping wording.
+    expect(formatShippedRecency("not-a-date", NOW)).toBe("shipped — ago");
   });
 });

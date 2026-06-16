@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Open a change and find the Product control in its header",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:N6NH9M53TW9ERXAMXZ8C7JQWPR",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "nf46xcgx-open-a-change-and-find-the-product-contr-1",
+  "output_artifacts": [
+    "nf46xcgx-open-a-change-and-find-the-product-contr-1-result"
+  ],
+  "postconditions": [
+    "the change shows a Product field with its current product (or an option to add one)"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

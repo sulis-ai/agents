@@ -292,6 +292,17 @@ export function createApp(deps: CreateAppDeps): Application {
     createChangesRouter({
       changeStore: deps.changeStore,
       sulisStateDir: deps.sulisStateDir,
+      claudeProjectsDir: deps.claudeProjectsDir,
+      // The sanctioned brain-write site (same adapter the settings forms use)
+      // assigns a change to a Product; the changes router itself does no I/O.
+      changeProductWriter: new SpineSettingsAdapter({
+        scriptsDir: resolvePluginScriptsDir({
+          scriptName: "_entity_adapter_local.py",
+          envOverride: process.env.SULIS_ADAPTER_SCRIPTS_DIR,
+        }),
+        baseDir: join(deps.sulisStateDir, ".brain", "instances"),
+        changesDir: join(deps.sulisStateDir, "changes"),
+      }),
     }),
   );
 

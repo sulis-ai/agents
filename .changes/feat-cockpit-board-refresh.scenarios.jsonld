@@ -1,0 +1,227 @@
+{
+ "scenarios": [
+  {
+   "exercises": "dna:design:00000000000000000000000000",
+   "id": "dna:scenario:KPJH4824GAK3X3TH27APCXGWZJ",
+   "journey": "dna:workflow:NFX159GTZV1TZTQWNH9AVADAYY",
+   "name": "The refreshed board renders as a calm triage surface",
+   "state": "draft",
+   "surface": "ui",
+   "sys_status": "active",
+   "verifies": [
+    "dna:requirement:84WXVP8RH85KMWCX51BJSS4DHC"
+   ]
+  },
+  {
+   "exercises": "dna:design:00000000000000000000000000",
+   "id": "dna:scenario:XQ3P3RQK71ZHB72RDF6HYANRND",
+   "journey": "dna:workflow:4Z00ZFSN6QGJX833NM64S6P5M9",
+   "name": "Switching the board scope by product",
+   "state": "draft",
+   "surface": "ui",
+   "sys_status": "active",
+   "verifies": [
+    "dna:requirement:2ZMCJHZR26RBFSX4GX67C41ES6"
+   ]
+  },
+  {
+   "exercises": "dna:design:00000000000000000000000000",
+   "id": "dna:scenario:1RW6KSPM5FN26GDYT4EY9AK81A",
+   "journey": "dna:workflow:YGM4B8JVC08WNM190V09QZQEZP",
+   "name": "Assigning a change to a product",
+   "state": "draft",
+   "surface": "ui",
+   "sys_status": "active",
+   "verifies": [
+    "dna:requirement:G1K0MXDB1QCW2ZKY70Y86RH6KX"
+   ]
+  }
+ ],
+ "workflows": [
+  {
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:workflow:NFX159GTZV1TZTQWNH9AVADAYY",
+   "initial_steps": [
+    "qv3mcqxy-open-the-cockpit-board-1"
+   ],
+   "name": "The refreshed board renders as a calm triage surface",
+   "state": "draft",
+   "steps": [
+    "qv3mcqxy-open-the-cockpit-board-1",
+    "qv3mcqxy-look-at-a-change-card-in-a-lane-2"
+   ],
+   "sys_status": "active",
+   "terminal_steps": [
+    "qv3mcqxy-look-at-a-change-card-in-a-lane-2"
+   ],
+   "transitions": [
+    "qv3mcqxy-open-the-cockpit-board-1 -> qv3mcqxy-look-at-a-change-card-in-a-lane-2"
+   ],
+   "type": "review"
+  },
+  {
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:workflow:4Z00ZFSN6QGJX833NM64S6P5M9",
+   "initial_steps": [
+    "fv92p5hj-open-the-product-switcher-and-choose-all-1"
+   ],
+   "name": "Switching the board scope by product",
+   "state": "draft",
+   "steps": [
+    "fv92p5hj-open-the-product-switcher-and-choose-all-1",
+    "fv92p5hj-choose-a-specific-product-in-the-switche-2"
+   ],
+   "sys_status": "active",
+   "terminal_steps": [
+    "fv92p5hj-choose-a-specific-product-in-the-switche-2"
+   ],
+   "transitions": [
+    "fv92p5hj-open-the-product-switcher-and-choose-all-1 -> fv92p5hj-choose-a-specific-product-in-the-switche-2"
+   ],
+   "type": "review"
+  },
+  {
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:workflow:YGM4B8JVC08WNM190V09QZQEZP",
+   "initial_steps": [
+    "nf46xcgx-open-a-change-and-find-the-product-contr-1"
+   ],
+   "name": "Assigning a change to a product",
+   "state": "draft",
+   "steps": [
+    "nf46xcgx-open-a-change-and-find-the-product-contr-1",
+    "nf46xcgx-pick-a-product-from-the-menu-2"
+   ],
+   "sys_status": "active",
+   "terminal_steps": [
+    "nf46xcgx-pick-a-product-from-the-menu-2"
+   ],
+   "transitions": [
+    "nf46xcgx-open-a-change-and-find-the-product-contr-1 -> nf46xcgx-pick-a-product-from-the-menu-2"
+   ],
+   "type": "review"
+  }
+ ],
+ "steps": [
+  {
+   "agent_instructions": "Open the cockpit board",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:P653VZHXNHR05FXP1WYFF2TAXT",
+   "input_artifacts": [
+    "test-target"
+   ],
+   "mechanism": "human",
+   "name": "qv3mcqxy-open-the-cockpit-board-1",
+   "output_artifacts": [
+    "qv3mcqxy-open-the-cockpit-board-1-result"
+   ],
+   "postconditions": [
+    "the board shows the six stage lanes (Recon through Ship)",
+    "each lane fills the full height of the board"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "Look at a change card in a lane",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:S06BBZ17P8GW5RRDMKE72ES70D",
+   "input_artifacts": [
+    "qv3mcqxy-open-the-cockpit-board-1-result"
+   ],
+   "mechanism": "human",
+   "name": "qv3mcqxy-look-at-a-change-card-in-a-lane-2",
+   "output_artifacts": [
+    "qv3mcqxy-look-at-a-change-card-in-a-lane-2-result"
+   ],
+   "postconditions": [
+    "the card shows the change handle and a relative time on the top line",
+    "the card foot shows a single status \u2014 either 'Waiting on you' or a health state, never both"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "Open the product switcher and choose 'All products'",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:X32ABAJQH2ZHAHCZ4KR6E7SSD8",
+   "input_artifacts": [
+    "test-target"
+   ],
+   "mechanism": "human",
+   "name": "fv92p5hj-open-the-product-switcher-and-choose-all-1",
+   "output_artifacts": [
+    "fv92p5hj-open-the-product-switcher-and-choose-all-1-result"
+   ],
+   "postconditions": [
+    "the board shows every change regardless of product"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "Choose a specific product in the switcher",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:YTWZ7CH8RTDJB2BXK5CV3GDP7E",
+   "input_artifacts": [
+    "fv92p5hj-open-the-product-switcher-and-choose-all-1-result"
+   ],
+   "mechanism": "human",
+   "name": "fv92p5hj-choose-a-specific-product-in-the-switche-2",
+   "output_artifacts": [
+    "fv92p5hj-choose-a-specific-product-in-the-switche-2-result"
+   ],
+   "postconditions": [
+    "the board shows only the changes assigned to that product"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "Open a change and find the Product control in its header",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:N6NH9M53TW9ERXAMXZ8C7JQWPR",
+   "input_artifacts": [
+    "test-target"
+   ],
+   "mechanism": "human",
+   "name": "nf46xcgx-open-a-change-and-find-the-product-contr-1",
+   "output_artifacts": [
+    "nf46xcgx-open-a-change-and-find-the-product-contr-1-result"
+   ],
+   "postconditions": [
+    "the change shows a Product field with its current product (or an option to add one)"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "Pick a product from the menu",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:5AEMNDKQPNE4RRQS851K7A76SE",
+   "input_artifacts": [
+    "nf46xcgx-open-a-change-and-find-the-product-contr-1-result"
+   ],
+   "mechanism": "human",
+   "name": "nf46xcgx-pick-a-product-from-the-menu-2",
+   "output_artifacts": [
+    "nf46xcgx-pick-a-product-from-the-menu-2-result"
+   ],
+   "postconditions": [
+    "the change is assigned to that product",
+    "the board's filter for that product now includes this change"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  }
+ ]
+}

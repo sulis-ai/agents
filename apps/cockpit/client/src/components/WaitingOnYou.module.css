@@ -1,0 +1,51 @@
+/* WP-005 — <WaitingOnYou> styles.
+ *
+ * Transcribed from the production-approved MOCKUP (.waiting* rules). Tokens
+ * only — no raw colour. Full-width + horizontally centered, spanning the card
+ * foot so it's loud and unmistakable. Stands out by WEIGHT (1.5px warning
+ * border + bold label) — never colour alone. The `why` truncates first; the
+ * icon + label never drop. */
+
+.waiting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 5px 10px;
+  border: 1.5px solid var(--warning);
+  border-radius: var(--radius-badge);
+  background: var(--bg-warning);
+  color: var(--foreground);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.waiting svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  color: var(--warning);
+}
+
+/* the bold lead label — never dropped, never truncated */
+.label {
+  flex: none;
+  font-weight: 600;
+}
+
+/* the why — lighter weight, subordinate to the bold label; uses the full
+ * --foreground (not --text-secondary) so it clears AA on the louder, more-
+ * saturated dark warning tint. Truncates first so the line never wraps. */
+.why {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  font-weight: var(--weight-body);
+  color: var(--foreground);
+  font-size: 10.5px;
+}

@@ -45,6 +45,56 @@
   margin: 0;
 }
 
+/* ADR-003 — the cold-start empty state: a soft welcome + example chips, shown
+ * only before the founder has typed anything. Built to the SIGNED visual
+ * contract (MOCKUP state 2). Tokens only — no raw hex (WPF-07 / UXD-04). */
+.coldStart {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.coldStartWelcome {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted-foreground);
+  margin: 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-button);
+  background: var(--card);
+  color: var(--secondary-foreground);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Visible focus — never colour alone; keyboard-reachable (WPF-06 / UXD-07). */
+.chip:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.chip:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* The quiet proposal recap — shown before any change starts (the gate). */
 .proposal {
   border: 1px solid var(--border);

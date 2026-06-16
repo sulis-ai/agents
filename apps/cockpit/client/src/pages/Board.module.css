@@ -1,21 +1,29 @@
-/* WP-003 — Board page styles (was Dashboard).
+/* WP-004 — Board page styles: the FULL-HEIGHT lane board.
  *
- * The six-stage-column board matching the SIGNED visual contract
- * (sulis-app.html, board panel): a responsive 6→3→2 column grid of
- * neutral stage columns. Consumes tokens.css only — no raw hex. Reuses
- * the page header + error treatment shape the Dashboard established. */
+ * The six stage lanes fill the viewport row top to bottom and each lane
+ * scrolls INTERNALLY (the lane's own list owns the scroll; the page no
+ * longer scrolls as one column). Matches the production-approved visual
+ * contract (.design/cockpit-board-refresh/MOCKUP.html — .boardPage / .board
+ * fill the first screen, the inner lanes own the scroll). The responsive
+ * 6→3→2 grid breakpoints are preserved from WP-003 (the mobile lane-switcher
+ * is WP-008's). Consumes tokens.css only — no raw hex. */
 
 .page {
+  /* The board page fills its shell row and is itself a non-scrolling flex
+   * column — header + toolbar are fixed-height, and the board grid below
+   * takes the remaining height while its lanes own the scroll. */
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
   padding: 24px;
   width: 100%;
 }
 
 .header {
+  /* fixed-height row at the top of the board page — it does not grow or
+   * shrink; the board grid below takes the remaining height. */
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -30,53 +38,124 @@
   color: var(--foreground);
 }
 
-/* The stage-column grid: six columns, responsive down to three then two
- * (matches the signed contract's board grid). Columns align to the top so
- * a tall column doesn't stretch its neighbours. */
+/* THE BOARD — six FULL-HEIGHT lanes. The board row fills the remaining
+ * viewport height and each lane scrolls INTERNALLY (the lane's own list owns
+ * the scroll). The lanes stretch to equal height (no `align-items: start`),
+ * so a short lane no longer leaves ragged dead space — the board shape stays
+ * stable. `minmax(…, 1fr)` keeps each lane an equal share of the row width.
+ *
+ * WP-008 — three responsive breakpoints (ADR-004 / IDEAS.md Concern 4, proven
+ * in the signed MOCKUP.html). DESKTOP (this default, ≥1100px): the six-lane
+ * grid, unchanged. TABLET / MOBILE re-lay-out below. The card internals never
+ * change across breakpoints (EP-03); only how the lanes are arranged does.
+ * WP-013's lane virtualisation is untouched — it lives inside each lane's own
+ * scroll, which these board-level rules never govern. */
 .board {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(6, minmax(180px, 1fr));
   gap: 16px;
-  align-items: start;
 }
 
-@media (max-width: 1100px) {
+/* ─── TABLET (600–1099px): lanes scroll sideways, nothing squished ───
+ * The board becomes a horizontally-scrolling row of lanes, each held at a
+ * comfortable min-width (~260px) so a lane is never crushed; 1fr is dropped so
+ * lanes keep their width and the row overflows rather than compressing six into
+ * the viewport. Lanes lightly snap. (The top bar + chip row condense in
+ * WorkspaceShell.module.css / SearchBar.module.css.) */
+@media (max-width: 1099px) {
   .board {
-    grid-template-columns: repeat(3, minmax(200px, 1fr));
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(260px, 1fr);
+    grid-template-columns: none;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+  .board > * {
+    scroll-snap-align: start;
   }
 }
 
-@media (max-width: 680px) {
+/* ─── MOBILE (<600px): ONE full-width lane at a time ───
+ * The board is a horizontally-snapping track where each lane is exactly one
+ * screen wide (100%); a firm (mandatory) snap shows one stage's cards at a
+ * time. Tapping a switcher chip scroll-snaps its lane into view (SearchBar's
+ * tablist), and a swipe moves between lanes with the selected chip following.
+ * The card is unchanged — it just fills the wider lane. */
+@media (max-width: 599px) {
   .board {
-    grid-template-columns: repeat(2, minmax(160px, 1fr));
+    grid-auto-flow: column;
+    grid-auto-columns: 100%;
+    grid-template-columns: none;
+    gap: 0;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+  .board > * {
+    scroll-snap-align: start;
   }
 }
 
-/* Loading skeleton — one placeholder column per stage, mirroring the
- * board grid so the layout doesn't jump when data arrives. */
-.skeletonCol {
+/* WP-010 — LOADING SKELETON BOARD. Per-card skeletons (FR-53) inside the SAME
+ * lane scaffold a loaded board uses, so the swap to real data is in-place with
+ * no layout jump (BR-24 / NFR-PERF-5). The loading region reuses `.board` (the
+ * grid + the three responsive breakpoints), so the lanes lay out identically;
+ * each `.skeletonLane` mirrors the loaded StageColumn lane's frame (the same
+ * --muted lane on a hairline border + a 2px top hairline + the
+ * --radius-container), its `.skeletonHead` holds the same band height as the
+ * real sticky laneHead, and `.skeletonList` matches the lane list's padding +
+ * 12px inter-card gap — so the FIRST skeleton card sits at the same x/y the
+ * first real card will. The skeleton card box itself is owned by
+ * SkeletonCard.module.css (the one card-box source of truth). */
+.skeletonLane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   background: var(--muted);
   border: 1px solid var(--border-muted);
-  /* mirror the real column's 2px top hairline so the layout doesn't jump
-   * when data replaces the skeleton. */
   border-top: 2px solid var(--border);
   border-radius: var(--radius-container);
-  padding: 12px;
 }
 
+/* Same height band as the real lane's sticky header (13px padding + a ~16px
+ * label row + the 1px bottom hairline) so the card list below starts at the
+ * same y as a loaded lane — the cards don't shift down when the header gains
+ * its real name/count. A quiet muted band, no placeholder bar (the loading
+ * read is carried by the cards + the SR line, not a fake header label). */
 .skeletonHead {
-  height: 16px;
-  width: 60%;
-  background: var(--border-muted);
-  border-radius: var(--radius-interactive);
-  margin-bottom: 12px;
+  flex: 0 0 auto;
+  height: 43px;
+  background: var(--muted);
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius-container) var(--radius-container) 0 0;
 }
 
-.skeletonCard {
-  height: 88px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-container);
+/* Matches the loaded lane list: the internal-scroll container's padding + the
+ * 12px inter-card gap, so the skeleton cards stack exactly where real cards
+ * will. */
+.skeletonList {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  overflow: hidden;
+}
+
+/* Screen-reader-only loading line. The visible skeleton bars are aria-hidden,
+ * so the SR line is what announces "loading" (with the region's aria-busy).
+ * Mirrors the per-module .sr / .srOnly pattern used elsewhere in the app
+ * (LivenessProbe, ChangeHealthBadge, StartFromIntent) — a shared utility is a
+ * cross-file extraction tracked separately (out of this WP's lane scope). */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .errorBox {

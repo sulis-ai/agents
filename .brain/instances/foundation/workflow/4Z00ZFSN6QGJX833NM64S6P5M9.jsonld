@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:workflow:4Z00ZFSN6QGJX833NM64S6P5M9",
+  "initial_steps": [
+    "fv92p5hj-open-the-product-switcher-and-choose-all-1"
+  ],
+  "name": "Switching the board scope by product",
+  "state": "draft",
+  "steps": [
+    "fv92p5hj-open-the-product-switcher-and-choose-all-1",
+    "fv92p5hj-choose-a-specific-product-in-the-switche-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "fv92p5hj-choose-a-specific-product-in-the-switche-2"
+  ],
+  "transitions": [
+    "fv92p5hj-open-the-product-switcher-and-choose-all-1 -> fv92p5hj-choose-a-specific-product-in-the-switche-2"
+  ],
+  "type": "review"
+}

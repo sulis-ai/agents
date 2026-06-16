@@ -1,59 +1,129 @@
-/* WP-012 — ChangeCard styles. */
+/* WP-005 — ChangeCard styles (redesigned card).
+ *
+ * Transcribed from the production-approved MOCKUP (.card / .topLine / .steps /
+ * .footRow rules). Tokens only — no raw colour. The probe + health + waiting
+ * reads live in their own component stylesheets; this file owns the card frame,
+ * the top line, the step dots, the meta line, and the foot row. */
 
 .card {
   display: block;
   border: 1px solid var(--border);
   border-radius: var(--radius-container);
-  padding: 16px;
+  padding: 14px;
   background: var(--card);
   text-decoration: none;
   color: inherit;
-  transition: border-color 120ms ease;
+  /* WP-009 — animate the interaction feedback (border on hover, the inset
+   * marker on selection, the small press on :active) so state changes read as
+   * calm transitions rather than jumps. */
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 80ms ease;
 }
 
 .card:hover {
   border-color: var(--input);
 }
-
-.headerRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
+.card:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+/* WP-009 — PRESSED feedback (CS-2 interaction). A momentary 1px sink on
+ * pointer/keyboard activation gives the card-as-link a tactile press without a
+ * new colour. Token-driven motion only; the focus ring + selected marker are
+ * unaffected (they coexist). */
+.card:active {
+  transform: translateY(1px);
 }
 
+/* WP-009 — SELECTED marker (CS-1 / FR-50). The card whose change is the open
+ * route is marked with a persistent NON-COLOUR signal: a thick inset left-edge
+ * bar PLUS a full inset ring drawn with box-shadow. The left bar is a
+ * structural cue (a visibly thicker inset edge) that survives greyscale, so the
+ * marker is never colour-alone (NFR-A11Y-1); aria-current carries it to a
+ * screen reader. Colour comes from the pre-validated --primary / --ring tokens
+ * (re-themed for dark), never a literal. The marker is ADDITIVE — it composes
+ * over the degraded dashed edge and the shipped mute below without removing
+ * either read (SRD §7c precedence). It coexists with :focus-visible (an
+ * outline sits outside the box-shadow ring). Mirrors SidebarItem's
+ * route-derived active treatment (reused pattern, EP-03). */
+.card[data-selected="true"] {
+  box-shadow:
+    inset 3px 0 0 0 var(--primary),
+    inset 0 0 0 1px var(--ring);
+  border-color: var(--ring);
+}
+/* DARK ONLY: a soft drop shadow reinforces that the card is a raised surface
+ * above the lane. Light theme is untouched. Uses the existing --shadow-float
+ * token, not an invented value. */
+:root[data-theme="dark"] .card {
+  box-shadow: var(--shadow-float);
+}
+/* Keep the selected marker visible in dark too: compose the float shadow with
+ * the inset selection ring so neither read is lost (the float gives depth, the
+ * inset bar+ring marks selection). */
+:root[data-theme="dark"] .card[data-selected="true"] {
+  box-shadow:
+    inset 3px 0 0 0 var(--primary),
+    inset 0 0 0 1px var(--ring),
+    var(--shadow-float);
+  border-color: var(--ring);
+}
+
+/* ── TOP LINE: handle (left) · probe + time (right) ── */
+.topLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 11px;
+  min-width: 0;
+}
 .handle {
-  flex: 1;
+  flex: 0 0 auto;
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: var(--weight-body);
+  letter-spacing: 0.01em;
   color: var(--muted-foreground);
-  /* keep the handle on one line; the card stays a calm fixed shape even
-   * when the slug/handle is long. flex:1 + min-width:0 lets it shrink and
-   * ellipsise instead of pushing the stage badge off the card. */
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
   min-width: 0;
 }
-
-.slug {
-  font-size: 12px;
-  color: var(--muted-foreground);
+/* the LivenessProbe is pinned to the RIGHT of the top line */
+.topLine > :last-child {
+  margin-left: auto;
 }
 
-/* Intent — CLAMPED to 2 lines (matches the SIGNED visual contract's
- * single-line-ish card; the card must stay a calm, fixed shape no matter
- * how long the change's description is). A long intent is truncated with an
- * ellipsis; the full text is available via the card's aria-label + title.
- * Without the clamp a long intent dumps a wall of text and blows the card
- * out — the render defect this fix-forward closes. */
+/* ── the slim "· N/6" step dots ── */
+.steps {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 11px;
+}
+.step {
+  width: 13px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.stepOn {
+  background: var(--muted-foreground);
+}
+.stepCur {
+  background: var(--foreground);
+}
+
+/* Intent — CLAMPED to 2 lines (the calm fixed card shape, matching the signed
+ * visual contract). A long intent truncates with an ellipsis; the full text is
+ * available via the card's aria-label + title. */
 .intent {
   font-size: 13px;
   font-weight: var(--weight-label);
   color: var(--foreground);
-  margin: 8px 0 14px;
+  margin: 0 0 12px;
   line-height: 1.45;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -62,13 +132,111 @@
   overflow: hidden;
 }
 
-.footerRow {
+/* the meta line — just the slug now (the relative time lives on the top line,
+ * so it's not duplicated here). */
+.cardMeta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   font-size: 12px;
   color: var(--muted-foreground);
+}
+.slug {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* ── THE ONE-LINE FOOT (every card, exactly one read) ──
+ * Default (health): left-aligned, content-width — the quiet default.
+ * Waiting: full-width + centered (the .waitingFoot modifier). Never both. */
+.footRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 11px;
+  padding-top: 11px;
+  border-top: 1px solid var(--border-muted);
+  min-width: 0;
+}
+.waitingFoot {
+  justify-content: center;
+}
+
+/* ── WP-011 — DEGRADED / PARTIAL ──
+ * A malformed/partial record. A faint DASHED top edge marks the whole card as
+ * "partially read" — echoing the dashed "no signal yet" language, applied to
+ * the card itself. The other three sides keep the normal card border so it is
+ * not alarmed; only the top edge goes dashed as the marker. Transcribed from
+ * the production-approved MOCKUP (.card.degraded). Tokens only. */
+.degraded {
+  border-top: 1px dashed var(--border);
+}
+
+/* The quiet "Some details couldn't be read" line — the FIXED-STRING notice
+ * (FR-55). Reinforcement of the per-field unknown reads (BR-3): small, muted,
+ * italic, with a leading info glyph. Neutral tokens only — never alarmed. */
+.degradedNote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 11px;
+  padding-top: 11px;
+  border-top: 1px solid var(--border-muted);
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+.degradedNote svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  color: var(--muted-foreground);
+}
+
+/* ── WP-012 — SHIPPED / TERMINAL (archived) ──
+ * A shipped change reads as ARCHIVED, not active: the whole card is MUTED so it
+ * recedes from the live cards. The mute is a token-only treatment — a muted
+ * surface + dimmed text + a calm border — never a literal colour. The static
+ * "Shipped" marker + the "shipped Nd ago" recency are the only status reads;
+ * the live probe + both feet are suppressed in the markup (FR-56 / BR-28). */
+.shipped {
+  background: var(--muted);
+  border-color: var(--border-muted);
+  /* dim the whole archived card a touch so it sits behind the live cards. */
+  opacity: 0.82;
+}
+.shipped .handle,
+.shipped .intent,
+.shipped .slug {
+  color: var(--muted-foreground);
+}
+
+/* The static "Shipped" marker — sits in the live probe's slot on the top line.
+ * Muted, calm, with a small archive glyph. No motion, no state colour. */
+.shippedMarker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: var(--weight-label);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.shippedMarker svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+/* The archival "shipped Nd ago" recency on the meta line — quiet + muted, the
+ * companion read to the static marker. Pushed to the right of the slug. */
+.shippedRecency {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--muted-foreground);
+  white-space: nowrap;
 }
 
 /* WP-009 — "Open terminal" action row (the cockpit-rendered terminal path). */
@@ -77,7 +245,6 @@
   justify-content: flex-end;
   margin-top: 12px;
 }
-
 .openTerminal {
   font-size: 12px;
   padding: 4px 10px;
@@ -87,13 +254,6 @@
   border-radius: var(--radius-interactive);
   cursor: pointer;
 }
-
 .openTerminal:hover {
   border-color: var(--primary);
-}
-
-.livenessGroup {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }

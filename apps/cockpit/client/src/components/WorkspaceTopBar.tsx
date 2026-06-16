@@ -7,7 +7,11 @@
 // a change's own nav lives inside the change (ThreadView), not here.
 
 import { NavLink, useNavigate } from "react-router-dom";
-import { Squares2X2Icon, Cog6ToothIcon } from "@heroicons/react/24/outline";
+import {
+  PlusIcon,
+  Squares2X2Icon,
+  Cog6ToothIcon,
+} from "@heroicons/react/24/outline";
 import { XMarkIcon } from "@heroicons/react/20/solid";
 import type { Change } from "../../../shared/api-types";
 import { useProducts } from "../api/useProducts";
@@ -20,6 +24,12 @@ import { ProductSwitcher } from "./ProductSwitcher";
 // always-present chrome, so the toggle lives top-right of it.
 import { ThemeToggle } from "./ThemeToggle";
 import styles from "../layouts/WorkspaceShell.module.css";
+
+// ADR-003 — the visible keyboard hint on the front-door button. The same flow
+// is also reachable via the global hotkey (useStartHotkey); this constant is
+// exported so the button hint and the hotkey stay in sync — one source of truth
+// for the "⌘N" string, never two copies that can drift.
+export const START_HOTKEY_HINT = "⌘N";
 
 /** "deploy-founder-web" → "Deploy founder web" — a readable tab name. */
 function changeName(change: Change): string {
@@ -41,7 +51,6 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
   const { openChangeIds, closeTab } = useOpenTabs();
 
   const productList = products.data?.products ?? [];
-  const serverActiveProductId = products.data?.activeProductId ?? null;
 
   const byId = new Map<string, Change>(
     (changesQuery.isSuccess ? changesQuery.data : []).map((c) => [
@@ -62,22 +71,53 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
 
   return (
     <header className={styles.topbar} data-testid="workspace-topbar">
+      {/* The one front door (ADR-003). The single primary action in the chrome:
+          navigates to the existing /start route — no network, no mutation, no
+          start-state. The ⌘N hint mirrors the global hotkey (useStartHotkey). */}
+      {/* WP-008 — the full action name is pinned on the button's accessible
+          name (aria-label), independent of the VISIBLE label span. At tablet/
+          mobile widths CSS collapses the visible "Start something new" text to
+          a compact "+ New" so the bar never wraps/clips — but assistive tech
+          still announces the full "Start something new" because the name rides
+          aria-label, not the (CSS-hideable) label text. */}
+      <button
+        type="button"
+        className={styles.startBtn}
+        data-testid="start-change-button"
+        aria-label="Start something new"
+        onClick={() => navigate("/start")}
+      >
+        <span className={styles.startBtnIcon}>
+          <PlusIcon aria-hidden="true" />
+        </span>
+        <span className={styles.startBtnLabel}>Start something new</span>
+        <span className={styles.startBtnHint} aria-hidden="true">
+          {START_HOTKEY_HINT}
+        </span>
+      </button>
+
       {productList.length > 0 && (
         <div className={styles.brand}>
           <ProductSwitcher
             products={productList}
-            activeProductId={activeProductId ?? serverActiveProductId}
+            activeProductId={activeProductId}
             onSelect={setActiveProductId}
-            onSetUpNew={() => navigate("/onboarding")}
+            onSetUpNew={() => navigate("/settings?new=product")}
           />
         </div>
       )}
 
       <nav className={styles.tabs} aria-label="Open tabs">
+        {/* WP-008 — the visible "Board" label folds to its icon at tablet/mobile
+            widths (CSS hides .tabLabel) so the bar never wraps. The accessible
+            name is pinned on aria-label so the icon-only collapsed form is still
+            announced "Board" (a link with only an aria-hidden icon would have no
+            accessible name otherwise). */}
         <NavLink
           to="/"
           end
           data-testid="tab-board"
+          aria-label="Board"
           className={({ isActive }) =>
             isActive ? `${styles.tab} ${styles.tabActive}` : styles.tab
           }
@@ -97,6 +137,10 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
               to={`/c/${id}`}
               data-testid="tab-change"
               data-change-id={id}
+              // WP-008 — the visible change-name label also folds to its dot at
+              // narrow widths; pin the name on aria-label so the tab is still
+              // announced by its change name when the text is hidden.
+              aria-label={label}
               className={({ isActive }) =>
                 isActive ? `${styles.tab} ${styles.tabActive}` : styles.tab
               }

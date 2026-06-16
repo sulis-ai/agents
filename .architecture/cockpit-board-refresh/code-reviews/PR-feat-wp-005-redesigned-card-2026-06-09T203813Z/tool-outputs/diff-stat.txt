@@ -1,0 +1,7 @@
+ .../client/src/components/ChangeCard.module.css    | 106 +++++++++++++------
+ apps/cockpit/client/src/components/ChangeCard.tsx  | 117 +++++++++++++++------
+ apps/cockpit/client/src/components/StageBadge.tsx  |  17 ++-
+ apps/cockpit/client/src/tests/StageColumn.test.tsx |   6 ++
+ .../client/src/tests/contract-links.test.tsx       |   5 +
+ apps/cockpit/client/src/utils/relativeTime.ts      |  30 ++++++
+ 6 files changed, 219 insertions(+), 62 deletions(-)

@@ -98,10 +98,11 @@ describe("GET /api/changes", () => {
       // Most-recent-first ordering (matches the adapter's contract).
       expect(body[0]?.changeId).toBe("01AAA");
       expect(body[1]?.changeId).toBe("01BBB");
-      // Liveness attached to every record. No session.json in our temp
-      // state dir, so liveness.status is "unknown".
+      // Liveness attached to every record. No session record in our temp
+      // state dir, so the change reads as idle: "not-running" (a definite
+      // "nothing is live here"), not the vaguer "unknown".
       for (const row of body) {
-        expect(row.liveness.status).toBe("unknown");
+        expect(row.liveness.status).toBe("not-running");
       }
     } finally {
       await rm(tmpState, { recursive: true, force: true });

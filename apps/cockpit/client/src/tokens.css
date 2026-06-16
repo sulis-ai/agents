@@ -28,7 +28,11 @@
   --destructive-foreground: #FFFFFF;
   --positive: #16A34A;
   --positive-foreground: #FFFFFF;
-  --warning: #F59E0B;
+  /* Darkened amber-500→amber-700 (cockpit-board-refresh TDD §3): the old
+   * #F59E0B warning icon/border measured ~2.2:1 on its light tint, under the
+   * 3:1 graphical bar (WCAG 1.4.11); #B45309 clears it (4.84:1 on tint,
+   * 5.02:1 on card). Light-only; dark --warning is sharpened separately. */
+  --warning: #B45309;
   --warning-foreground: #121212;
   --ring: #2563EB;
   --brand-gold: #C9A962;
@@ -119,20 +123,25 @@
  * .architecture/feat-dark-mode/mockup/dark-theme.html (its
  * :root[data-theme="dark"] block is the canonical value source per TDD §6). */
 :root[data-theme="dark"] {
-  /* Surfaces (dark) — layered: background is darkest, cards lift above it */
-  --background: #16181d;
+  /* Surfaces (dark) — three-step elevation: page (darkest) → lane → card
+   * (lightest, raised). cockpit-board-refresh TDD §3 / IDEAS.md "Dark-mode
+   * token changes": the prior values made the card (#1e2127) DARKER than the
+   * lane (--muted #20232a), so cards sank into the board; these invert that so
+   * page < lane < card and a card reads as raised. Border brightened so the
+   * raised edge reads against the lighter card. */
+  --background: #121419;
   --foreground: #e8e6e3;
-  --card: #1e2127;
+  --card: #262a32;
   --card-foreground: #e8e6e3;
-  --popover: #23262e;
+  --popover: #2b3038;
   --popover-foreground: #e8e6e3;
-  --muted: #20232a;
+  --muted: #1b1e24;
   --muted-foreground: #a3a09b;
-  --secondary: #2a2e36;
+  --secondary: #2f343d;
   --secondary-foreground: #e8e6e3;
-  --border: #343842;
+  --border: #3a3f4a;
   --border-muted: #2a2e36;
-  --input: #343842;
+  --input: #3a3f4a;
 
   /* Semantic colours — brightened for WCAG AA on dark surfaces */
   --primary: #5b9bff;
@@ -143,7 +152,7 @@
   --destructive-foreground: #1a0b0c;
   --positive: #4caf68;
   --positive-foreground: #07210f;
-  --warning: #f5b342;
+  --warning: #ffb627;
   --warning-foreground: #1f1402;
   --ring: #5b9bff;
   --brand-gold: #d8bd7e;
@@ -189,12 +198,17 @@
   --bg-positive-border: color-mix(in srgb, var(--positive) 45%, var(--card));
   --bg-destructive: color-mix(in srgb, var(--destructive) 16%, var(--card));
   --bg-destructive-border: color-mix(in srgb, var(--destructive) 45%, var(--card));
-  --bg-warning: color-mix(in srgb, var(--warning) 18%, var(--card));
-  --bg-warning-border: color-mix(in srgb, var(--warning) 45%, var(--card));
+  /* Waiting-amber tint bumped for the new lighter card (TDD §3): 18→24% fill
+   * reads warmer/present against #262a32; 45→60% border restores the 1.5px
+   * waiting edge to the 3:1 graphical bar (3.9:1) on the lighter card. */
+  --bg-warning: color-mix(in srgb, var(--warning) 24%, var(--card));
+  --bg-warning-border: color-mix(in srgb, var(--warning) 60%, var(--card));
 
   --text-secondary: var(--muted-foreground);
 
   /* Float shadow — deepen for dark surfaces (the light 8%-black shadow is
-   * invisible on a dark background; a stronger black reads as elevation). */
-  --shadow-float: 0 6px 20px rgba(0, 0, 0, 0.45);
+   * invisible on a dark background; a stronger black reads as elevation).
+   * Deepened 0.45→0.55 (TDD §3) so the card drop-shadow reads against the
+   * darker page (#121419). */
+  --shadow-float: 0 6px 20px rgba(0, 0, 0, 0.55);
 }

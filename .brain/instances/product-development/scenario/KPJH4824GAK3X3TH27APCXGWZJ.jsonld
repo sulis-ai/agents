@@ -1,0 +1,12 @@
+{
+  "exercises": "dna:design:00000000000000000000000000",
+  "id": "dna:scenario:KPJH4824GAK3X3TH27APCXGWZJ",
+  "journey": "dna:workflow:NFX159GTZV1TZTQWNH9AVADAYY",
+  "name": "The refreshed board renders as a calm triage surface",
+  "state": "draft",
+  "surface": "ui",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:84WXVP8RH85KMWCX51BJSS4DHC"
+  ]
+}

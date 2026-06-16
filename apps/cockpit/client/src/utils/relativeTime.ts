@@ -21,7 +21,10 @@ const WEEK_MS = 7 * DAY_MS;
  * @param now  optional "now" override; defaults to `new Date()` (tests
  *             pass a fixed Date for deterministic bucket coverage).
  */
-export function formatRelativeTime(iso: string, now: Date = new Date()): string {
+export function formatRelativeTime(
+  iso: string,
+  now: Date = new Date(),
+): string {
   const past = new Date(iso);
   if (Number.isNaN(past.getTime())) return "unknown";
 
@@ -48,4 +51,55 @@ export function formatRelativeTime(iso: string, now: Date = new Date()): string 
   }
   const weeks = Math.floor(deltaMs / WEEK_MS);
   return `${weeks} ${weeks === 1 ? "week" : "weeks"} ago`;
+}
+
+/**
+ * Compact relative-time form for the card's top-line probe — "now", "12m",
+ * "6h", "1w" (the production-approved MOCKUP form; no "ago", no spelled-out
+ * unit). The card stays calm and one-line, so the recency is a glanceable
+ * token, not a sentence.
+ *
+ * Falsy / invalid inputs and future times resolve to "—" so a malformed
+ * payload never prints a bogus value (FR-42's discipline at the formatter
+ * level; the caller separately renders "—" for a null `lastActivityAt`).
+ *
+ * @param iso  ISO-8601 timestamp string.
+ * @param now  optional "now" override (tests pass a fixed Date).
+ */
+export function formatCompactRelativeTime(
+  iso: string,
+  now: Date = new Date(),
+): string {
+  const past = new Date(iso);
+  if (Number.isNaN(past.getTime())) return "—";
+
+  const deltaMs = now.getTime() - past.getTime();
+  if (deltaMs < 0) return "—";
+
+  if (deltaMs < MINUTE_MS) return "now";
+  if (deltaMs < HOUR_MS) return `${Math.floor(deltaMs / MINUTE_MS)}m`;
+  if (deltaMs < DAY_MS) return `${Math.floor(deltaMs / HOUR_MS)}h`;
+  if (deltaMs < WEEK_MS) return `${Math.floor(deltaMs / DAY_MS)}d`;
+  return `${Math.floor(deltaMs / WEEK_MS)}w`;
+}
+
+/**
+ * WP-012 — the SHIPPED-RECENCY wording (Q-7 default "shipped Nd ago"). A
+ * terminal / archived change reads its recency as an archival "shipped N ago"
+ * phrase, NOT a live-activity age (BR-28 — a shipped card carries no live
+ * signal). The compact `Nd` / `Nw` / `Nh` token is REUSED from
+ * `formatCompactRelativeTime` (EP-03 — one bucketing source), wrapped in the
+ * one archival phrase. The whole wording is this single function, swappable on
+ * founder confirmation (Q-7) without touching the card render.
+ *
+ * @param iso  the ISO-8601 timestamp the change shipped (the record's
+ *             `updatedAt` — always present, unlike the nullable
+ *             `lastActivityAt`).
+ * @param now  optional "now" override (tests pass a fixed Date).
+ */
+export function formatShippedRecency(
+  iso: string,
+  now: Date = new Date(),
+): string {
+  return `shipped ${formatCompactRelativeTime(iso, now)} ago`;
 }

@@ -118,6 +118,28 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
 }
 
 /**
+ * PUT helper (per-change product assignment, ADR-019 parity). Lives HERE so it
+ * stays inside the client `fetch` funnel — the inventory gate allow-lists
+ * exactly api/client.ts as a fetch caller. Same error contract as apiPost.
+ */
+export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const { code, message } = await readErrorBody(res);
+    throw new ApiError(res.status, code, message);
+  }
+  try {
+    return (await res.json()) as T;
+  } catch {
+    return undefined as T;
+  }
+}
+
+/**
  * DELETE helper for the settings management routes (WP-007; ADR-019). It lives
  * HERE so it stays inside the client `fetch` funnel — the inventory gate
  * allow-lists exactly api/client.ts as a fetch caller. Returns the parsed JSON

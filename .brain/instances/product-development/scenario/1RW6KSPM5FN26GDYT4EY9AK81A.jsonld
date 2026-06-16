@@ -1,0 +1,12 @@
+{
+  "exercises": "dna:design:00000000000000000000000000",
+  "id": "dna:scenario:1RW6KSPM5FN26GDYT4EY9AK81A",
+  "journey": "dna:workflow:YGM4B8JVC08WNM190V09QZQEZP",
+  "name": "Assigning a change to a product",
+  "state": "draft",
+  "surface": "ui",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:G1K0MXDB1QCW2ZKY70Y86RH6KX"
+  ]
+}

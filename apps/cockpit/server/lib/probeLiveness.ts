@@ -35,7 +35,7 @@ type ProbeResult = Liveness & { pidKind?: SessionJson["pid_kind"] };
  * can flag the terminal-pid ambiguity (TDD §14.4).
  *
  * Behaviour matrix:
- *   - session.json missing            → unknown / "no session record"
+ *   - session.json missing            → not-running (no session = not running)
  *   - session.json malformed JSON     → unknown / "malformed session record"
  *   - pid === null                    → unknown / "no pid recorded"
  *   - process.kill(pid, 0) no throw   → running, pid
@@ -60,7 +60,12 @@ export async function probeLiveness(
   try {
     raw = await fs.readFile(sessionPath, "utf8");
   } catch {
-    return { status: "unknown", reason: "no session record" };
+    // No session.json on disk = no session was ever spawned (or it was cleaned
+    // up) = the change is simply NOT running. This is a DEFINITE not-running,
+    // not an "I can't tell" — so the board shows a clean idle dot rather than
+    // the indeterminate unknown "?" read. `unknown` is reserved for a session
+    // record we genuinely can't resolve (malformed, or no usable pid).
+    return { status: "not-running" };
   }
 
   let parsed: SessionJson;

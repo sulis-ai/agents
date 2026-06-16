@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:workflow:YGM4B8JVC08WNM190V09QZQEZP",
+  "initial_steps": [
+    "nf46xcgx-open-a-change-and-find-the-product-contr-1"
+  ],
+  "name": "Assigning a change to a product",
+  "state": "draft",
+  "steps": [
+    "nf46xcgx-open-a-change-and-find-the-product-contr-1",
+    "nf46xcgx-pick-a-product-from-the-menu-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "nf46xcgx-pick-a-product-from-the-menu-2"
+  ],
+  "transitions": [
+    "nf46xcgx-open-a-change-and-find-the-product-contr-1 -> nf46xcgx-pick-a-product-from-the-menu-2"
+  ],
+  "type": "review"
+}
