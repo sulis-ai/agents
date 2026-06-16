@@ -55,6 +55,7 @@ import { SearchBar } from "../components/SearchBar";
 import { SkeletonCard } from "../components/SkeletonCard";
 import { StageColumn } from "../components/StageColumn";
 import { useActiveProduct } from "../api/activeProduct";
+import { filterChangesByScope } from "../lib/productCounts";
 import {
   BOARD_STAGES,
   type BoardStage,
@@ -169,9 +170,16 @@ export function Board() {
   const data = active.data;
   const hasData = data !== undefined;
 
+  // WP-005 — the Unassigned scope is CLIENT-derived: the feed was fetched
+  // UNSCOPED (the sentinel is stripped to null in the hooks), so narrow it to
+  // the changes with no product here. For All / a real product scope this is a
+  // pass-through (the server already scoped, or there's nothing to narrow), so
+  // existing behaviour is unchanged.
+  const scopedData = hasData ? filterChangesByScope(data, activeProductId) : data;
+
   // Group into the six fixed columns; shipped is excluded (FR-15), so an
   // all-shipped store yields zero in-flight changes → the empty state.
-  const columns = hasData ? groupChangesByStage(data) : [];
+  const columns = hasData ? groupChangesByStage(scopedData!) : [];
   const inFlightCount = columns.reduce((n, c) => n + c.changes.length, 0);
 
   // WP-008 — per-lane counts for the mobile switcher's tab chips (the count

@@ -21,6 +21,7 @@ import type { Product } from "../../../shared/api-types";
 import { Board } from "../pages/Board";
 import { ActiveProductProvider, useActiveProduct } from "../api/activeProduct";
 import { ProductSwitcher } from "../components/ProductSwitcher";
+import { UNASSIGNED_SCOPE } from "../lib/productCounts";
 
 const ACME = "dna:product:01ACME00000000000000000000";
 const HELP = "dna:product:01HELP00000000000000000000";
@@ -147,10 +148,12 @@ describe("Board re-scopes to the active Product (FR-37)", () => {
       expect(within(getByTestId("board")).getByText("acme work")).toBeInTheDocument(),
     );
 
-    // Pick Helpdesk in the switcher — the switch.
-    fireEvent.click(getByTestId("product-switcher-trigger"));
+    // Pick Helpdesk in the switcher — the switch. (WP-005: the switcher now
+    // renders the shared ProductControl primitive, so the trigger/menu test
+    // ids are the primitive's; the re-scope behaviour is unchanged.)
+    fireEvent.click(getByTestId("product-control-trigger"));
     fireEvent.click(
-      within(getByTestId("product-switcher-menu")).getByText("Helpdesk"),
+      within(getByTestId("product-control-menu")).getByText("Helpdesk"),
     );
 
     await waitFor(() =>
@@ -161,5 +164,61 @@ describe("Board re-scopes to the active Product (FR-37)", () => {
     expect(
       fetchMock.mock.calls.some((c) => String(c[0]).includes(encodeURIComponent(HELP))),
     ).toBe(true);
+  });
+});
+
+// ─── WP-005 — the Unassigned scope is CLIENT-derived ─────────────────────────
+//
+// The server scopes by ?product=<id> and has NO "unassigned" value (TDD). The
+// Unassigned scope is therefore rendered by fetching the FULL (All-scoped)
+// list — no ?product= param — and filtering to forProduct == null on the
+// client. These pin that the sentinel never reaches the wire and the board
+// shows only the unassigned changes.
+describe("WP-005 — the Unassigned scope (client-derived, no new endpoint)", () => {
+  beforeEach(() => {
+    vi.spyOn(globalThis, "fetch").mockReset();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("fetches the FULL list (no ?product=) when the scope is Unassigned — the sentinel never reaches the wire", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        jsonResponse(200, [
+          makeChange({ changeId: "u1", intent: "orphan work", forProduct: null }),
+        ]),
+      );
+
+    const { getByTestId } = renderBoardWithProduct(freshClient(), UNASSIGNED_SCOPE);
+    await waitFor(() => expect(getByTestId("board")).toBeInTheDocument());
+
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toContain("/api/changes");
+    // The Unassigned sentinel must NOT be sent as a product scope value.
+    expect(url).not.toContain("product=");
+    expect(url).not.toContain(encodeURIComponent(UNASSIGNED_SCOPE));
+  });
+
+  it("shows ONLY the unassigned changes (forProduct == null) under the Unassigned scope", async () => {
+    // The feed returns a mix (an assigned change + two unassigned); the board
+    // narrows to the unassigned ones client-side.
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse(200, [
+        makeChange({ changeId: "a1", intent: "assigned work", forProduct: ACME }),
+        makeChange({ changeId: "u1", intent: "orphan one", forProduct: null }),
+        makeChange({ changeId: "u2", intent: "orphan two" }), // forProduct undefined
+      ]),
+    );
+
+    const { getByTestId } = renderBoardWithProduct(freshClient(), UNASSIGNED_SCOPE);
+    await waitFor(() => expect(getByTestId("board")).toBeInTheDocument());
+
+    const board = within(getByTestId("board"));
+    await waitFor(() => expect(board.getByText("orphan one")).toBeInTheDocument());
+    expect(board.getByText("orphan two")).toBeInTheDocument();
+    // The assigned change is filtered out.
+    expect(board.queryByText("assigned work")).not.toBeInTheDocument();
   });
 });
