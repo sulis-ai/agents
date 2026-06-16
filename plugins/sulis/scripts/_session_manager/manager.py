@@ -847,7 +847,7 @@ class SessionManager:
 
     # ── internal helpers ────────────────────────────────────────────────────
 
-    def _child_env(self) -> dict[str, str]:
+    def _child_env(self, spec: SessionSpec) -> dict[str, str]:
         """The environment a spawned agent session is launched with (WP-003).
 
         Applies the Rule-of-Two credential exclusion (SPEC §L1(d), ADR-001):
@@ -863,11 +863,18 @@ class SessionManager:
         the exclusion is fine — the endpoint var is not credential-named, and it
         is re-set explicitly afterwards regardless.)
 
+        Per-session change binding (this change's ADR-001): ``spec.brief_change_id``
+        is stamped onto the child as ``SULIS_CHANGE_ID``, overriding the daemon's
+        inherited launch-time value; a spec with no target change yields no
+        ``SULIS_CHANGE_ID`` in the child (no stale inheritance).
+
         Previously ``Popen`` was called with no ``env=`` and inherited the full
         parent environment; this makes the child environment explicit so the
         exclusion is enforced. The pipe/pty branch logic is untouched."""
         endpoint = os.environ.get(PROXY_ENDPOINT_ENV, DEFAULT_SAFE_FETCH_PROXY_ENDPOINT)
-        return child_spawn_env(os.environ, proxy_endpoint=endpoint)
+        return child_spawn_env(
+            os.environ, proxy_endpoint=endpoint, change_id=spec.brief_change_id
+        )
 
     def _spawn_process(
         self, adapter: ProviderAdapter, spec: SessionSpec
@@ -899,7 +906,7 @@ class SessionManager:
             process = subprocess.Popen(
                 argv,
                 cwd=spec.cwd,
-                env=self._child_env(),
+                env=self._child_env(spec),
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -941,7 +948,7 @@ class SessionManager:
             process = subprocess.Popen(
                 argv,
                 cwd=spec.cwd,
-                env=self._child_env(),
+                env=self._child_env(spec),
                 stdin=slave_fd,
                 stdout=slave_fd,
                 stderr=slave_fd,

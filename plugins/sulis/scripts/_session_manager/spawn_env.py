@@ -80,7 +80,10 @@ def is_credential_var(name: str) -> bool:
 
 
 def child_spawn_env(
-    parent_env: Mapping[str, str], *, proxy_endpoint: str | None
+    parent_env: Mapping[str, str],
+    *,
+    proxy_endpoint: str | None,
+    change_id: str | None = None,
 ) -> dict[str, str]:
     """Compute the child environment for a spawned agent session.
 
@@ -94,11 +97,22 @@ def child_spawn_env(
        wired — the credential exclusion is unconditional regardless);
     3. **passes through** every other variable unchanged, so PATH/HOME/LANG and
        the session's own ``SULIS_*`` context still reach the child and normal
-       work is unaffected.
+       work is unaffected;
+    4. **stamps** ``SULIS_CHANGE_ID`` per spawn from ``change_id`` (this change's
+       ADR-001): when ``change_id`` is supplied it **overrides** any inherited
+       value (the session carries its own target change, never the daemon's
+       launch-time value); when ``change_id`` is ``None`` (the default) it
+       **removes** ``SULIS_CHANGE_ID`` from the child so a session with no bound
+       change does not silently adopt a stale inherited one. Callers must opt in
+       to a target by passing ``change_id``.
     """
     child = {
         name: value for name, value in parent_env.items() if not is_credential_var(name)
     }
     if proxy_endpoint is not None:
         child[PROXY_ENDPOINT_ENV] = proxy_endpoint
+    if change_id:
+        child["SULIS_CHANGE_ID"] = change_id
+    else:
+        child.pop("SULIS_CHANGE_ID", None)
     return child

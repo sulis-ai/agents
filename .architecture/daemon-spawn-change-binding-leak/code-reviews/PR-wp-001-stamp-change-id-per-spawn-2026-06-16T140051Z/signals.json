@@ -1,0 +1,28 @@
+{
+  "target": "wp/fix-daemon-spawn-change-binding-leak/wp-001-stamp-change-id-per-spawn",
+  "base": "change/fix-daemon-spawn-change-binding-leak",
+  "timestamp": "2026-06-16T140051Z",
+  "verdict": "PASS",
+  "build_verification": {
+    "errors": 0,
+    "commands": ["python3 -m compileall (exit 0)", "ruff check (All checks passed)"],
+    "type_checker": "none configured (repo contract)"
+  },
+  "hygiene": {
+    "scope": {"severity": "clean", "commit_type_spread": ["fix"], "module_fan_out": 1},
+    "size": {"severity": "clean", "lines_added": 155, "lines_removed": 6, "files_changed": 4},
+    "safety": {"severity": "clean", "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0},
+    "completeness": {"severity": "clean", "new_source_without_test": 0, "new_tests": 6}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "in_neighbours": {"critical": 0, "high": 0, "medium": 0, "low": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "status": "complete"},
+    "security": {"findings": 0, "status": "complete"},
+    "quality": {"findings": 0, "status": "complete"}
+  },
+  "draft_fixes": 0,
+  "auto_downgrade_triggers": []
+}
