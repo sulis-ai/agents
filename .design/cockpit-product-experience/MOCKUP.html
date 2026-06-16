@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cockpit product experience — recommended mockup</title>
+
+<!-- Real type tokens reference Inter (sans) + Satoshi (display) + JetBrains Mono.
+     Load Inter + JetBrains Mono from Google Fonts so the mockup renders with the
+     actual brand type, not a fallback (a mockup whose fonts don't load isn't a
+     real preview — L-13). Satoshi isn't on Google Fonts; the token stack falls
+     back to system-ui for the display face, exactly as the app does when Satoshi
+     is absent. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- The REAL cockpit tokens, verbatim from apps/cockpit/client/src/tokens.css.
+     The mockup invents no colours, spacing, or fonts — every value below is a
+     var(--*) from this block. Light :root + dark override, copied verbatim. -->
+<style>
+:root {
+  --background: #fafafa;
+  --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #171717;
+  --border: #e5e5e5;
+  --border-muted: #f0f0f0;
+  --input: #e5e5e5;
+
+  --primary: #2563EB;
+  --primary-foreground: #FFFFFF;
+  --accent: #2D7D90;
+  --accent-foreground: #FFFFFF;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --positive: #16A34A;
+  --positive-foreground: #FFFFFF;
+  --warning: #B45309;
+  --warning-foreground: #121212;
+  --ring: #2563EB;
+  --brand-gold: #C9A962;
+  --brand-depth: #1E3A5F;
+
+  --bg-positive: #F0FDF4;
+  --bg-positive-border: #BBF7D0;
+  --bg-destructive: #FEF2F2;
+  --bg-destructive-border: #FECACA;
+  --bg-warning: #FFFBEB;
+  --bg-warning-border: #FDE68A;
+
+  --stage-recon: #8B7355;
+  --stage-specify: #6366F1;
+  --stage-design: #2D7D90;
+  --stage-implement: #2563EB;
+  --stage-review: #9333EA;
+  --stage-ship: #15803D;
+
+  --radius-interactive: 4px;
+  --radius-button: 9999px;
+  --radius-container: 4px;
+  --radius-badge: 9999px;
+  --radius-media: 4px;
+
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Satoshi', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
+
+  --weight-body: 400;
+  --weight-heading: 300;
+  --weight-label: 500;
+
+  --bg-card: var(--card);
+  --bg-muted: var(--muted);
+  --border-light: var(--border-muted);
+  --font: var(--font-sans);
+  --radius: var(--radius-container);
+  --text: var(--foreground);
+  --text-secondary: #525252;
+  --text-muted: var(--muted-foreground);
+
+  --shadow-float: 0 6px 20px rgba(23, 23, 23, 0.08);
+}
+:root[data-theme="dark"] {
+  --background: #121419;
+  --foreground: #e8e6e3;
+  --card: #262a32;
+  --card-foreground: #e8e6e3;
+  --popover: #2b3038;
+  --popover-foreground: #e8e6e3;
+  --muted: #1b1e24;
+  --muted-foreground: #a3a09b;
+  --secondary: #2f343d;
+  --secondary-foreground: #e8e6e3;
+  --border: #3a3f4a;
+  --border-muted: #2a2e36;
+  --input: #3a3f4a;
+  --primary: #5b9bff;
+  --primary-foreground: #0b1220;
+  --accent: #4fb3c9;
+  --accent-foreground: #07181c;
+  --destructive: #f0686b;
+  --destructive-foreground: #1a0b0c;
+  --positive: #4caf68;
+  --positive-foreground: #07210f;
+  --warning: #ffb627;
+  --warning-foreground: #1f1402;
+  --ring: #5b9bff;
+  --brand-gold: #d8bd7e;
+  --brand-depth: #6f9cc9;
+
+  --bg-positive: color-mix(in srgb, var(--positive) 16%, var(--card));
+  --bg-positive-border: color-mix(in srgb, var(--positive) 45%, var(--card));
+  --bg-destructive: color-mix(in srgb, var(--destructive) 16%, var(--card));
+  --bg-destructive-border: color-mix(in srgb, var(--destructive) 45%, var(--card));
+  --bg-warning: color-mix(in srgb, var(--warning) 24%, var(--card));
+  --bg-warning-border: color-mix(in srgb, var(--warning) 60%, var(--card));
+
+  --text-secondary: var(--muted-foreground);
+  --shadow-float: 0 6px 20px rgba(0, 0, 0, 0.55);
+}
+
+/* ─── Mockup scaffolding (NOT product CSS — just the demo page) ───────────── */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font);
+  font-weight: var(--weight-body);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.45;
+}
+.page { max-width: 1180px; margin: 0 auto; padding: 28px 24px 80px; }
+.docHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; }
+.docHead h1 { font-family: var(--font-display); font-weight: var(--weight-heading); font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+.docHead p { margin: 0; color: var(--text-secondary); font-size: 14px; max-width: 640px; }
+.themeToggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid var(--border); background: var(--card); color: var(--text);
+  border-radius: var(--radius-button); padding: 8px 14px; font: inherit; font-size: 13px;
+  font-weight: 500; cursor: pointer; min-height: 40px;
+}
+.themeToggle:hover { background: var(--muted); }
+.themeToggle:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+.sectionTitle { font-family: var(--font-display); font-weight: 400; font-size: 17px; margin: 38px 0 4px; }
+.sectionNote { margin: 0 0 16px; color: var(--text-secondary); font-size: 13.5px; max-width: 760px; }
+.frame {
+  border: 1px solid var(--border); border-radius: var(--radius-container);
+  background: var(--card); padding: 0; overflow: visible; margin-bottom: 8px;
+}
+.frameLabel {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600;
+  color: var(--text-muted); padding: 10px 14px; border-bottom: 1px solid var(--border-light);
+}
+.frameBody { padding: 22px; }
+.cluster { display: flex; flex-wrap: wrap; gap: 36px; align-items: flex-start; }
+.demoCol { min-width: 230px; }
+.demoCap { font-size: 12px; color: var(--text-muted); margin: 0 0 10px; font-weight: 500; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   PRODUCT VOCABULARY — the one control, three homes.
+   Every value below resolves to a tokens.css var(--*). No invented hex.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* The neutral monogram tile — shared by switcher trigger, menu rows, change
+   property, and board card. NOT brand-coloured (a locked cockpit decision). */
+.mono {
+  width: 26px; height: 26px; flex: none; border-radius: var(--radius);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--muted); border: 1px solid var(--border);
+  font-weight: 700; font-size: 12px; color: var(--text-secondary);
+  font-family: var(--font);
+}
+.mono.sm { width: 20px; height: 20px; font-size: 10px; border-radius: 3px; }
+/* "All products" — an everything-tile (grid of dots), not two letters. */
+.tileAll, .tileNone {
+  width: 26px; height: 26px; flex: none; border-radius: var(--radius);
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); color: var(--text-secondary);
+}
+.tileAll { background: var(--muted); }
+.tileAll svg { width: 14px; height: 14px; }
+/* "Unassigned" — the board's dashed "no signal yet" language. */
+.tileNone { background: transparent; border-style: dashed; border-color: var(--input); color: var(--text-muted); }
+.tileNone.sm, .tileAll.sm { width: 20px; height: 20px; }
+.tileNone svg, .tileAll.sm svg { width: 12px; height: 12px; }
+
+/* ── HOME 1: the top-bar scope switcher ───────────────────────────────────── */
+.topbar {
+  display: flex; align-items: center; gap: 10px; height: 48px;
+  padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-container);
+  background: var(--card);
+}
+.startBtn {
+  display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px;
+  border-radius: var(--radius-button); border: 1px solid transparent;
+  background: var(--primary); color: var(--primary-foreground);
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.startBtn:hover { filter: brightness(1.05); }
+.startBtn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.startBtn svg { width: 15px; height: 15px; }
+.startHint { font-size: 11px; opacity: 0.75; font-family: var(--font-mono); }
+
+/* the switcher itself (the refined trigger) */
+.pswitch { position: relative; margin: 0 2px; }
+.pstrigger {
+  display: flex; align-items: center; gap: 10px; min-width: 188px;
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--card); text-align: left; cursor: pointer; font: inherit; color: var(--text);
+  min-height: 40px;
+}
+.pstrigger:hover { background: var(--muted); border-color: var(--input); }
+.pstrigger[aria-expanded="true"] { border-color: var(--input); background: var(--muted); }
+.pstrigger:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.pmeta { flex: 1; min-width: 0; }
+.plabel { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 600; }
+.pname { display: block; font-size: 14px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3; }
+.pchev { width: 15px; height: 15px; flex: none; color: var(--text-muted); }
+
+.tabstrip { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; }
+.tab {
+  display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 11px;
+  border-radius: var(--radius); color: var(--text-secondary); font-size: 13px; font-weight: 500;
+  border: 1px solid transparent; background: none; text-decoration: none; cursor: pointer; white-space: nowrap;
+}
+.tab:hover { background: var(--muted); color: var(--text); }
+.tab.active { background: var(--muted); color: var(--text); }
+.tab svg { width: 16px; height: 16px; }
+.tabDot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.iconbtn {
+  width: 34px; height: 34px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--radius); border: 1px solid transparent; background: none; color: var(--text-secondary); cursor: pointer;
+}
+.iconbtn:hover { background: var(--muted); color: var(--text); }
+.iconbtn:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.iconbtn svg { width: 18px; height: 18px; }
+
+/* the scope header echo */
+.scopeHeader {
+  display: flex; align-items: center; gap: 8px; margin-top: 12px;
+  font-size: 13px; color: var(--text-secondary);
+}
+.scopeHeader strong { color: var(--text); font-weight: 600; }
+.clearScope {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; min-height: 28px;
+  border: 1px solid var(--border); border-radius: var(--radius-button); background: var(--card);
+  color: var(--text-secondary); font: inherit; font-size: 12px; cursor: pointer;
+}
+.clearScope:hover { background: var(--muted); color: var(--text); }
+.clearScope:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.clearScope svg { width: 12px; height: 12px; }
+
+/* ── the popover menu — shared by switcher + change property + card ───────── */
+.pmenu {
+  position: absolute; top: calc(100% + 6px); left: 0; min-width: 264px; z-index: 30;
+  background: var(--popover); color: var(--popover-foreground);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-float); padding: 6px;
+}
+.pmenu.static { position: static; box-shadow: none; margin-top: 10px; }
+.pmsearch {
+  display: flex; align-items: center; gap: 8px; padding: 7px 9px; margin: 2px 2px 6px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--card);
+}
+.pmsearch svg { width: 15px; height: 15px; color: var(--text-muted); flex: none; }
+.pmsearch input { border: 0; background: none; outline: none; font: inherit; font-size: 13px; color: var(--text); width: 100%; }
+.pmsearch input::placeholder { color: var(--text-muted); }
+.pmlabel { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 600; padding: 8px 9px 5px; }
+.pmitem {
+  display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 9px; min-height: 44px;
+  border-radius: var(--radius); text-align: left; color: var(--text-secondary); font: inherit; font-size: 13px;
+  border: 1px solid transparent; background: none; cursor: pointer;
+}
+.pmitem:hover { background: var(--muted); color: var(--text); }
+.pmitem.active { background: var(--muted); color: var(--text); font-weight: 500; }
+.pmitem:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.pmname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pmcount { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; flex: none; }
+.pmcheck { width: 15px; height: 15px; flex: none; color: var(--accent); }
+.pmsep { height: 1px; background: var(--border-light); margin: 6px 4px; }
+.pmnew, .pmmanage {
+  display: flex; align-items: center; gap: 9px; width: 100%; padding: 9px; min-height: 44px;
+  border-radius: var(--radius); text-align: left; color: var(--text); font: inherit; font-size: 13px; font-weight: 500;
+  border: 1px solid transparent; background: none; cursor: pointer;
+}
+.pmnew:hover, .pmmanage:hover { background: var(--muted); }
+.pmnew:focus-visible, .pmmanage:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.pmnew svg, .pmmanage svg { width: 15px; height: 15px; flex: none; color: var(--text-muted); }
+.pmRemove { color: var(--text-secondary); }
+.pmRemove svg { color: var(--text-muted); }
+
+/* ── HOME 2: the change-nav product property ──────────────────────────────── */
+.leftnav {
+  width: 268px; border: 1px solid var(--border); border-radius: var(--radius-container);
+  background: var(--card); padding: 16px 14px; font-size: 13px;
+}
+.cnKicker { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+.cnName { font-size: 16px; font-weight: 600; margin: 3px 0 8px; line-height: 1.25; }
+.cnMeta { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.stagebadge {
+  font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: var(--radius-badge);
+  background: var(--stage-implement-bg, var(--muted)); color: var(--stage-implement-fg, var(--text)); border: 1px solid var(--stage-implement-border, var(--border));
+}
+.cnLive { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-secondary); }
+.cnLive .g { width: 7px; height: 7px; border-radius: 50%; background: var(--positive); }
+
+.propLabel { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 600; margin: 0 0 6px; }
+.propChip {
+  display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px; min-height: 44px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--card);
+  text-align: left; cursor: pointer; font: inherit; color: var(--text);
+}
+.propChip:hover { background: var(--muted); border-color: var(--input); }
+.propChip:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.propChip.unassigned { border-style: dashed; border-color: var(--input); color: var(--text-secondary); }
+.propChip .pcname { flex: 1; min-width: 0; font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.propChip.unassigned .pcname { font-weight: 500; color: var(--text-secondary); }
+.propChip .pchev { margin-left: auto; }
+.propChip .plusIcon { width: 16px; height: 16px; color: var(--text-muted); flex: none; }
+
+.savedTick {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 8px;
+  font-size: 12px; color: var(--text); font-weight: 500;
+}
+.savedTick svg { width: 14px; height: 14px; color: var(--positive); }
+
+.navSectionLabel { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 600; margin: 16px 0 6px; }
+.navitem { display: flex; align-items: center; gap: 9px; padding: 7px 9px; border-radius: var(--radius); color: var(--text-secondary); font-size: 13px; }
+.navitem.on { background: var(--muted); color: var(--text); font-weight: 500; }
+.navitem svg { width: 16px; height: 16px; flex: none; }
+
+/* ── HOME 3: the board card (product chip + assign-in-context) ─────────────── */
+.boardCard {
+  position: relative; width: 268px; border: 1px solid var(--border); border-radius: var(--radius-container);
+  background: var(--card); padding: 12px 13px; box-shadow: var(--shadow-float);
+}
+.bcTop { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bcHandle { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+.bcProbe { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); }
+.bcProbe .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--positive); flex: none; }
+.bcProbe .dot.idle { background: transparent; border: 1.5px solid var(--muted-foreground); }
+.bcSteps { display: flex; gap: 3px; margin: 9px 0 7px; }
+.bcSteps .s { width: 12px; height: 4px; border-radius: 2px; background: var(--border); }
+.bcSteps .s.on { background: var(--stage-implement); }
+.bcIntent { font-size: 13.5px; font-weight: 600; line-height: 1.3; }
+.bcSlug { font-size: 12px; color: var(--text-secondary); margin-top: 1px; }
+.bcFoot { display: flex; align-items: center; gap: 8px; margin-top: 11px; flex-wrap: wrap; }
+/* assigned: a quiet product chip in the card foot */
+.cardProdChip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px 3px 4px; min-height: 28px;
+  border: 1px solid var(--border); border-radius: var(--radius-button); background: var(--muted);
+  font-size: 11.5px; color: var(--text-secondary); cursor: pointer; font: inherit; font-weight: 500;
+}
+.cardProdChip:hover { background: var(--card); border-color: var(--input); color: var(--text); }
+.cardProdChip:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+/* unassigned: the quiet "+ Product" affordance (always present; hover emphasises) */
+.cardAddProd {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px 3px 8px; min-height: 28px;
+  border: 1px dashed var(--input); border-radius: var(--radius-button); background: transparent;
+  font-size: 11.5px; color: var(--text-muted); cursor: pointer; font: inherit; font-weight: 500; opacity: 0.85;
+}
+.boardCard:hover .cardAddProd, .cardAddProd:hover, .cardAddProd:focus-visible { opacity: 1; color: var(--text-secondary); border-color: var(--muted-foreground); }
+.cardAddProd:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.cardAddProd svg, .cardProdChip svg { width: 13px; height: 13px; flex: none; }
+
+.health { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; min-height: 28px; border-radius: var(--radius-badge); font-size: 11.5px; font-weight: 500; border: 1px solid var(--bg-positive-border); background: var(--bg-positive); color: var(--text); }
+.health svg { width: 13px; height: 13px; color: var(--positive); }
+
+.legend { font-size: 12.5px; color: var(--text-secondary); margin: 14px 0 0; max-width: 820px; }
+.legend code { font-family: var(--font-mono); font-size: 11.5px; background: var(--muted); border: 1px solid var(--border-light); border-radius: 3px; padding: 1px 5px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+@media (max-width: 560px) {
+  .pstrigger { min-width: 0; }
+  .pmeta { display: none; } /* trigger folds to monogram + chevron, name on aria */
+  .leftnav, .boardCard { width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="docHead">
+    <div>
+      <h1>Cockpit — a refined product experience</h1>
+      <p>One <strong>product vocabulary</strong> — a neutral monogram chip plus a
+      searchable menu — used in three homes: the top-bar <strong>scope switcher</strong>,
+      a change's <strong>product property</strong> (replacing the raw dropdown), and the
+      <strong>board card</strong>. Real <code>tokens.css</code> values, light + dark.
+      Toggle the theme to check both.</p>
+    </div>
+    <button class="themeToggle" id="themeBtn" type="button" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <span id="themeLabel">Dark theme</span>
+    </button>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       HOME 1 — the top-bar scope switcher (Concern A + C1 + D1)
+       ════════════════════════════════════════════════════════════════════ -->
+  <h2 class="sectionTitle">1 · The scope switcher — "All vs a product", refined</h2>
+  <p class="sectionNote">The top-left control the founder already has, made considered:
+  <strong>"All products"</strong> gets an everything-tile (not two letters), every scope
+  shows a live <strong>count</strong>, <strong>"Unassigned"</strong> is a real scope, and
+  "create / manage" sit at the menu foot. Picking a scope re-scopes the same board in place.</p>
+
+  <div class="frame">
+    <div class="frameLabel">The persistent top bar — switcher closed</div>
+    <div class="frameBody">
+      <div class="topbar" role="presentation">
+        <button class="startBtn" type="button" aria-label="Start something new">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Start something new <span class="startHint">⌘N</span>
+        </button>
+        <div class="pswitch">
+          <button class="pstrigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Viewing All products, 23 changes. Switch scope.">
+            <span class="tileAll" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6" cy="6" r="2"/><circle cx="12" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="18" cy="12" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="12" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+            </span>
+            <span class="pmeta">
+              <span class="plabel">Viewing</span>
+              <span class="pname">All products</span>
+            </span>
+            <svg class="pchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+        <div class="tabstrip" aria-label="Open tabs">
+          <span class="tab active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Board</span>
+          <span class="tab"><span class="tabDot" style="background:var(--stage-implement)"></span>Clinic intake</span>
+        </div>
+        <button class="iconbtn" type="button" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+      </div>
+
+      <div class="scopeHeader">
+        Viewing <strong>All products</strong> · 23 changes
+      </div>
+    </div>
+  </div>
+
+  <div class="frame">
+    <div class="frameLabel">The switcher menu — open (counts · "Unassigned" scope · create / manage foot)</div>
+    <div class="frameBody">
+      <div class="pswitch" style="display:inline-block">
+        <button class="pstrigger" type="button" aria-haspopup="menu" aria-expanded="true" aria-label="Viewing All products. Switch scope.">
+          <span class="tileAll" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6" cy="6" r="2"/><circle cx="12" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="18" cy="12" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="12" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+          </span>
+          <span class="pmeta"><span class="plabel">Viewing</span><span class="pname">All products</span></span>
+          <svg class="pchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="pmenu" role="menu" aria-label="Switch scope">
+          <button class="pmitem active" role="menuitemradio" aria-checked="true">
+            <span class="tileAll sm" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="6" r="2"/><circle cx="12" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="18" cy="12" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="12" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></span>
+            <span class="pmname">All products</span>
+            <span class="pmcount">23</span>
+            <svg class="pmcheck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="pmitem" role="menuitemradio" aria-checked="false" aria-label="Unassigned, 9 changes">
+            <span class="tileNone sm" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/></svg></span>
+            <span class="pmname">Unassigned</span>
+            <span class="pmcount">9</span>
+          </button>
+          <div class="pmsep" role="separator"></div>
+          <div class="pmlabel">Your products</div>
+          <button class="pmitem" role="menuitemradio" aria-checked="false" aria-label="Clinics, 6 changes">
+            <span class="mono sm" aria-hidden="true">CL</span><span class="pmname">Clinics</span><span class="pmcount">6</span>
+          </button>
+          <button class="pmitem" role="menuitemradio" aria-checked="false" aria-label="Founder Web, 5 changes">
+            <span class="mono sm" aria-hidden="true">FW</span><span class="pmname">Founder Web</span><span class="pmcount">5</span>
+          </button>
+          <button class="pmitem" role="menuitemradio" aria-checked="false" aria-label="Billing, 3 changes">
+            <span class="mono sm" aria-hidden="true">BI</span><span class="pmname">Billing</span><span class="pmcount">3</span>
+          </button>
+          <div class="pmsep" role="separator"></div>
+          <button class="pmnew" role="menuitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Set up a new product
+          </button>
+          <button class="pmmanage" role="menuitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Manage products
+          </button>
+        </div>
+      </div>
+      <p class="legend"><strong>Scoped read:</strong> when a product is picked, the header
+      reads <em>"Viewing <strong>Clinics</strong> · 6"</em> with a one-tap
+      <code>× All products</code> to clear back. "All" vs a product vs "Unassigned" differ by
+      <em>glyph + words</em>, the active scope by <em>tick + bold</em> — never colour alone.</p>
+
+      <div class="scopeHeader" style="margin-top:18px">
+        Viewing <strong>Clinics</strong> · 6 changes
+        <button class="clearScope" type="button" aria-label="Clear scope, view all products">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          All products
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       HOME 2 — the change-nav product property (Concern B) — the acute fix
+       ════════════════════════════════════════════════════════════════════ -->
+  <h2 class="sectionTitle">2 · The change's product — replacing the raw dropdown</h2>
+  <p class="sectionNote">The acute pain point: today a bare OS <code>&lt;select&gt;</code>.
+  Replaced by a labelled <strong>"Product" property</strong> — a value chip at rest, a
+  searchable menu on click, <strong>commit-on-select with a "Saved" tick</strong>, no Save
+  button — sitting with the change's identity (under the name/stage), speaking the same
+  monogram-chip language as the switcher.</p>
+
+  <div class="frame">
+    <div class="frameLabel">The change's left-nav — three states of the product property</div>
+    <div class="frameBody">
+      <div class="cluster">
+
+        <!-- assigned -->
+        <div class="demoCol">
+          <p class="demoCap">Assigned (resting)</p>
+          <nav class="leftnav" aria-label="Clinic intake — change navigation">
+            <div class="cnKicker">CH-01KSJA · create</div>
+            <div class="cnName">Clinic intake submission flow</div>
+            <div class="cnMeta">
+              <span class="stagebadge">Implement</span>
+              <span class="cnLive"><span class="g"></span>Running</span>
+            </div>
+            <p class="propLabel">Product</p>
+            <button class="propChip" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Product: Clinics. Change product.">
+              <span class="mono" aria-hidden="true">CL</span>
+              <span class="pcname">Clinics</span>
+              <svg class="pchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="navSectionLabel">Views</div>
+            <div class="navitem on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Conversation</div>
+            <div class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Files</div>
+          </nav>
+        </div>
+
+        <!-- unassigned -->
+        <div class="demoCol">
+          <p class="demoCap">Unassigned (a real, clickable state)</p>
+          <nav class="leftnav" aria-label="Dark mode polish — change navigation">
+            <div class="cnKicker">CH-01KK8G · fix</div>
+            <div class="cnName">Dark-mode contrast polish</div>
+            <div class="cnMeta">
+              <span class="stagebadge" style="background:var(--stage-review-bg,var(--muted));color:var(--stage-review-fg,var(--text));border-color:var(--stage-review-border,var(--border))">Review</span>
+            </div>
+            <p class="propLabel">Product</p>
+            <button class="propChip unassigned" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Add this change to a product">
+              <span class="tileNone" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+              <span class="pcname">Add to a product</span>
+            </button>
+            <div class="navSectionLabel">Views</div>
+            <div class="navitem on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Conversation</div>
+            <div class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Files</div>
+          </nav>
+        </div>
+
+        <!-- mid-menu -->
+        <div class="demoCol">
+          <p class="demoCap">Picking (searchable menu + commit-on-select)</p>
+          <nav class="leftnav" aria-label="Billing retry — change navigation">
+            <div class="cnKicker">CH-01KP7C · fix</div>
+            <div class="cnName">Billing retry on decline</div>
+            <div class="cnMeta">
+              <span class="stagebadge" style="background:var(--stage-specify-bg,var(--muted));color:var(--stage-specify-fg,var(--text));border-color:var(--stage-specify-border,var(--border))">Specify</span>
+            </div>
+            <p class="propLabel">Product</p>
+            <button class="propChip" type="button" aria-haspopup="menu" aria-expanded="true" aria-label="Product: Clinics. Change product.">
+              <span class="mono" aria-hidden="true">CL</span>
+              <span class="pcname">Clinics</span>
+              <svg class="pchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="pmenu static" role="menu" aria-label="Assign to a product">
+              <div class="pmsearch">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" placeholder="Find a product…" aria-label="Find a product" />
+              </div>
+              <button class="pmitem active" role="menuitemradio" aria-checked="true">
+                <span class="mono sm" aria-hidden="true">CL</span><span class="pmname">Clinics</span>
+                <svg class="pmcheck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              </button>
+              <button class="pmitem" role="menuitemradio" aria-checked="false"><span class="mono sm" aria-hidden="true">FW</span><span class="pmname">Founder Web</span></button>
+              <button class="pmitem" role="menuitemradio" aria-checked="false"><span class="mono sm" aria-hidden="true">BI</span><span class="pmname">Billing</span></button>
+              <div class="pmsep" role="separator"></div>
+              <button class="pmitem pmRemove" role="menuitem" aria-label="Remove from product, set to unassigned">
+                <span class="tileNone sm" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+                <span class="pmname">Remove from product</span>
+              </button>
+              <button class="pmnew" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Set up a new product
+              </button>
+            </div>
+            <div class="savedTick" role="status" aria-live="polite">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              Saved
+            </div>
+          </nav>
+        </div>
+
+      </div>
+      <p class="legend">Picking commits immediately (it calls the same assign endpoint the
+      old <code>&lt;select&gt;</code> already used); the chip swaps and a <em>tick + "Saved"</em>
+      confirms with an <code>aria-live</code> announce. "Remove from product" returns the change
+      to <strong>Unassigned</strong> — the one small new write to confirm (today's endpoint only
+      <em>sets</em> a product).</p>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       HOME 3 — the board card (Concern C2) — assign in context
+       ════════════════════════════════════════════════════════════════════ -->
+  <h2 class="sectionTitle">3 · The board card — see &amp; assign product in context</h2>
+  <p class="sectionNote">Under the "All products" scope, an assigned card carries a quiet
+  <strong>product chip</strong> so membership reads at a glance; an unassigned card shows a
+  quiet <strong>"＋ Product"</strong> affordance (always present for keyboard/touch; hover only
+  emphasises) opening the <em>same</em> menu. <em>This rides the board card — sequenced with
+  the board refresh; ships detail-first if it crowds the card.</em></p>
+
+  <div class="frame">
+    <div class="frameLabel">Board cards — assigned chip vs in-context assign</div>
+    <div class="frameBody">
+      <div class="cluster">
+
+        <div class="demoCol">
+          <p class="demoCap">Assigned — quiet product chip in the foot</p>
+          <div class="boardCard">
+            <div class="bcTop">
+              <span class="bcHandle">CH-01KSJA</span>
+              <span class="bcProbe"><span class="dot"></span>now</span>
+            </div>
+            <div class="bcSteps" aria-hidden="true"><span class="s on"></span><span class="s on"></span><span class="s on"></span><span class="s on"></span><span class="s"></span><span class="s"></span></div>
+            <div class="bcIntent">Clinic intake submission flow</div>
+            <div class="bcSlug">clinic-intake</div>
+            <div class="bcFoot">
+              <span class="health"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>On track</span>
+              <button class="cardProdChip" type="button" aria-label="Product: Clinics. Change product.">
+                <span class="mono sm" aria-hidden="true">CL</span>Clinics
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="demoCol">
+          <p class="demoCap">Unassigned — quiet "＋ Product" affordance</p>
+          <div class="boardCard">
+            <div class="bcTop">
+              <span class="bcHandle">CH-01KK8G</span>
+              <span class="bcProbe"><span class="dot idle"></span>6h</span>
+            </div>
+            <div class="bcSteps" aria-hidden="true"><span class="s on"></span><span class="s on"></span><span class="s on"></span><span class="s on"></span><span class="s on"></span><span class="s"></span></div>
+            <div class="bcIntent">Dark-mode contrast polish</div>
+            <div class="bcSlug">dark-mode-polish</div>
+            <div class="bcFoot">
+              <span class="health" style="background:var(--bg-warning);border-color:var(--bg-warning-border)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="color:var(--warning)"><line x1="12" y1="5" x2="12" y2="14"/><circle cx="12" cy="18" r="1" fill="currentColor" stroke="none"/></svg>Worth a look</span>
+              <button class="cardAddProd" type="button" aria-label="Add this change to a product">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Product
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <p class="legend">The card chip and the change-nav property are the <strong>same control</strong>
+      in two places — same monogram, same menu, same commit-on-select. Membership and assignment
+      live where the founder is already looking, not buried in a detail view.</p>
+    </div>
+  </div>
+
+  <p class="legend" style="margin-top:30px">
+    <strong>Accessibility, baked in:</strong> every product state is word + glyph/shape, never
+    colour alone; the active scope is tick + bold; "Saved" is tick + word + <code>aria-live</code>;
+    triggers/chips are real buttons with <code>aria-haspopup</code>/<code>aria-expanded</code>, menus
+    are <code>role="menu"</code> with <code>aria-checked</code> radios; every interactive element has a
+    visible <code>--ring</code> focus outline and a ≥44px target; the only motion (menu open, "Saved"
+    fade) respects <code>prefers-reduced-motion</code>. All values are real <code>tokens.css</code>,
+    verified AA in light + dark (see <code>IDEAS.md</code>).
+  </p>
+
+</div>
+
+<script>
+  // Theme toggle — flips data-theme so the founder can check both against the
+  // real dark tokens. (Demo-only; the app drives data-theme via its ThemeToggle.)
+  var btn = document.getElementById('themeBtn');
+  var label = document.getElementById('themeLabel');
+  btn.addEventListener('click', function () {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    document.documentElement.setAttribute('data-theme', dark ? 'light' : 'dark');
+    btn.setAttribute('aria-pressed', String(!dark));
+    label.textContent = dark ? 'Dark theme' : 'Light theme';
+  });
+</script>
+</body>
+</html>
