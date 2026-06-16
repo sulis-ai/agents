@@ -326,7 +326,17 @@ export function ProductControl({
         onClick={() => setOpen((v) => !v)}
         onKeyDown={onTriggerKeyDown}
       >
-        <Tile glyph={triggerGlyph} name={triggerName} compact={compact} />
+        {mode === "assign" && !isAssigned ? (
+          // #378 — the unassigned product chip leads with the signed mockup's
+          // light inline "＋" icon (.plusIcon), not the dashed tile box, so the
+          // chip reads as "＋ Add to a product" exactly as the visual contract
+          // (.design/.../MOCKUP.html .propChip.unassigned) draws it.
+          <span className={styles.plusIcon} data-glyph="plus" aria-hidden="true">
+            <PlusGlyph />
+          </span>
+        ) : (
+          <Tile glyph={triggerGlyph} name={triggerName} compact={compact} />
+        )}
         {mode === "scope" ? (
           <span className={styles.pmeta}>
             <span className={styles.plabel}>Viewing</span>

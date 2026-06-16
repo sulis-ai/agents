@@ -214,10 +214,10 @@ describe("<ProductControl> — shared behaviour (ADR-002)", () => {
       );
       const trigger = getByTestId("product-control-trigger");
       expect(trigger.textContent).toMatch(/add to a product/i);
-      // Unassigned trigger carries the dashed tile glyph, never colour alone.
-      expect(
-        trigger.querySelector("[data-glyph='unassigned-dashed']"),
-      ).toBeTruthy();
+      // #378 — the unassigned chip leads with the signed mockup's inline "＋"
+      // icon (data-glyph="plus"), so it reads "＋ Add to a product". Shape, not
+      // colour alone: the plus glyph + the chip's dashed border carry the state.
+      expect(trigger.querySelector("[data-glyph='plus']")).toBeTruthy();
     });
 
     it("uses an explicit triggerLabel for the unassigned trigger's accessible name when given", () => {
