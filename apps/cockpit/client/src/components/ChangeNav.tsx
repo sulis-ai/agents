@@ -16,7 +16,7 @@ import {
 } from "@heroicons/react/24/outline";
 import type { Change, WorkflowStage } from "../../../shared/api-types";
 import { stageLabel } from "./StageBadge";
-import { ProductPicker } from "./ProductPicker";
+import { ChangeProductProperty } from "./ChangeProductProperty";
 import styles from "../styles/ChangeWorkspace.module.css";
 
 export type ChangeView =
@@ -95,9 +95,17 @@ export function ChangeNav({
             </span>
           )}
         </div>
-        {/* Assign (or change) this change's product — the board filter scopes
-            by it. Hidden until the founder has a product to assign to. */}
-        <ProductPicker
+      </div>
+
+      {/* The change's Product — an IDENTITY property ("which product owns this"),
+          so it sits with the name + stage badge, NOT under the stage track
+          (signed design, Concern B1). The shared ProductControl primitive
+          renders the chip + searchable popover; commit-on-select via the assign
+          / clear hooks (no Save button). Hidden until the founder has a product
+          to assign to. */}
+      <div className={styles.sectionLabel}>Product</div>
+      <div className={styles.cnProduct}>
+        <ChangeProductProperty
           changeId={change.changeId}
           currentProductId={change.forProduct}
         />
