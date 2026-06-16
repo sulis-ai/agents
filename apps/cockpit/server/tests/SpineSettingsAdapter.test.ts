@@ -488,3 +488,83 @@ describe("SpineSettingsAdapter — hardening follow-ups", { timeout: 60_000 }, (
     expect(String(errs[0]?.detail ?? "")).not.toBe("");
   });
 });
+
+// ── change → product un-assign (clearChangeProduct) — WP-003 ────────────────
+describe("SpineSettingsAdapter.clearChangeProduct (real helper, no mocks)", {
+  timeout: 60_000,
+}, () => {
+  const CHANGE_ULID = "01CHG0000000000000000000AA";
+  const PRODUCT_ID = "dna:product:01ACME00000000000000000000";
+
+  /** A fresh `<state>/changes` dir holding one seeded `<ulid>/change.json`. */
+  function tmpChangesWithRecord(ulid: string): string {
+    const dir = mkdtempSync(join(tmpdir(), "wp003-changes-"));
+    cleanups.push(dir);
+    const recDir = join(dir, ulid);
+    mkdirSync(recDir, { recursive: true });
+    writeFileSync(
+      join(recDir, "change.json"),
+      JSON.stringify({
+        change_id: ulid,
+        handle: "CH-0000AA",
+        slug: "unassign-me",
+        intent: "a change to un-assign from a product",
+        primitive: "feat",
+        created_at: "2026-06-16T00:00:00Z",
+        branch: `change/feat-${ulid}`,
+      }),
+    );
+    return dir;
+  }
+
+  function changeEntityPath(base: string, ulid: string): string {
+    return join(base, PRODUCT_DOMAIN, "change", `${ulid}.jsonld`);
+  }
+
+  it("clears for_product back to null and emits a structured log line", async () => {
+    if (unavailable()) return;
+    const base = tmpBrain();
+    const changesDir = tmpChangesWithRecord(CHANGE_ULID);
+    const entries: Record<string, unknown>[] = [];
+    const adapter = new SpineSettingsAdapter({
+      scriptsDir: SCRIPTS_DIR,
+      baseDir: base,
+      changesDir,
+      log: (e) => entries.push(e),
+    });
+
+    // Assign first so there is a link to clear (compose path from change.json).
+    await adapter.assignChangeProduct(CHANGE_ULID, PRODUCT_ID);
+    expect(
+      JSON.parse(readFileSync(changeEntityPath(base, CHANGE_ULID), "utf8"))
+        .for_product,
+    ).toBe(PRODUCT_ID);
+
+    // Clear it.
+    const result = await adapter.clearChangeProduct(CHANGE_ULID);
+    expect(result).toEqual({
+      id: `dna:change:${CHANGE_ULID}`,
+      forProduct: null,
+    });
+
+    // The on-disk entity now has NO link — "unassigned" is the absence of the
+    // key (the schema types for_product as an optional string), not a null.
+    expect(
+      JSON.parse(readFileSync(changeEntityPath(base, CHANGE_ULID), "utf8")),
+    ).not.toHaveProperty("for_product");
+
+    // A structured audit line was emitted for the clear.
+    const writes = entries.filter((e) => e.evt === "settings-write");
+    expect(writes.some((e) => e.op === "clear-change-product")).toBe(true);
+  });
+
+  it("rejects a malformed change id with VALIDATION_FAILED before any helper runs", async () => {
+    const adapter = new SpineSettingsAdapter({
+      scriptsDir: SCRIPTS_DIR,
+      baseDir: tmpBrain(),
+    });
+    await expect(
+      adapter.clearChangeProduct("../../etc/passwd"),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  });
+});

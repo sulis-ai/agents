@@ -1,0 +1,6 @@
+apps/cockpit/server/adapters/SpineSettingsAdapter.ts
+apps/cockpit/server/adapters/spine/set-change-product.py
+apps/cockpit/server/routes/changes.ts
+apps/cockpit/server/tests/SpineSettingsAdapter.test.ts
+apps/cockpit/server/tests/routes.changes.product.test.ts
+plugins/sulis/scripts/tests/unit/test_set_change_product.py
