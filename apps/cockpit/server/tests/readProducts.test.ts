@@ -16,6 +16,7 @@ import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readProducts, IMPLICIT_PRODUCT_ID } from "../lib/products/readProducts";
+import type { ChangeStoreRecord } from "../ports/ChangeStoreReader";
 
 let dir: string;
 
@@ -215,5 +216,94 @@ describe("readProducts sys_status filter (WP-003, ADR-020)", () => {
     const names = result.list.products.map((p) => p.name);
     expect(names).toContain("Acme Checkout");
     expect(names).not.toContain("Crafted Status Product");
+  });
+});
+
+// The explicit change→Product link: a change's brain Change entity carries an
+// optional `for_product`. That assignment is authoritative — it must drive the
+// roll-up regardless of where the change's worktree sits (worktrees live under
+// ~/.sulis/changes, never under a Project's repo root, so the path heuristic
+// can't claim them). This is the read half of per-change product assignment.
+describe("readProducts — explicit change.for_product assignment drives the roll-up", () => {
+  async function seedChange(
+    stateDir: string,
+    ulid: string,
+    fields: Record<string, unknown>,
+  ): Promise<void> {
+    const changeDir = join(
+      stateDir,
+      ".brain",
+      "instances",
+      "product-development",
+      "change",
+    );
+    await mkdir(changeDir, { recursive: true });
+    await writeFile(
+      join(changeDir, `${ulid}.jsonld`),
+      JSON.stringify({ id: `dna:change:${ulid}`, sys_status: "active", ...fields }),
+      "utf8",
+    );
+  }
+
+  function changeRecord(changeId: string): ChangeStoreRecord {
+    return {
+      changeId,
+      handle: `CH-${changeId.slice(-6)}`,
+      slug: "some-change",
+      primitive: "feat",
+      branch: `change/feat-${changeId}`,
+      // Deliberately NOT under any Project repo root — proves the explicit link,
+      // not the path, is what assigns the change.
+      worktreePath: `/Users/x/.sulis/changes/${changeId}/worktree`,
+      intent: "do a thing",
+      baseBranch: "main",
+      baseSha: null,
+      createdAt: "2026-06-16T00:00:00Z",
+      updatedAt: "2026-06-16T00:00:00Z",
+      stage: "recon",
+    };
+  }
+
+  it("rolls a change up to the Product named by its for_product link", async () => {
+    await seedProduct(dir, "01ACME00000000000000000000", "Acme Checkout");
+    await seedProduct(dir, "01HELP00000000000000000000", "Helpdesk");
+    await seedChange(dir, "01CHG0000000000000000000AA", {
+      handle: "CH-0000AA",
+      for_product: "dna:product:01HELP00000000000000000000",
+    });
+
+    const result = await readProducts({
+      sulisStateDir: dir,
+      changes: [changeRecord("01CHG0000000000000000000AA")],
+    });
+    expect(result.rollup.changeToProduct.get("01CHG0000000000000000000AA")).toBe(
+      "dna:product:01HELP00000000000000000000",
+    );
+  });
+
+  it("ignores a for_product link that names a Product the Tenant no longer has", async () => {
+    await seedProduct(dir, "01ACME00000000000000000000", "Acme Checkout");
+    await seedChange(dir, "01CHG0000000000000000000BB", {
+      for_product: "dna:product:01GONE0000000000000000000000",
+    });
+
+    const result = await readProducts({
+      sulisStateDir: dir,
+      changes: [changeRecord("01CHG0000000000000000000BB")],
+    });
+    // Unknown Product ⇒ unassigned (left out of the index), never a phantom link.
+    expect(result.rollup.changeToProduct.has("01CHG0000000000000000000BB")).toBe(false);
+  });
+
+  it("leaves a change with no for_product unassigned (shown under All)", async () => {
+    await seedProduct(dir, "01ACME00000000000000000000", "Acme Checkout");
+    await seedProduct(dir, "01HELP00000000000000000000", "Helpdesk");
+    await seedChange(dir, "01CHG0000000000000000000CC", { handle: "CH-0000CC" });
+
+    const result = await readProducts({
+      sulisStateDir: dir,
+      changes: [changeRecord("01CHG0000000000000000000CC")],
+    });
+    expect(result.rollup.changeToProduct.has("01CHG0000000000000000000CC")).toBe(false);
   });
 });

@@ -111,13 +111,53 @@ export async function readProducts(
   const changeToProduct = new Map<string, string>();
   if (opts.changes && opts.changes.length > 0) {
     const projects = await readProjects(instancesDir);
+    // The explicit `for_product` link on a change's brain record is the
+    // authoritative assignment — it wins over the change→Project→Product path
+    // heuristic (which can't match a change worktree under ~/.sulis/changes
+    // anyway). Only honour a link that names a Product the Tenant still has.
+    const explicitLinks = await readChangeProductLinks(instancesDir);
+    const knownProducts = new Set(productIds);
     for (const change of opts.changes) {
-      const productId = rollUpChange(change, projects);
+      const explicit = explicitLinks.get(change.changeId);
+      const productId =
+        explicit && knownProducts.has(explicit)
+          ? explicit
+          : rollUpChange(change, projects);
       if (productId !== null) changeToProduct.set(change.changeId, productId);
     }
   }
 
   return { list, rollup: { productIds, changeToProduct } };
+}
+
+/**
+ * Read each change's explicit `for_product` assignment from its brain Change
+ * entity (`dna:change:<ulid>`), keyed by the change's ULID — the cockpit's
+ * `changeId`. This is the authoritative change→Product link a founder sets;
+ * a change with no record, or no `for_product`, is simply absent (unassigned →
+ * shown under the "All" scope). Soft-deleted entities are already filtered by
+ * readEntitiesOfKind. Fail-soft: an absent brain yields an empty map.
+ */
+async function readChangeProductLinks(
+  instancesDir: string,
+): Promise<Map<string, string>> {
+  const raw = await readEntitiesOfKind(instancesDir, "change");
+  const out = new Map<string, string>();
+  const PREFIX = "dna:change:";
+  for (const entity of raw) {
+    const id = typeof entity.id === "string" ? entity.id : null;
+    const forProduct = entity.for_product;
+    if (
+      id === null ||
+      typeof forProduct !== "string" ||
+      forProduct.length === 0
+    ) {
+      continue;
+    }
+    const changeId = id.startsWith(PREFIX) ? id.slice(PREFIX.length) : id;
+    out.set(changeId, forProduct);
+  }
+  return out;
 }
 
 /**
