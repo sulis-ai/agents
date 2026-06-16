@@ -1,0 +1,350 @@
+/* WP-002 — <ProductControl> styles (ADR-002).
+ *
+ * Ported VERBATIM from the SIGNED visual contract
+ * (.design/cockpit-product-experience/MOCKUP.html — .mono / .tileAll /
+ * .tileNone / .pstrigger / .propChip / .pmenu / .pmitem / .savedTick).
+ * Consumes tokens.css custom properties ONLY — no hard-coded colours. The
+ * monogram tile is a NEUTRAL chrome tile (not brand-coloured — a locked
+ * cockpit decision). Every interactive surface clears the ≥44px touch target
+ * and carries a visible :focus-visible ring; a prefers-reduced-motion fallback
+ * drops the menu's transition (the "Saved" WORD, never motion, is the carrier). */
+
+.root {
+  position: relative;
+}
+
+/* ── glyph tiles — shared by trigger + menu rows (never colour alone) ───────── */
+.mono,
+.tileAll,
+.tileNone {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: var(--radius);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  font-family: var(--font);
+}
+.mono {
+  background: var(--muted);
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 12px;
+}
+/* "All products" — an everything-tile (grid of dots), not two letters. */
+.tileAll {
+  background: var(--muted);
+  color: var(--text-secondary);
+}
+.tileAll svg {
+  width: 14px;
+  height: 14px;
+}
+/* "Unassigned" — the board's dashed "no signal yet" language. */
+.tileNone {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--input);
+  color: var(--text-muted);
+}
+.tileNone svg {
+  width: 12px;
+  height: 12px;
+}
+/* compact (board card + menu rows) */
+.sm {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+  border-radius: 3px;
+}
+.sm svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ── scope-mode trigger (the refined switcher) ──────────────────────────────── */
+.pstrigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 188px;
+  padding: 6px 10px;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+}
+.pstrigger:hover {
+  background: var(--muted);
+  border-color: var(--input);
+}
+.pstrigger[aria-expanded="true"] {
+  border-color: var(--input);
+  background: var(--muted);
+}
+.pstrigger:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.pmeta {
+  flex: 1;
+  min-width: 0;
+}
+.plabel {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.pname {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+.pchev {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* ── assign-mode trigger (the change-nav / card value chip) ─────────────────── */
+.propChip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 9px;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+}
+.propChip:hover {
+  background: var(--muted);
+  border-color: var(--input);
+}
+.propChip:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+/* unassigned — dashed shape + muted words, never colour alone */
+.propChip.unassigned {
+  border-style: dashed;
+  border-color: var(--input);
+  color: var(--text-secondary);
+}
+.pcname {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.propChip.unassigned .pcname {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+/* compact (board-card placement) — denser chip */
+.compact {
+  min-width: 0;
+  padding: 3px 8px 3px 4px;
+  min-height: 44px;
+}
+
+/* ── the popover menu (shared) ─────────────────────────────────────────────── */
+.pmenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 264px;
+  z-index: 30;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-float);
+  padding: 6px;
+  transition: opacity 120ms ease;
+}
+.pmsearch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  margin: 2px 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.pmsearch svg {
+  width: 15px;
+  height: 15px;
+  color: var(--text-muted);
+  flex: none;
+}
+.pmsearch input {
+  border: 0;
+  background: none;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  width: 100%;
+}
+.pmsearch input::placeholder {
+  color: var(--text-muted);
+}
+.pmitem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 9px;
+  min-height: 44px;
+  border-radius: var(--radius);
+  text-align: left;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+}
+.pmitem:hover,
+.pmitem.keyactive {
+  background: var(--muted);
+  color: var(--text);
+}
+.pmitem.active {
+  background: var(--muted);
+  color: var(--text);
+  font-weight: 500;
+}
+.pmitem:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.pmname {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pmcount {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+.pmcheck {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--accent);
+}
+.pmsep {
+  height: 1px;
+  background: var(--border-light);
+  margin: 6px 4px;
+}
+.pmRemove {
+  color: var(--text-secondary);
+}
+.pmRemove svg {
+  color: var(--text-muted);
+}
+.pmnew,
+.pmmanage {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px;
+  min-height: 44px;
+  border-radius: var(--radius);
+  text-align: left;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+}
+.pmnew:hover,
+.pmmanage:hover {
+  background: var(--muted);
+}
+.pmnew:focus-visible,
+.pmmanage:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.pmnew svg,
+.pmmanage svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--text-muted);
+}
+
+/* ── commit feedback — tick + the WORD "Saved" (never colour alone) ─────────── */
+.savedTick {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text);
+  font-weight: 500;
+  min-height: 16px;
+}
+.savedTick svg {
+  width: 14px;
+  height: 14px;
+  color: var(--positive);
+}
+
+/* The only motion is the menu's open transition + the brief "Saved" fade; drop
+ * both under reduced-motion and show the end state immediately. */
+@media (prefers-reduced-motion: reduce) {
+  .pmenu,
+  .savedTick {
+    transition: none;
+  }
+}
+
+/* Narrow widths — the scope trigger folds to its tile + chevron (the name
+ * folds but stays on the accessible name), mirroring the existing top bar. */
+@media (max-width: 560px) {
+  .pstrigger {
+    min-width: 0;
+  }
+  .pstrigger .pmeta {
+    display: none;
+  }
+}
