@@ -1,3 +1,9 @@
+## v0.167.0 — 2026-06-17
+
+**Minor — release-train batch.**
+
+- Cockpit follow-ups: isolate e2e ports so the test harness boots a clean fixture (#377); the unassigned product chip leads with the signed mockup inline plus icon (#378).
+
 ## v0.166.0 — 2026-06-16
 
 **Minor — release-train batch.**
