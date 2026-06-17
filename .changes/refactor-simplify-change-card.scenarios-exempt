@@ -1,0 +1,8 @@
+Exempt from authored verification scenarios.
+
+Reason: pure internal refactor of ChangeCard.tsx — extracting inline render
+branches into named sub-components. No behaviour, props, DOM, or accessibility
+change. The card's user journeys are unchanged and already covered by the
+existing 86 ChangeCard tests (13 files, incl. axe) + 82 Board/StageColumn
+integration tests, all proven green identically before and after the refactor
+(EP-07 characterisation). No new user journey is introduced.
