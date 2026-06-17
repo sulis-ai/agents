@@ -24,9 +24,16 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 12px;
   font-size: 13px;
   color: var(--text-secondary);
+}
+/* The 12px stack gap applies ONLY when the echo sits UNDER the trigger inside
+ * the switcher (the vertical Sidebar). In the top-bar strip the echo is a
+ * sibling below the bar and gets its own framing (WorkspaceShell .scopeStrip),
+ * so the base .scopeHeader carries no top margin (which would otherwise add a
+ * stray gap and reintroduce the overflow). */
+.pswitch .scopeHeader {
+  margin-top: 12px;
 }
 .scopeHeader strong {
   color: var(--text);
