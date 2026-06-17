@@ -51,6 +51,15 @@ export interface ProductSwitcherProps {
   onSetUpNew?: () => void;
   /** "Manage products" foot action (WP-007 wires it; optional here). */
   onManageProducts?: () => void;
+  /**
+   * Whether to render the "Viewing <scope> · N changes" echo under the trigger.
+   * Default true (the vertical Sidebar has the room to stack it). The
+   * horizontal 48px top bar passes FALSE and renders the echo as a separate
+   * strip BELOW the bar (the signed mockup's structure) — a stacked echo inside
+   * the 48px bar overflows it (the selector floats above the bar, the echo
+   * hangs below). The trigger itself still names the scope ("Viewing <scope>").
+   */
+  showScopeEcho?: boolean;
 }
 
 /**
@@ -73,6 +82,80 @@ function scopeName(scope: ProductScope, products: Product[]): string {
   return products.find((p) => p.productId === scope)?.name ?? "All products";
 }
 
+/** Normalise the stored scope: an activeProductId that matches no known scope
+ *  reads as "All" (safe fallback — never a blank header). Shared by the
+ *  switcher trigger and the ScopeHeader echo so both resolve identically. */
+function resolveScope(
+  activeProductId: ProductScope,
+  products: Product[],
+): ProductScope {
+  const knownProduct =
+    typeof activeProductId === "string" &&
+    activeProductId !== UNASSIGNED_SCOPE &&
+    products.some((p) => p.productId === activeProductId);
+  return activeProductId === null ||
+    activeProductId === UNASSIGNED_SCOPE ||
+    knownProduct
+    ? activeProductId
+    : null;
+}
+
+/**
+ * The scope echo — "Viewing <scope> · N changes" with a one-tap "× clear" back
+ * to All when scoped away from it (Concern A1). Extracted so it can render in
+ * TWO places: stacked under the trigger in the vertical Sidebar, OR as a strip
+ * BELOW the horizontal top bar (where the mockup puts it — the top bar is only
+ * 48px tall, so the echo cannot stack inside it without overflowing). Pure
+ * presentational; the consumer supplies the scope state.
+ */
+export function ScopeHeader({
+  products,
+  activeProductId,
+  changes = [],
+  onSelect,
+}: {
+  products: Product[];
+  activeProductId: ProductScope;
+  changes?: Change[];
+  onSelect: (scope: ProductScope) => void;
+}) {
+  if (products.length === 0) return null;
+  const scope = resolveScope(activeProductId, products);
+  const scopeLabel = scopeName(scope, products);
+  const scopeCount = countForScope(changes, scope);
+  // "× clear" only appears when scoped away from All (there's somewhere to go
+  // back to). At the All scope there is nothing to clear.
+  const showClear = scope !== null;
+  return (
+    <div className={styles.scopeHeader} data-testid="product-scope-header">
+      <span>
+        Viewing <strong>{scopeLabel}</strong> · {scopeCount}{" "}
+        {scopeCount === 1 ? "change" : "changes"}
+      </span>
+      {showClear && (
+        <button
+          type="button"
+          className={styles.clearScope}
+          aria-label="Clear scope, view all products"
+          onClick={() => onSelect(null)}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+          All products
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function ProductSwitcher({
   products,
   activeProductId,
@@ -80,22 +163,12 @@ export function ProductSwitcher({
   changes = [],
   onSetUpNew,
   onManageProducts,
+  showScopeEcho = true,
 }: ProductSwitcherProps) {
   // Nothing to switch when the Tenant has no Products at all.
   if (products.length === 0) return null;
 
-  // An activeProductId that matches no known scope reads as "All" (safe
-  // fallback — never a blank header), preserving the old switcher's behaviour.
-  const knownProduct =
-    typeof activeProductId === "string" &&
-    activeProductId !== UNASSIGNED_SCOPE &&
-    products.some((p) => p.productId === activeProductId);
-  const scope: ProductScope =
-    activeProductId === null ||
-    activeProductId === UNASSIGNED_SCOPE ||
-    knownProduct
-      ? activeProductId
-      : null;
+  const scope = resolveScope(activeProductId, products);
 
   // The scope rows: All (everything-tile) → Unassigned (dashed) → each product
   // (monogram). Each carries a live count derived from the All-scoped feed.
@@ -130,9 +203,6 @@ export function ProductSwitcher({
 
   const scopeLabel = scopeName(scope, products);
   const scopeCount = countForScope(changes, scope);
-  // "× clear" only appears when scoped away from All (there's somewhere to go
-  // back to). At the All scope there is nothing to clear.
-  const showClear = scope !== null;
   // The trigger's accessible name always carries the active scope + its count
   // ("Viewing All products, 23 changes"), so a screen reader announces the
   // scope even at narrow widths where the visible "Viewing <scope>" text folds
@@ -154,35 +224,18 @@ export function ProductSwitcher({
         onManageProducts={onManageProducts}
       />
 
-      {/* The header echo — the active scope is always named in the chrome so
-          the founder never wonders what they're looking at (Concern A1). The
-          count rides the text; "× clear" returns to All when scoped. */}
-      <div className={styles.scopeHeader} data-testid="product-scope-header">
-        <span>
-          Viewing <strong>{scopeLabel}</strong> · {scopeCount}{" "}
-          {scopeCount === 1 ? "change" : "changes"}
-        </span>
-        {showClear && (
-          <button
-            type="button"
-            className={styles.clearScope}
-            aria-label="Clear scope, view all products"
-            onClick={() => onSelect(null)}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-            All products
-          </button>
-        )}
-      </div>
+      {/* The scope echo stacks under the trigger ONLY where there's vertical
+          room (the Sidebar). The horizontal top bar passes showScopeEcho=false
+          and renders <ScopeHeader> as a strip below the bar instead — a stacked
+          echo inside the 48px bar overflows it. */}
+      {showScopeEcho ? (
+        <ScopeHeader
+          products={products}
+          activeProductId={activeProductId}
+          changes={changes}
+          onSelect={onSelect}
+        />
+      ) : null}
     </div>
   );
 }

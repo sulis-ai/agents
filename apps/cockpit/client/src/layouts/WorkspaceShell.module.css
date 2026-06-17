@@ -26,6 +26,20 @@
   background: var(--card);
 }
 
+/* The scope-echo strip — the "Viewing <scope> · N changes" line BELOW the 48px
+ * top bar (the signed mockup's structure). Its own flex row in the shell column
+ * so it never crowds — or overflows — the fixed-height bar. Quiet sub-header:
+ * card surface, a divider beneath, padding aligned with the bar. Auto-height
+ * (it has nothing to overflow), and absent entirely when there are no products. */
+.scopeStrip {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
 /* The "Start something new" front door (ADR-003). The single primary action in
  * the chrome — a filled --primary button, so it reads as the way in (signed-off
  * MOCKUP state 1). Token-only (WPF-07). Vertically centred in the 48px bar; sits

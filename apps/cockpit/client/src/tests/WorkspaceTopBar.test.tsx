@@ -201,3 +201,53 @@ describe("WorkspaceTopBar — front-door 'Start something new' button (WP-001)",
     });
   });
 });
+
+describe("WorkspaceTopBar — scope echo placement (top-bar overflow fix)", () => {
+  // The bug: the switcher's "Viewing <scope> · N changes" echo was stacked
+  // INSIDE the 48px horizontal top bar, so the ~74px (trigger + echo) stack
+  // overflowed it — the selector floated above the bar and the echo hung below.
+  // The fix: the bar shows the selector TRIGGER ONLY; the echo renders as a
+  // strip BELOW the bar (the signed mockup's structure). These tests pin that
+  // structure so the overflow can't regress.
+  beforeEach(() => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : (input as Request).url ?? String(input);
+      if (url.includes("/api/products")) {
+        return Promise.resolve(
+          jsonResponse(200, {
+            products: [{ productId: "p1", name: "Clinics" }],
+            activeProductId: null,
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse(200, []));
+    });
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    delete document.documentElement.dataset.theme;
+  });
+
+  it("renders the product selector INSIDE the bar but the 'Viewing…' echo BELOW it (never nested in the 48px bar)", async () => {
+    renderTopBar();
+    const topbar = await screen.findByTestId("workspace-topbar");
+
+    // The selector trigger lives in the bar (the scope is still switchable there).
+    expect(
+      await within(topbar).findByTestId("product-control-trigger"),
+    ).toBeInTheDocument();
+
+    // The scope echo is NOT nested inside the 48px bar — stacking it there was
+    // the overflow bug (selector floats above, echo hangs below).
+    expect(
+      within(topbar).queryByTestId("product-scope-header"),
+    ).not.toBeInTheDocument();
+
+    // It IS rendered — as the strip BELOW the bar (a sibling, not a descendant).
+    const echo = await screen.findByTestId("product-scope-header");
+    expect(echo).toBeInTheDocument();
+    expect(topbar.contains(echo)).toBe(false);
+    expect(echo.textContent).toMatch(/viewing/i);
+  });
+});

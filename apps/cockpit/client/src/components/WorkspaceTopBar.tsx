@@ -18,7 +18,7 @@ import { useProducts } from "../api/useProducts";
 import { useActiveProduct } from "../api/activeProduct";
 import { useChangesWithLiveness } from "../api/useChangesWithLiveness";
 import { useOpenTabs } from "../api/openTabs";
-import { ProductSwitcher } from "./ProductSwitcher";
+import { ProductSwitcher, ScopeHeader } from "./ProductSwitcher";
 // CH-01KTHP — the light/dark toggle is re-homed here. #216 deleted the old
 // <Shell /> top bar that used to host it; the workspace top bar is the new
 // always-present chrome, so the toggle lives top-right of it.
@@ -76,6 +76,7 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
   }
 
   return (
+    <>
     <header className={styles.topbar} data-testid="workspace-topbar">
       {/* The one front door (ADR-003). The single primary action in the chrome:
           navigates to the existing /start route — no network, no mutation, no
@@ -104,6 +105,10 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
 
       {productList.length > 0 && (
         <div className={styles.brand}>
+          {/* Trigger ONLY in the 48px bar (showScopeEcho={false}). The
+              "Viewing… · N · ×clear" echo renders as a strip BELOW the bar
+              (see the fragment sibling below) — stacking it inside the bar
+              overflows it. */}
           <ProductSwitcher
             products={productList}
             activeProductId={activeProductId}
@@ -111,6 +116,7 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
             changes={allChanges.data ?? []}
             onSetUpNew={() => navigate("/settings?new=product")}
             onManageProducts={() => navigate("/settings")}
+            showScopeEcho={false}
           />
         </div>
       )}
@@ -192,5 +198,20 @@ export function WorkspaceTopBar({ activeChangeId }: Props) {
         <ThemeToggle />
       </div>
     </header>
+    {/* The scope echo lives BELOW the bar (the signed mockup's structure):
+        "Viewing <scope> · N changes" + a one-tap "× clear". Kept out of the
+        48px bar so it can't overflow it; only shown once there's a product to
+        scope by. */}
+    {productList.length > 0 && (
+      <div className={styles.scopeStrip}>
+        <ScopeHeader
+          products={productList}
+          activeProductId={activeProductId}
+          changes={allChanges.data ?? []}
+          onSelect={setActiveProductId}
+        />
+      </div>
+    )}
+    </>
   );
 }
