@@ -292,6 +292,196 @@ function CardProductAffordance({
   );
 }
 
+/** Per-field degraded fallbacks (FR-54): readable fields render verbatim;
+ *  unreadable content fields fall to a FIXED placeholder — never blank, never
+ *  the (possibly malformed) row text. The aria name stays honest even when the
+ *  intent is unreadable. Pure; extracted so the card body holds no field-branch. */
+function degradedFields(change: Change): {
+  intentText: string;
+  slugText: string;
+  ariaIntent: string;
+} {
+  const intentBlank = change.intent.trim() === "";
+  return {
+    intentText: intentBlank ? INTENT_UNREADABLE : change.intent,
+    slugText: change.slug.trim() === "" ? SLUG_UNREADABLE : change.slug,
+    ariaIntent: intentBlank ? "some details couldn't be read" : change.intent,
+  };
+}
+
+/** WP-008 — resolve the assigned product (if any). The board feed carries only
+ *  `forProduct` (an id); the human name comes from the INJECTED products list
+ *  (ADR-002 — the card never fetches). Pure; null when unassigned or no list. */
+function resolveAssignedProduct(
+  change: Change,
+  products?: Product[],
+): Product | null {
+  if (typeof change.forProduct !== "string" || !products) return null;
+  return products.find((p) => p.productId === change.forProduct) ?? null;
+}
+
+/** The card's CSS class string — `card` plus the additive selected/degraded/
+ *  shipped state classes. Extracted so the parent holds no className branch. */
+function cardClassName(
+  selected: boolean,
+  degraded: boolean,
+  shipped: boolean,
+): string {
+  return [
+    styles.card,
+    selected ? styles.selected : "",
+    degraded ? styles.degraded : "",
+    shipped ? styles.shipped : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+/** A boolean → the `"true"`-or-omitted attribute value pattern the card uses
+ *  for its data-/aria- state flags (present only when on, never colour-alone). */
+const attrFlag = (on: boolean): "true" | undefined => (on ? "true" : undefined);
+
+/** WP-012 — top-line right element: the static "Shipped" marker on a terminal
+ *  card (BR-28 — no live signal), else the live probe. */
+function CardProbe({
+  shipped,
+  change,
+  now,
+}: {
+  shipped: boolean;
+  change: Change;
+  now?: Date;
+}) {
+  if (shipped) return <ShippedMarker />;
+  return (
+    <LivenessProbe
+      liveness={change.liveness}
+      lastActivityAt={change.lastActivityAt}
+      now={now}
+    />
+  );
+}
+
+/** WP-008 — the quiet ASSIGNED chip: a neutral monogram tile + the product
+ *  name. A non-interactive <span>, so it sits inside the card <Link>
+ *  legitimately. Never colour-alone — the glyph + the name carry the meaning. */
+function AssignedProductChip({ product }: { product: Product }) {
+  return (
+    <span className={styles.cardProductChip} data-testid="card-product-chip">
+      <span className={styles.cardProductMono} aria-hidden="true">
+        {monogram(product.name)}
+      </span>
+      <span className={styles.cardProductName}>{product.name}</span>
+    </span>
+  );
+}
+
+/** The meta line: slug + (shipped recency, WP-012) + (assigned chip, WP-008).
+ *  Shipped recency is the archival "shipped Nd ago" read (Q-7), NOT a live age,
+ *  derived from `updatedAt` (always present, unlike the nullable lastActivityAt). */
+function CardMeta({
+  slugText,
+  shipped,
+  updatedAt,
+  now,
+  assignedProduct,
+}: {
+  slugText: string;
+  shipped: boolean;
+  updatedAt: string;
+  now?: Date;
+  assignedProduct: Product | null;
+}) {
+  return (
+    <div className={styles.cardMeta}>
+      <span className={styles.slug}>{slugText}</span>
+      {shipped ? (
+        <span className={styles.shippedRecency} data-testid="shipped-recency">
+          {formatShippedRecency(updatedAt, now)}
+        </span>
+      ) : null}
+      {assignedProduct ? (
+        <AssignedProductChip product={assignedProduct} />
+      ) : null}
+    </div>
+  );
+}
+
+/** THE ONE FOOT VERDICT — waiting XOR health, never both (the founder's
+ *  load-bearing rule, BR-1). WP-012 — SUPPRESSED entirely on a shipped card:
+ *  a terminal change shows NEITHER live foot (BR-28 mutual suppression). */
+function CardFootVerdict({
+  shipped,
+  flagged,
+  change,
+}: {
+  shipped: boolean;
+  flagged: boolean;
+  change: Change;
+}) {
+  if (shipped) return null;
+  return (
+    <div className={`${styles.footRow} ${flagged ? styles.waitingFoot : ""}`}>
+      {flagged ? (
+        <WaitingOnYou why={attentionWhy(change.needsAttention.reason)} />
+      ) : (
+        <ChangeHealthBadge health={change.health} />
+      )}
+    </div>
+  );
+}
+
+/** WP-011 — the quiet, FIXED-STRING degraded notice (FR-55). Reinforcement of
+ *  the per-field unknown reads (BR-3); role="status" announces it so it is never
+ *  colour-/placement-alone (NFR-A11Y-4). Never interpolates row content. */
+function DegradedNotice({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <div className={styles.degradedNote} role="status">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        aria-hidden="true"
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 8v4M12 16h.01" strokeLinecap="round" />
+      </svg>
+      {DEGRADED_NOTICE}
+    </div>
+  );
+}
+
+/** WP-009 — the "Open terminal" action: a SEPARATE tab stop inside the card
+ *  (stopPropagation, so it doesn't also navigate). Omitted → not rendered. */
+function OpenTerminalAction({
+  changeId,
+  onOpenTerminal,
+}: {
+  changeId: string;
+  onOpenTerminal?: (changeId: string) => void;
+}) {
+  if (!onOpenTerminal) return null;
+  return (
+    <div className={styles.actions}>
+      <button
+        type="button"
+        className={styles.openTerminal}
+        onClick={(event) => {
+          // "open terminal" is a distinct action from "open change" — stop the
+          // click from also navigating via the enclosing card <Link>.
+          event.preventDefault();
+          event.stopPropagation();
+          onOpenTerminal(changeId);
+        }}
+      >
+        Open terminal
+      </button>
+    </div>
+  );
+}
+
 export function ChangeCard({
   change,
   selected = false,
@@ -304,66 +494,39 @@ export function ChangeCard({
   const degraded = isDegraded(change);
   // WP-012 — terminal/archived treatment. Shipped wins the foot/probe over the
   // live + degraded reads (SRD §7c precedence); the per-field identity reads
-  // below still apply (an unreadable slug/intent still falls to its placeholder).
+  // still apply (an unreadable slug/intent still falls to its placeholder).
   const shipped = isShipped(change);
 
-  // Per-field degraded fallbacks (FR-54): readable fields render verbatim;
-  // unreadable content fields fall to a FIXED placeholder — never blank, never
-  // the (possibly malformed) row text. The aria-label keeps an honest name even
-  // when the intent is unreadable.
-  const intentText =
-    change.intent.trim() === "" ? INTENT_UNREADABLE : change.intent;
-  const slugText = change.slug.trim() === "" ? SLUG_UNREADABLE : change.slug;
-  const ariaIntent =
-    change.intent.trim() === ""
-      ? "some details couldn't be read"
-      : change.intent;
+  const { intentText, slugText, ariaIntent } = degradedFields(change);
 
-  // WP-008 — resolve the assigned product (if any) for the quiet foot-meta chip
-  // + the card's accessible name. The board feed carries only `forProduct` (an
-  // id); the human name comes from the INJECTED products list (ADR-002 — the
-  // card never fetches). A shipped/archived card keeps its product read like any
-  // other; it just shows no affordance (nothing to re-assign on a terminal
-  // change — see below). When no products list is injected (existing dashboard
-  // usages / provider-less unit tests), the placement simply doesn't render.
-  const assignedProduct =
-    typeof change.forProduct === "string" && products
-      ? (products.find((p) => p.productId === change.forProduct) ?? null)
-      : null;
+  // WP-008 — the assigned product drives the quiet foot-meta chip, the card's
+  // accessible name, and whether the unassigned affordance shows. A shipped card
+  // keeps its product read like any other; it just shows no affordance.
+  const assignedProduct = resolveAssignedProduct(change, products);
   const assigned = assignedProduct !== null;
-  // The product name rides the card's accessible name when assigned, so a
-  // screen reader hears which product the change belongs to.
+  // The product name rides the card's accessible name when assigned, so a screen
+  // reader hears which product the change belongs to.
   const productAria = assignedProduct ? ` · ${assignedProduct.name}` : "";
 
   return (
     <div className={styles.cardShell} data-testid="change-card-shell">
       <Link
         to={`/c/${change.changeId}`}
-        className={`${styles.card} ${selected ? styles.selected : ""} ${degraded ? styles.degraded : ""} ${shipped ? styles.shipped : ""}`}
+        className={cardClassName(selected, degraded, shipped)}
         data-testid="change-card"
         // WP-009 — route-derived selection marker. data-selected drives the CSS
         // and test selection (mirrors SidebarItem's data-active); aria-current
         // announces it to assistive tech so it's never colour-/placement-alone
         // (NFR-A11Y-1). Additive — it sits alongside the degraded/shipped reads.
-        data-selected={selected ? "true" : undefined}
-        aria-current={selected ? "true" : undefined}
-        data-degraded={degraded ? "true" : undefined}
-        data-shipped={shipped ? "true" : undefined}
+        data-selected={attrFlag(selected)}
+        aria-current={attrFlag(selected)}
+        data-degraded={attrFlag(degraded)}
+        data-shipped={attrFlag(shipped)}
         aria-label={`Change ${change.handle}: ${ariaIntent}${productAria}`}
       >
         <div className={styles.topLine}>
           <span className={styles.handle}>{change.handle}</span>
-          {/* WP-012 — a shipped card REPLACES the live probe with the static
-           * "Shipped" marker (BR-28 — no live signal on a terminal card). */}
-          {shipped ? (
-            <ShippedMarker />
-          ) : (
-            <LivenessProbe
-              liveness={change.liveness}
-              lastActivityAt={change.lastActivityAt}
-              now={now}
-            />
-          )}
+          <CardProbe shipped={shipped} change={change} now={now} />
         </div>
 
         <StepDots step={step} />
@@ -374,103 +537,31 @@ export function ChangeCard({
           {intentText}
         </p>
 
-        <div className={styles.cardMeta}>
-          <span className={styles.slug}>{slugText}</span>
-          {/* WP-012 — shipped recency: the archival "shipped Nd ago" read (Q-7),
-           * NOT a live age. Derived from `updatedAt` (the shipped-at time; always
-           * present, unlike the nullable lastActivityAt). */}
-          {shipped ? (
-            <span
-              className={styles.shippedRecency}
-              data-testid="shipped-recency"
-            >
-              {formatShippedRecency(change.updatedAt, now)}
-            </span>
-          ) : null}
-          {/* WP-008 — the quiet ASSIGNED chip: a neutral monogram tile + the
-           * product name. A non-interactive <span>, so it sits inside the card
-           * <Link> legitimately; the product name also rides the card's
-           * accessible name (above). Never colour-alone — the glyph + the name
-           * carry the meaning. */}
-          {assignedProduct ? (
-            <span
-              className={styles.cardProductChip}
-              data-testid="card-product-chip"
-            >
-              <span className={styles.cardProductMono} aria-hidden="true">
-                {monogram(assignedProduct.name)}
-              </span>
-              <span className={styles.cardProductName}>
-                {assignedProduct.name}
-              </span>
-            </span>
-          ) : null}
-        </div>
+        <CardMeta
+          slugText={slugText}
+          shipped={shipped}
+          updatedAt={change.updatedAt}
+          now={now}
+          assignedProduct={assignedProduct}
+        />
 
-        {/* THE ONE FOOT VERDICT — waiting XOR health, never both (single branch).
-         * WP-012 — SUPPRESSED entirely on a shipped card: a terminal change shows
-         * NEITHER live foot (BR-28 mutual suppression). The static "Shipped"
-         * marker + the shipped recency are its only status reads. */}
-        {shipped ? null : (
-          <div
-            className={`${styles.footRow} ${flagged ? styles.waitingFoot : ""}`}
-          >
-            {flagged ? (
-              <WaitingOnYou why={attentionWhy(change.needsAttention.reason)} />
-            ) : (
-              <ChangeHealthBadge health={change.health} />
-            )}
-          </div>
-        )}
+        <CardFootVerdict shipped={shipped} flagged={flagged} change={change} />
 
-        {/* WP-011 — the quiet, FIXED-STRING degraded notice (FR-55). Reinforcement
-         * of the per-field unknown reads (BR-3); role="status" announces it so it
-         * is never colour-/placement-alone (NFR-A11Y-4). Never interpolates the
-         * row content (NFR-SEC-03). */}
-        {degraded ? (
-          <div className={styles.degradedNote} role="status">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.8}
-              aria-hidden="true"
-            >
-              <circle cx="12" cy="12" r="9" />
-              <path d="M12 8v4M12 16h.01" strokeLinecap="round" />
-            </svg>
-            {DEGRADED_NOTICE}
-          </div>
-        ) : null}
+        <DegradedNotice show={degraded} />
 
-        {onOpenTerminal ? (
-          <div className={styles.actions}>
-            <button
-              type="button"
-              className={styles.openTerminal}
-              // The action lives inside the card's <Link>; stop the click from
-              // also navigating to the change page — "open terminal" is a
-              // distinct action from "open change".
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onOpenTerminal(change.changeId);
-              }}
-            >
-              Open terminal
-            </button>
-          </div>
-        ) : null}
+        <OpenTerminalAction
+          changeId={change.changeId}
+          onOpenTerminal={onOpenTerminal}
+        />
       </Link>
 
       {/* WP-008 — the assign-from-card affordance. Rendered OUTSIDE the <Link>
        * (interactive content can't nest in an anchor) and only when a products
        * list is injected (the board), the change is UNASSIGNED, and it's not
-       * shipped (a terminal change has nothing to assign in context). Always in
-       * the DOM + keyboard-reachable when shown; hover only emphasises it.
-       * Honours the recorded WP fallback: if this ever destabilises the card it
-       * can be dropped (the change-nav property, WP-006, is the alternate
-       * assignment surface) — but it ships here per the signed design. */}
+       * shipped (a terminal change has nothing to assign in context). Honours the
+       * recorded WP fallback: if it ever destabilises the card it can be dropped
+       * (the change-nav property, WP-006, is the alternate surface) — but it
+       * ships here per the signed design. */}
       {products && !assigned && !shipped ? (
         <CardProductAffordance changeId={change.changeId} products={products} />
       ) : null}
