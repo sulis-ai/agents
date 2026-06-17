@@ -1,0 +1,7 @@
+Exempt from authored verification scenarios.
+
+Reason: a contained layout-regression fix (the scope echo overflowed the 48px
+top bar). The fix's behaviour is pinned by a new structural regression test in
+WorkspaceTopBar.test.tsx (selector trigger inside the bar; the 'Viewing…' echo
+rendered below it, never nested in the 48px bar) plus the existing ProductSwitcher
++ responsive e2e suites. No new user journey is introduced.
