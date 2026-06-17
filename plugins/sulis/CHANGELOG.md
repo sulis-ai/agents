@@ -1,3 +1,9 @@
+## v0.167.1 — 2026-06-17
+
+**Patch — release-train batch.**
+
+- Decompose the board change-card into named sub-components to cut its complexity (CCN 38 -> <15); behaviour unchanged.
+
 ## v0.167.0 — 2026-06-17
 
 **Minor — release-train batch.**

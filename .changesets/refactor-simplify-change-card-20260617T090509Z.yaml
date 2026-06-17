@@ -1,7 +1,0 @@
-change_id: 01KVACXVWPY1Z1N0EDNJT2FS15
-primitive: refactor
-tier: patch
-touches_plugin: false
-summary: |
-  Decompose the board change-card into named sub-components to cut its complexity (CCN 38 -> <15); behaviour unchanged.
-created_at: 2026-06-17T09:05:09Z
