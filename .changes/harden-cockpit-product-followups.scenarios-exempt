@@ -1,0 +1,8 @@
+Exempt from authored verification scenarios.
+
+Reason: this change is (a) a test-harness isolation fix (#377, non-user-facing —
+dedicated e2e ports) and (b) a visual-fidelity refinement (#378) to the product
+chip, a surface already covered by CH-FNVQNN's five authored verification
+scenarios. No new user journey is introduced. The specific changes are verified
+by the updated ProductControl + ChangeNavProduct component & axe tests and by the
+happy-path/responsive Playwright e2e suite (all green). #379 required no change.

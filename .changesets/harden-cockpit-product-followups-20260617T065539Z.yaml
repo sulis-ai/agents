@@ -1,0 +1,7 @@
+change_id: 01KV97F3X9BH5YM2X5TJ9C6GX9
+primitive: harden
+tier: minor
+touches_plugin: false
+summary: |
+  Cockpit follow-ups: isolate e2e ports so the test harness boots a clean fixture (#377); the unassigned product chip leads with the signed mockup inline plus icon (#378).
+created_at: 2026-06-17T06:55:39Z
