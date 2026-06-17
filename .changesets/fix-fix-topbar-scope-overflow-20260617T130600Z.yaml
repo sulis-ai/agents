@@ -1,7 +1,0 @@
-change_id: 01KVAT8TS240APQS8YK8C586D5
-primitive: fix
-tier: patch
-touches_plugin: false
-summary: |
-  Fix the cockpit header: the product scope echo overflowed the 48px top bar (selector floated above, text hung below) — the top bar now holds the selector only and the Viewing/count/clear echo renders as a strip below the bar.
-created_at: 2026-06-17T13:06:00Z

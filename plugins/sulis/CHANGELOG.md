@@ -1,3 +1,9 @@
+## v0.167.2 — 2026-06-17
+
+**Patch — release-train batch.**
+
+- Fix the cockpit header: the product scope echo overflowed the 48px top bar (selector floated above, text hung below) — the top bar now holds the selector only and the Viewing/count/clear echo renders as a strip below the bar.
+
 ## v0.167.1 — 2026-06-17
 
 **Patch — release-train batch.**
