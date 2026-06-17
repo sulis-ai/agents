@@ -26,17 +26,28 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 import {
-  getClientPort,
-  getServerPort,
+  getE2eClientPort,
+  getE2eServerPort,
   COCKPIT_HOST,
 } from "../shared/dev-ports";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cockpitRoot = join(here, "..");
 
-const serverPort = getServerPort();
-const clientPort = getClientPort();
+// Use DEDICATED e2e ports (not the dev ports) so the harness never reuses a
+// developer's running cockpit on 5173/5174 — that would serve the real change
+// store instead of the seeded fixture and make count-based tests
+// non-deterministic (issue #377). Both webServer commands are handed these as
+// COCKPIT_SERVER_PORT / COCKPIT_CLIENT_PORT so run-server.ts + vite bind here
+// and the client proxies /api to the e2e server.
+const serverPort = getE2eServerPort();
+const clientPort = getE2eClientPort();
 const clientOrigin = `http://${COCKPIT_HOST}:${clientPort}`;
+const webServerEnv = {
+  ...process.env,
+  COCKPIT_SERVER_PORT: String(serverPort),
+  COCKPIT_CLIENT_PORT: String(clientPort),
+};
 
 export default defineConfig({
   testDir: here,
@@ -77,6 +88,7 @@ export default defineConfig({
     {
       command: "npx tsx e2e/run-server.ts",
       cwd: cockpitRoot,
+      env: webServerEnv,
       url: `http://${COCKPIT_HOST}:${serverPort}/api/changes`,
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
@@ -88,6 +100,7 @@ export default defineConfig({
       // vite's root there (positional arg) with the client config.
       command: "npx vite client --config client/vite.config.ts",
       cwd: cockpitRoot,
+      env: webServerEnv,
       url: clientOrigin,
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,

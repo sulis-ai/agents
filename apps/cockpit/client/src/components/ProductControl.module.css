@@ -153,6 +153,21 @@
   border-color: var(--input);
   color: var(--text-secondary);
 }
+/* #378 — the unassigned chip's leading "＋" icon, per the signed mockup
+ * (.propChip .plusIcon): a light inline plus, not the dashed tile box. */
+.plusIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+}
+.plusIcon svg {
+  width: 16px;
+  height: 16px;
+}
 .pcname {
   flex: 1;
   min-width: 0;

@@ -128,8 +128,9 @@ describe("<ChangeProductProperty> — change-nav product property (ADR-002)", ()
     // The accessible name survives even when the visible text folds at narrow
     // width (triggerLabel carried through the primitive).
     expect(trigger.getAttribute("aria-label")).toMatch(/product/i);
-    // Never colour alone — the unassigned state carries the dashed glyph.
-    expect(trigger.querySelector("[data-glyph='unassigned-dashed']")).toBeTruthy();
+    // #378 — never colour alone: the unassigned chip leads with the signed
+    // mockup's inline "＋" icon (data-glyph="plus") + a dashed chip border.
+    expect(trigger.querySelector("[data-glyph='plus']")).toBeTruthy();
   });
 
   it("commits an assignment via PUT when a product is picked (assign scenario)", async () => {
