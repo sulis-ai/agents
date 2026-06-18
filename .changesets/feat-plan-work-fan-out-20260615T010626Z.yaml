@@ -1,0 +1,16 @@
+change_id: 01KV4D1JHNFSNV82M4MSAXDCMQ
+primitive: feat
+tier: minor
+touches_plugin: true
+summary: |
+  plan-work fan-out: step 8 now authors each Work Package BODY through the
+  faithful-generation chain (dispatch design-work-package -> compile-manifest +
+  faithful-generation-harness) instead of freehand. plan-work still owns the
+  decomposition + frontmatter (steps 3-7); the chain grounds the body (Intent +
+  Contract + Definition of Done + Sequence) so every claim traces to the design,
+  with an MDMP-derived commander's-intent field. Parallelised by the dependency
+  graph + tier-gated by SIZING. A partial-unattributed body surfaces a thin
+  design slice rather than passing silently. Requires sulis-brain >= 0.18.0.
+  Validated by the design-work-package loop test (sulis-brain DR-038; WP-004 +
+  WP-001 runs, both grounded).
+created_at: 2026-06-15T01:06:26Z
