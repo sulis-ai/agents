@@ -38,6 +38,10 @@ _CHANGE_ID = "CH-GJ9KQR"
 # protection flags a literal sk_live_ string); find_secrets still detects the
 # assembled value, so the redaction under test is unchanged.
 _SECRET = "sk" + "_live_" + "ABCDEFGHIJKLMNOPQRSTUVWX" + "0123456789"
+# A modern OpenAI project-scoped key (WP-010 — the GAP 3 blind spot). Assembled
+# at runtime for the same push-safety reason; the new catalogue pattern must
+# reach this persistence surface so the key never lands verbatim on disk.
+_OPENAI_KEY = "sk-proj-" + "T3BlbkFJ" + "aB3dEf6hIjKlMn0pQrStUvWx" + "Yz12_3-4"
 
 
 def _store(root: Path) -> LocalThreadStore:
@@ -207,6 +211,30 @@ def test_token_secret_scrubbed_before_bytes_land(tmp_path: Path) -> None:
     # write — the read does not re-scrub or expose the raw value).
     got = store.get_messages("t1")[0]
     assert _SECRET not in got.content
+    assert "keep it safe" in got.content
+
+
+def test_openai_key_scrubbed_before_bytes_land(tmp_path: Path) -> None:
+    """A modern OpenAI key (``sk-proj-…``) in message content is scrubbed to
+    ``[redacted-secret]`` BEFORE bytes land — proving the WP-010 catalogue
+    pattern reaches the store's redaction-on-write surface (GAP 3 closure).
+
+    Agent conversations routinely echo LLM API keys, so this is the
+    highest-likelihood secret type for the durable thread store."""
+    root = tmp_path / "threads"
+    store = _store(root)
+    store.append_message(
+        "t1", _msg("m0", 0, content=f"my key is {_OPENAI_KEY} keep it safe")
+    )
+
+    log_path = root / tc.messages_record_filename("t1")
+    raw_bytes = log_path.read_bytes()
+    assert _OPENAI_KEY.encode() not in raw_bytes, "OpenAI key leaked to disk"
+    assert b"[redacted-secret]" in raw_bytes, "secret span must be redacted"
+    assert b"keep it safe" in raw_bytes, "non-secret content must be preserved"
+
+    got = store.get_messages("t1")[0]
+    assert _OPENAI_KEY not in got.content
     assert "keep it safe" in got.content
 
 

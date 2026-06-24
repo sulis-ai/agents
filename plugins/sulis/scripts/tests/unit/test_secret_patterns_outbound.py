@@ -42,6 +42,10 @@ _GOOGLE_API_KEY = "AIza" + "SyAbcdefghijklmnopqrstuvwxyz0123456"
 # Generic high-entropy bearer/opaque token: clearly fake, no provider prefix the
 # in-house catalogue recognises — exactly the gap detect-secrets fills.
 _GENERIC_TOKEN = "xK9pLm2QrT7vWnB4cE6gH1jD8sF3aZ5yU0iO9wQ2eR4"
+# OpenAI keys (WP-010 — GAP 3 blind spot, supplied by the in-house catalogue
+# layer of the union). Assembled from parts; push-safe.
+_OPENAI_PROJ_KEY = "sk-proj-" + "T3BlbkFJ" + "aB3dEf6hIjKlMn0pQrStUvWx" + "Yz12_3-4"
+_OPENAI_LEGACY_KEY = "sk-" + "aB3dEf6hIjKlMn0pQrStUvWxYz0123456789ABCDEFGHijkl"
 
 
 def _categories(text: str) -> set[str]:
@@ -76,6 +80,21 @@ def test_generic_high_entropy_bearer_token_is_caught() -> None:
     prefix, so only the detect-secrets entropy plugin catches it."""
     header_value = f'{{"authorization": "{_GENERIC_TOKEN}"}}'
     assert find_secrets(header_value), "high-entropy bearer token must be detected"
+
+
+def test_openai_project_key_caught_via_union() -> None:
+    """Modern ``sk-proj-…`` OpenAI key in an outbound URL — supplied by the
+    in-house catalogue layer of the union (WP-010, GAP 3 blind spot)."""
+    assert "openai-key" in _categories(
+        f"https://example.com/x?key={_OPENAI_PROJ_KEY}"
+    )
+
+
+def test_openai_legacy_key_caught_via_union() -> None:
+    """Legacy ``sk-<48 alnum>`` OpenAI key in an outbound body — supplied by the
+    in-house catalogue layer of the union (WP-010, GAP 3 blind spot)."""
+    body = f'{{"authorization": "Bearer {_OPENAI_LEGACY_KEY}"}}'
+    assert "openai-key" in _categories(body)
 
 
 # ─── Benign requests in prose context stay clean (no fail-open, no FP storm) ──
