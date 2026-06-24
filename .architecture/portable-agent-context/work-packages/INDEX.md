@@ -34,9 +34,9 @@
 | WP-006 | Cockpit raw-view reads our store (strangle) | substitute-strangle | done | WP-002, WP-004 | — |
 | WP-007 | Integration — mock→real + conformance + resume drive (component-level) | expand-create | done | WP-002, WP-003, WP-004, WP-005 | WP-009 |
 | WP-008 | Thread mint-candidate record (no mint) | expand-create | done | WP-001 | — |
-| WP-009 | Live assemble→inject resume wiring (real Working Set + brain readers) | reinforce-instrument | step-7-complete | WP-002, WP-003, WP-004, WP-005, WP-007 | WP-011 |
-| WP-010 | Scrub modern OpenAI keys on write to the thread store | reinforce-harden | step-7-complete | WP-002 | — |
-| WP-011 | Cold-memory resume — regenerate summary on demand + keep memory fresh | reinforce-instrument | pending | WP-002, WP-003, WP-004, WP-009 | — |
+| WP-009 | Live assemble→inject resume wiring (real Working Set + brain readers) | reinforce-instrument | done | WP-002, WP-003, WP-004, WP-005, WP-007 | WP-011 |
+| WP-010 | Scrub modern OpenAI keys on write to the thread store | reinforce-harden | done | WP-002 | — |
+| WP-011 | Cold-memory resume — regenerate summary on demand + keep memory fresh | reinforce-instrument | done | WP-002, WP-003, WP-004, WP-009 | — |
 
 ## Dependency shape
 

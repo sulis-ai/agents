@@ -106,3 +106,8 @@ control point, so the change is one pattern + tests.
   (the established seam this codebase already uses for the slack/jwt/long-token
   hardening lessons #39/#40/#42) over reaching for a new detector dependency —
   the boring, single-source choice.
+
+## Acceptance Evidence
+
+- Branch: wp/create-portable-agent-context/wp-010-openai-key-detector-pattern (deleted post-merge)
+- Completed: `2026-06-24T21:49:18Z` (Step 12 by calling session)

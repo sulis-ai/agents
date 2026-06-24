@@ -169,3 +169,8 @@ component-level contract test).
   exist), the two real readers (new small modules or functions, e.g. a
   `working_set_reader` over `.changes/*.WORKING-SET.md` and a `brain_reader`
   over `_brain_query`), and the new wiring test. Parallelisable with WP-010.
+
+## Acceptance Evidence
+
+- Branch: wp/create-portable-agent-context/wp-009-live-assemble-inject-resume-wiring (deleted post-merge)
+- Completed: `2026-06-24T21:49:18Z` (Step 12 by calling session)

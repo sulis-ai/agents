@@ -1,0 +1,16 @@
+train_id: "train-2026-06-24T221115Z"
+started_at: "2026-06-24T22:11:15Z"
+completed_at: "2026-06-24T22:22:06Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-24T22:16:25Z"
+bundle:
+  - wp: WP-011
+    branch: wp/create-portable-agent-context/wp-011-cold-memory-resume-on-demand-summary
+    pre_train_sha: 205c92d6f62b48e55703bfdbd51048853fdedeb1
+    rebased_to_sha: 205c92d6f62b48e55703bfdbd51048853fdedeb1
+    merge_sha_on_dev: 2d4992bdb07867948e9e7ead1bfd2d3e56e2e6ec

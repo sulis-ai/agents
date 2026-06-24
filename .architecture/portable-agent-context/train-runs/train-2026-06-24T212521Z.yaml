@@ -1,6 +1,7 @@
 train_id: "train-2026-06-24T212521Z"
 started_at: "2026-06-24T21:25:21Z"
-outcome: "awaiting_gates"
+completed_at: "2026-06-24T21:49:06Z"
+outcome: "success"
 batch_size: 2
 deploy_url: null
 deploy_workflow_run: null

@@ -227,3 +227,8 @@ degrade-on-cold-memory assertion into the genuinely-unrecoverable case.
 > (e.g. 100KB WS → ~25k tokens at a 1.5k budget). Trim participant_context into the
 > tier cap too (in summarise_memory / _fit_to_budget, or bound the read), so the
 > budget guarantee holds for a large Working Set, not just a large thread.
+
+## Acceptance Evidence
+
+- Branch: wp/create-portable-agent-context/wp-011-cold-memory-resume-on-demand-summary (deleted post-merge)
+- Completed: `2026-06-24T22:22:06Z` (Step 12 by calling session)
