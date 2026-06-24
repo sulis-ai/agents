@@ -112,4 +112,108 @@ describe("GET /api/changes/:id/transcript", () => {
     expect(res.status).toBe(404);
     expect((res.body as { code: string }).code).toBe("NOT_FOUND");
   });
+
+  // ── CH-GJ9KQR WP-006 — strangle: raw view reads OUR durable store ─────────
+  //
+  // The data source for /transcript moves from locateTranscripts (Claude's
+  // provider transcript files) to the durable ThreadStore (WP-002), keyed by
+  // the change (thread_id == changeId, ADR-004). SUBSTITUTE-Strangle: the
+  // store is preferred; the provider-transcript path stays available as a
+  // fallback (removal_plan) until the new path is proven across a full thread
+  // lifecycle.
+
+  async function seedThreadStore(
+    stateDir: string,
+    changeId: string,
+    contents: string[],
+  ): Promise<void> {
+    const threadsDir = join(stateDir, "changes", changeId, "threads");
+    await mkdir(threadsDir, { recursive: true });
+    const lines =
+      contents
+        .map((content, order) =>
+          JSON.stringify({
+            id: `${changeId}-${order}`,
+            participant_id: "studio-agent",
+            participant_type: "studio_agent",
+            content,
+            role: "observation",
+            created_at: `2026-06-24T10:00:0${order}.000Z`,
+            order,
+          }),
+        )
+        .join("\n") + (contents.length > 0 ? "\n" : "");
+    await writeFile(join(threadsDir, `${changeId}.messages.jsonl`), lines, "utf8");
+  }
+
+  it("reads from OUR store when the durable thread log has messages", async () => {
+    const stateDir = await mkdtemp(join(tmpdir(), "state-"));
+    const worktree = await mkdtemp(join(tmpdir(), "wt-"));
+    const changeId = "01STORE";
+    await seedThreadStore(stateDir, changeId, ["from our store"]);
+
+    const reader = new FakeChangeStoreReader([
+      record({ changeId, worktreePath: worktree }),
+    ]);
+    try {
+      const app = createApp({
+        changeStore: reader,
+        sulisStateDir: stateDir,
+        // Provider transcripts point nowhere — the store must satisfy the read.
+        claudeProjectsDir: "/tmp/never-provider",
+      });
+      const res = await request(app).get(`/api/changes/${changeId}/transcript`);
+      expect(res.status).toBe(200);
+      const body = res.body as Array<{ uuid: string }>;
+      expect(body).toHaveLength(1);
+      expect(body[0]?.uuid).toBe(`${changeId}-0`);
+      expect(JSON.stringify(body[0])).toContain("from our store");
+    } finally {
+      await rm(stateDir, { recursive: true, force: true });
+      await rm(worktree, { recursive: true, force: true });
+    }
+  });
+
+  it("falls back to the provider transcript when OUR store is empty (strangle)", async () => {
+    const stateDir = await mkdtemp(join(tmpdir(), "state-"));
+    const worktree = await mkdtemp(join(tmpdir(), "wt-"));
+    const projects = await mkdtemp(join(tmpdir(), "proj-"));
+    const changeId = "01FALLBACK";
+    // No durable store log seeded for this change → the strangle falls back.
+    const mangled = mangleCwd(worktree);
+    const projDir = join(projects, mangled);
+    await mkdir(projDir, { recursive: true });
+    await writeFile(
+      join(projDir, "session-001.jsonl"),
+      JSON.stringify({
+        type: "user",
+        uuid: "legacy-u1",
+        timestamp: "2026-05-26T00:00:00Z",
+        cwd: worktree,
+        message: { role: "user", content: "from provider transcript" },
+      }) + "\n",
+      "utf8",
+    );
+
+    const reader = new FakeChangeStoreReader([
+      record({ changeId, worktreePath: worktree }),
+    ]);
+    try {
+      const app = createApp({
+        changeStore: reader,
+        sulisStateDir: stateDir,
+        claudeProjectsDir: projects,
+      });
+      const res = await request(app).get(`/api/changes/${changeId}/transcript`);
+      expect(res.status).toBe(200);
+      const body = res.body as Array<{ uuid: string; kind: string }>;
+      expect(body).toHaveLength(1);
+      expect(body[0]?.uuid).toBe("legacy-u1");
+      expect(body[0]?.kind).toBe("user");
+    } finally {
+      await rm(stateDir, { recursive: true, force: true });
+      await rm(worktree, { recursive: true, force: true });
+      await rm(projects, { recursive: true, force: true });
+    }
+  });
 });
