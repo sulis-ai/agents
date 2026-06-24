@@ -61,6 +61,15 @@ from _session_manager.thread_contract import (
 WorkingSetReader = Callable[[str], str]
 BrainReader = Callable[[str], Sequence[Any]]
 
+# The ``participant_context`` keys the assembler writes the rich resume content
+# under (the Working Set crystallisation + the relevant brain entities, ADR-005).
+# Pinned as named constants so the PRODUCER (this assembler) and the CONSUMER
+# (the brief renderer ``durable_sink.render_payload_brief``) agree on one name and
+# cannot silently drift — the same one-definition discipline ``RAW_FETCH_TOOL_NAME``
+# and ``_BRIEF_FRAGMENT_HEADER`` already use (EP-03).
+WORKING_SET_CONTEXT_KEY = "working_set"
+BRAIN_ENTITIES_CONTEXT_KEY = "brain_entities"
+
 
 def estimate_tokens(text: str) -> int:
     """A rough, deterministic token estimate: ~4 characters per token.
@@ -262,18 +271,26 @@ class ContextPayloadAssembler:
     ) -> dict[str, Any]:
         """The payload's ``participant_context``: the memory's own context,
         plus — for the richer tiers (``standard`` / ``full``) — the Working Set
-        crystallisation and the relevant brain entities (ADR-005 rich content).
-        ``lean`` carries only the memory's own context (recovery floor)."""
+        crystallisation AND the relevant brain entities (ADR-005 rich content).
+        ``lean`` carries only the memory's own context (recovery floor).
+
+        Both the Working Set and the brain entities fold in at ``standard`` (the
+        default rich resume payload) — the live resume path (WP-009) seeds at
+        the standard tier and the spec's load-bearing journey requires the
+        resumed brief to carry REAL Working Set + REAL brain content within the
+        standard budget. ``full`` carries the same rich content under the looser
+        budget. The hard token cap (:meth:`_fit_to_budget`) still governs what
+        actually ships, so folding brain at ``standard`` cannot overflow the
+        budget — an over-budget assembly degrades to the tighter tier."""
         ctx: dict[str, Any] = dict(content.participant_context)
         if tier == "lean":
             return ctx
         working_set = self._working_set_reader(thread_id)
         if working_set:
-            ctx["working_set"] = working_set
-        if tier == "full":
-            brain_entities = list(self._brain_reader(thread_id))
-            if brain_entities:
-                ctx["brain_entities"] = brain_entities
+            ctx[WORKING_SET_CONTEXT_KEY] = working_set
+        brain_entities = list(self._brain_reader(thread_id))
+        if brain_entities:
+            ctx[BRAIN_ENTITIES_CONTEXT_KEY] = brain_entities
         return ctx
 
     def _fit_to_budget(
