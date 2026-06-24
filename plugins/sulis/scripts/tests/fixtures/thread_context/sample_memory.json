@@ -1,0 +1,57 @@
+{
+  "thread_id": "thr_01KVX26BDX",
+  "version": 2,
+  "created_at": "2026-06-24T15:57:00Z",
+  "updated_at": "2026-06-24T16:10:00Z",
+  "content": {
+    "messages": [
+      {
+        "id": "msg_0",
+        "participant_id": "user_founder",
+        "participant_type": "user",
+        "content": "Make every spawned agent resume from our context, not the provider transcript.",
+        "role": "question",
+        "created_at": "2026-06-24T15:57:10Z",
+        "order": 0
+      },
+      {
+        "id": "msg_1",
+        "participant_id": "studio_agent_executor",
+        "participant_type": "studio_agent",
+        "content": "Adopting the platform thread model as the canonical shape; storing locally, append-only.",
+        "role": "decision",
+        "created_at": "2026-06-24T15:58:02Z",
+        "order": 1
+      },
+      {
+        "id": "msg_2",
+        "participant_id": "studio_agent_executor",
+        "participant_type": "studio_agent",
+        "content": "Provider transcript removed; resumed from our store with the rich payload intact.",
+        "role": "observation",
+        "created_at": "2026-06-24T16:09:40Z",
+        "order": 2
+      }
+    ],
+    "exploration_journal": [
+      {
+        "type": "decision_captured",
+        "content": "HYBRID: local-first store conforming to the platform thread-sdk contract (ADR-002).",
+        "created_at": "2026-06-24T15:58:05Z",
+        "participant_id": "studio_agent_executor",
+        "metadata": {"adr": "ADR-002"}
+      },
+      {
+        "type": "pattern_detected",
+        "content": "Discovery seam mirrors the safe-tools MCP pattern: one denyable, parameterised, change-scoped tool.",
+        "created_at": "2026-06-24T16:00:11Z",
+        "participant_id": null,
+        "metadata": null
+      }
+    ],
+    "participant_context": {
+      "change_id": "CH-GJ9KQR",
+      "provider": "local"
+    }
+  }
+}
