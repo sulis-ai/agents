@@ -1,0 +1,17 @@
+{
+  "pr": "wp-010-openai-key-detector-pattern",
+  "base": "change/create-portable-agent-context",
+  "head": "wp/create-portable-agent-context/wp-010-openai-key-detector-pattern",
+  "diff": {"lines_added": 137, "lines_removed": 3, "files_changed": 5, "generated_ratio": 0.0},
+  "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "clean"},
+  "size": {"lines": 137, "files": 5, "severity": "clean", "band": "<=200 lines AND <=5 files (single-reader carve-out)"},
+  "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "clean"},
+  "completeness": {"new_source_without_test": 0, "api_change_without_schema": false, "severity": "clean", "note": "source change ships with 9 new tests (5 positive, 4 negative)"},
+  "build_verification": {"ruff_check": "pass", "py_compile": "pass", "pytest_secret_anonymiser_store": "224 passed, 2 skipped"},
+  "lenses": {
+    "architecture": {"findings": 0, "note": "single catalogue entry, two consumers inherit via import; no new dep; no dependency-direction violation"},
+    "security": {"findings": 0, "note": "ReDoS-safe (linear, 100k chars 0.14s); length-floored; no false positives on prose/SHA/ULID/UUID/kebab; fail-closed over-match acceptable"},
+    "quality": {"findings": 0, "note": "DRY (reuses _replace_long_token); fully tested; in-file docs updated"}
+  },
+  "verdict": "PASS"
+}

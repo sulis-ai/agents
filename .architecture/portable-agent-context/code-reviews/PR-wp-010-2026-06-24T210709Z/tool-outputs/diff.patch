@@ -1,0 +1,265 @@
+diff --git a/plugins/sulis/scripts/_anonymiser.py b/plugins/sulis/scripts/_anonymiser.py
+index edf660a1..6a9111a3 100644
+--- a/plugins/sulis/scripts/_anonymiser.py
++++ b/plugins/sulis/scripts/_anonymiser.py
+@@ -55,6 +55,7 @@ from _secret_patterns import (
+     _IP_ADDRESS,
+     _JWT,
+     _LONG_TOKEN,
++    _OPENAI_KEY,
+     _SLACK_TOKEN,
+ )
+ 
+@@ -157,7 +158,8 @@ _EMAIL = re.compile(
+ )
+ 
+ # Secret patterns (``_ENV_SECRET_ASSIGNMENT``, ``_JWT``, ``_SLACK_TOKEN``,
+-# ``_LONG_TOKEN``) and the IP regex (``_IP_ADDRESS``) are imported from the
++# ``_LONG_TOKEN``, ``_OPENAI_KEY``) and the IP regex (``_IP_ADDRESS``) are
++# imported from the
+ # shared ``_secret_patterns`` catalogue at the top of this module — one source
+ # of truth (ADR-002). ``_anonymiser`` applies the *redact* policy below; the L1
+ # proxy applies the *refuse* policy over the same catalogue.
+@@ -438,7 +440,8 @@ def _replace_ip(match: re.Match, keep: set[str]) -> str:
+     return s  # globally routable — preserve
+ 
+ 
+-# Pass order: code → URLs → secrets (env + JWT + long-token) → emails →
++# Pass order: code → URLs → secrets (env + JWT + long-token + openai-key) →
++# emails →
+ # other-repo → IPs → paths (absolute then relative) → domains. Precision
+ # decreases left-to-right; URLs run early so the path/domain passes
+ # never get a chance to gobble the host out of an http(s):// URL. IPs
+@@ -451,6 +454,7 @@ _PASSES: list[tuple[str, re.Pattern, callable]] = [
+     ("secret", _JWT, _replace_jwt),
+     ("secret", _SLACK_TOKEN, _replace_long_token),
+     ("secret", _LONG_TOKEN, _replace_long_token),
++    ("secret", _OPENAI_KEY, _replace_long_token),
+     ("email", _EMAIL, _replace_email),
+     ("other-repo", _OTHER_REPO_REF, _replace_other_repo),
+     ("ip", _IP_ADDRESS, _replace_ip),
+diff --git a/plugins/sulis/scripts/_secret_patterns.py b/plugins/sulis/scripts/_secret_patterns.py
+index 2590564d..43a692c7 100644
+--- a/plugins/sulis/scripts/_secret_patterns.py
++++ b/plugins/sulis/scripts/_secret_patterns.py
+@@ -43,6 +43,11 @@ Catalogue categories (the supplementary layer):
+   - ``slack``       — Slack token (``xox[abprs]-`` + ≥3 numeric blocks + tail).
+   - ``long-token``  — long opaque provider token (``sk_live_``/``ghp_``/
+                       ``AKIA``/``AIza``/``npm_``/… + ≥20 alnum, no hyphens).
++  - ``openai-key``  — OpenAI API key: the modern project-scoped ``sk-proj-…``
++                      (hyphenated) form and the legacy ``sk-`` + ≥40-alnum form.
++                      Distinct from ``long-token`` because the OpenAI shapes are
++                      hyphenated and so escape the underscore-anchored,
++                      hyphen-excluding ``long-token`` pattern (#WP-010, GAP 3).
+   - ``private-ip``  — private / loopback / link-local IP (RFC 1918/4193/3927/
+                       4291 + loopback), classified via the ``ipaddress`` stdlib;
+                       globally-routable IPs are NOT secrets and are not returned.
+@@ -76,7 +81,7 @@ class SecretHit:
+     ``value`` is the exact matched substring; ``start``/``end`` are character
+     offsets into the scanned ``text`` such that ``text[start:end] == value``.
+     """
+-    category: str   # "env-secret" | "jwt" | "slack" | "long-token" | "private-ip"
++    category: str   # "env-secret" | "jwt" | "slack" | "long-token" | "openai-key" | "private-ip"
+     value: str
+     start: int
+     end: int
+@@ -132,6 +137,32 @@ _LONG_TOKEN = re.compile(
+     re.VERBOSE,
+ )
+ 
++# OpenAI API keys (#WP-010 — verified blind spot GAP 3). The modern project-
++# scoped form is hyphenated (``sk-proj-…``) and the legacy form is ``sk-`` + a
++# long alphanumeric tail; BOTH use a hyphen after the ``sk`` token, so the
++# underscore-anchored ``_LONG_TOKEN`` above (``sk_live_``/``sk_test_`` + a
++# hyphen-excluding suffix) never matches them. A dedicated pattern is needed.
++#
++# Two alternatives, each ``\b``-anchored and length-floored to keep ordinary
++# ``sk-``-prefixed prose (``sk-arund``, ``ask-me``, ``sk-1``, ``risk-averse``)
++# and SHA/ULID/UUID shapes clean:
++#   - project-scoped: the ``sk-proj-`` infix is the discriminator; the tail is
++#     base62 plus ``-``/``_`` (the chars OpenAI uses), ≥20 long.
++#   - legacy: ``sk-`` + ≥40 alphanumeric (real legacy keys are ``sk-`` + 48);
++#     the high length floor + the leading ``sk-`` anchor exclude prose and bare
++#     hex/Crockford identifiers, which are never ``sk-``-prefixed.
++_OPENAI_KEY = re.compile(
++    r"""
++    \b
++    (?:
++        sk-proj-[A-Za-z0-9_-]{20,}      # modern project-scoped key (hyphenated)
++      | sk-[A-Za-z0-9]{40,}             # legacy key (sk- + long alnum tail)
++    )
++    \b
++    """,
++    re.VERBOSE,
++)
++
+ # IP addresses (v4 dotted-quad + v6 compact/full). The regex over-matches on
+ # purpose (catches version-string-shaped quads); ``ipaddress`` stdlib decides
+ # whether a candidate is a *private/loopback/link-local* secret (#40).
+@@ -152,6 +183,7 @@ _REGEX_CATALOGUE: list[tuple[str, re.Pattern[str]]] = [
+     ("jwt", _JWT),
+     ("slack", _SLACK_TOKEN),
+     ("long-token", _LONG_TOKEN),
++    ("openai-key", _OPENAI_KEY),
+ ]
+ 
+ 
+diff --git a/plugins/sulis/scripts/tests/integration/test_thread_store_local.py b/plugins/sulis/scripts/tests/integration/test_thread_store_local.py
+index 96c0a37f..638e049c 100644
+--- a/plugins/sulis/scripts/tests/integration/test_thread_store_local.py
++++ b/plugins/sulis/scripts/tests/integration/test_thread_store_local.py
+@@ -38,6 +38,10 @@ _CHANGE_ID = "CH-GJ9KQR"
+ # protection flags a literal sk_live_ string); find_secrets still detects the
+ # assembled value, so the redaction under test is unchanged.
+ _SECRET = "sk" + "_live_" + "ABCDEFGHIJKLMNOPQRSTUVWX" + "0123456789"
++# A modern OpenAI project-scoped key (WP-010 — the GAP 3 blind spot). Assembled
++# at runtime for the same push-safety reason; the new catalogue pattern must
++# reach this persistence surface so the key never lands verbatim on disk.
++_OPENAI_KEY = "sk-proj-" + "T3BlbkFJ" + "aB3dEf6hIjKlMn0pQrStUvWx" + "Yz12_3-4"
+ 
+ 
+ def _store(root: Path) -> LocalThreadStore:
+@@ -210,6 +214,30 @@ def test_token_secret_scrubbed_before_bytes_land(tmp_path: Path) -> None:
+     assert "keep it safe" in got.content
+ 
+ 
++def test_openai_key_scrubbed_before_bytes_land(tmp_path: Path) -> None:
++    """A modern OpenAI key (``sk-proj-…``) in message content is scrubbed to
++    ``[redacted-secret]`` BEFORE bytes land — proving the WP-010 catalogue
++    pattern reaches the store's redaction-on-write surface (GAP 3 closure).
++
++    Agent conversations routinely echo LLM API keys, so this is the
++    highest-likelihood secret type for the durable thread store."""
++    root = tmp_path / "threads"
++    store = _store(root)
++    store.append_message(
++        "t1", _msg("m0", 0, content=f"my key is {_OPENAI_KEY} keep it safe")
++    )
++
++    log_path = root / tc.messages_record_filename("t1")
++    raw_bytes = log_path.read_bytes()
++    assert _OPENAI_KEY.encode() not in raw_bytes, "OpenAI key leaked to disk"
++    assert b"[redacted-secret]" in raw_bytes, "secret span must be redacted"
++    assert b"keep it safe" in raw_bytes, "non-secret content must be preserved"
++
++    got = store.get_messages("t1")[0]
++    assert _OPENAI_KEY not in got.content
++    assert "keep it safe" in got.content
++
++
+ def test_redaction_scrubs_memory_content_before_write(tmp_path: Path) -> None:
+     """The memory checkpoint is the same new persistence surface; a secret in
+     an exploration-journal entry is scrubbed before the ``.memory.json`` bytes
+diff --git a/plugins/sulis/scripts/tests/unit/test_secret_patterns.py b/plugins/sulis/scripts/tests/unit/test_secret_patterns.py
+index 59b68583..0dbb8838 100644
+--- a/plugins/sulis/scripts/tests/unit/test_secret_patterns.py
++++ b/plugins/sulis/scripts/tests/unit/test_secret_patterns.py
+@@ -29,6 +29,15 @@ _JWT = f"{_JWT_HEAD}.{_JWT_BODY}.{_JWT_SIG}"
+ _SLACK_TOKEN = "xoxp-" + "1234567890" + "-" + "9876543210" + "-" + \
+     "1122334455" + "-" + "abcdef0123456789abcdef0123456789"
+ 
++# OpenAI API keys (WP-010 — the verified blind spot, GAP 3). Assembled at
++# runtime from parts so the contiguous provider signature never appears verbatim
++# in committed source (matching the push-safe convention the store + outbound
++# suites use). ``find_secrets`` detects the assembled value all the same.
++#   - project-scoped modern shape: ``sk-proj-`` + a base62/-/_ tail.
++#   - legacy shape: ``sk-`` + a 48-char alphanumeric tail (a real legacy key).
++_OPENAI_PROJ_KEY = "sk-proj-" + "T3BlbkFJ" + "aB3dEf6hIjKlMn0pQrStUvWx" + "Yz12_3-4"
++_OPENAI_LEGACY_KEY = "sk-" + "aB3dEf6hIjKlMn0pQrStUvWxYz0123456789ABCDEFGHijkl"
++
+ 
+ def _categories(text: str) -> set[str]:
+     return {hit.category for hit in find_secrets(text)}
+@@ -84,6 +93,20 @@ def test_finds_github_pat_as_long_token():
+     assert "long-token" in _categories(f"token {_GITHUB_PAT}")
+ 
+ 
++def test_finds_openai_project_key():
++    """Modern project-scoped OpenAI key ``sk-proj-…`` → a hit (WP-010, GAP 3).
++
++    Fails before the pattern is added — the verified catalogue blind spot."""
++    assert _values(f"my key is {_OPENAI_PROJ_KEY} keep safe")
++    assert "openai-key" in _categories(f"my key is {_OPENAI_PROJ_KEY}")
++
++
++def test_finds_openai_legacy_key():
++    """Legacy OpenAI key ``sk-<48 alnum>`` → a hit (WP-010, GAP 3)."""
++    assert _values(f"OPENAI key {_OPENAI_LEGACY_KEY} here")
++    assert "openai-key" in _categories(f"OPENAI key {_OPENAI_LEGACY_KEY}")
++
++
+ def test_finds_private_ip():
+     assert "private-ip" in _categories("the pod is at 10.0.0.5 internally")
+ 
+@@ -122,6 +145,34 @@ def test_plain_uuid_is_not_a_secret():
+     assert uuid not in _values(f"row {uuid} updated")
+ 
+ 
++# ─── OpenAI pattern: no false positives on ordinary ``sk-`` prose (WP-010) ────
++
++
++def test_ordinary_sk_prose_is_not_an_openai_key():
++    """Short / wordy ``sk-``-prefixed prose is NOT an OpenAI key — the pattern
++    anchors on the ``proj-`` infix or a long alphanumeric tail, not the bare
++    ``sk-`` prefix (WP-010 false-positive guard)."""
++    for benign in ("sk-arund", "ask-me", "sk-1", "task-manager", "risk-averse"):
++        assert "openai-key" not in _categories(benign), benign
++
++
++def test_commit_sha_is_not_an_openai_key():
++    """A git SHA is not ``sk-``-prefixed, so the legacy OpenAI pattern (which
++    requires the ``sk-`` anchor) never matches it."""
++    sha = "b2cc82565aa7f60369c356b6fa1d2f046e84c7ad"
++    assert "openai-key" not in _categories(f"commit {sha} landed")
++
++
++def test_ulid_is_not_an_openai_key():
++    ulid = "01KTZVX7RBE22SX6DNHA4Y6Y7B"
++    assert "openai-key" not in _categories(f"change {ulid} referenced")
++
++
++def test_uuid_is_not_an_openai_key():
++    uuid = "550e8400-e29b-41d4-a716-446655440000"
++    assert "openai-key" not in _categories(f"row {uuid} updated")
++
++
+ # ─── purity: same input → same output, no mutation ───────────────────────────
+ 
+ 
+diff --git a/plugins/sulis/scripts/tests/unit/test_secret_patterns_outbound.py b/plugins/sulis/scripts/tests/unit/test_secret_patterns_outbound.py
+index 89dd152d..ce6cf49c 100644
+--- a/plugins/sulis/scripts/tests/unit/test_secret_patterns_outbound.py
++++ b/plugins/sulis/scripts/tests/unit/test_secret_patterns_outbound.py
+@@ -42,6 +42,10 @@ _GOOGLE_API_KEY = "AIza" + "SyAbcdefghijklmnopqrstuvwxyz0123456"
+ # Generic high-entropy bearer/opaque token: clearly fake, no provider prefix the
+ # in-house catalogue recognises — exactly the gap detect-secrets fills.
+ _GENERIC_TOKEN = "xK9pLm2QrT7vWnB4cE6gH1jD8sF3aZ5yU0iO9wQ2eR4"
++# OpenAI keys (WP-010 — GAP 3 blind spot, supplied by the in-house catalogue
++# layer of the union). Assembled from parts; push-safe.
++_OPENAI_PROJ_KEY = "sk-proj-" + "T3BlbkFJ" + "aB3dEf6hIjKlMn0pQrStUvWx" + "Yz12_3-4"
++_OPENAI_LEGACY_KEY = "sk-" + "aB3dEf6hIjKlMn0pQrStUvWxYz0123456789ABCDEFGHijkl"
+ 
+ 
+ def _categories(text: str) -> set[str]:
+@@ -78,6 +82,21 @@ def test_generic_high_entropy_bearer_token_is_caught() -> None:
+     assert find_secrets(header_value), "high-entropy bearer token must be detected"
+ 
+ 
++def test_openai_project_key_caught_via_union() -> None:
++    """Modern ``sk-proj-…`` OpenAI key in an outbound URL — supplied by the
++    in-house catalogue layer of the union (WP-010, GAP 3 blind spot)."""
++    assert "openai-key" in _categories(
++        f"https://example.com/x?key={_OPENAI_PROJ_KEY}"
++    )
++
++
++def test_openai_legacy_key_caught_via_union() -> None:
++    """Legacy ``sk-<48 alnum>`` OpenAI key in an outbound body — supplied by the
++    in-house catalogue layer of the union (WP-010, GAP 3 blind spot)."""
++    body = f'{{"authorization": "Bearer {_OPENAI_LEGACY_KEY}"}}'
++    assert "openai-key" in _categories(body)
++
++
+ # ─── Benign requests in prose context stay clean (no fail-open, no FP storm) ──
+ 
+ 
