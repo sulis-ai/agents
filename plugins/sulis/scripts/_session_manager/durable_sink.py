@@ -79,11 +79,13 @@ _CHECKPOINT_TIER: PayloadTier = "standard"
 _AGENT_PARTICIPANT_ID = "studio_agent"
 
 
-def _now_iso() -> str:
+def now_iso() -> str:
     """A UTC ISO-8601 timestamp (the time the durable record was tracked).
 
     Stdlib, timezone-aware (``Z``-style UTC) — the same shape the contract's
-    ``created_at`` fields carry elsewhere in the change.
+    ``created_at`` fields carry elsewhere in the change. Public so the manager's
+    durable-sink wiring (WP-007) stamps a created Thread record with the SAME
+    timestamp shape this module stamps a message with — one definition (EP-03).
     """
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -148,6 +150,39 @@ class DurableAppendSink:
         #: trace a durable write was dropped).
         self.degraded_appends = 0
 
+    def seed_next_order_from_store(self) -> int:
+        """Reseed :attr:`_next_order` from the durable log's high-water mark —
+        the resume fix (WP-004 ADV-2).
+
+        A fresh sink defaults ``_next_order=0``. On **resume** over a non-empty
+        thread that is wrong: the store enforces a strictly-increasing ``order``,
+        so an append at 0 against a log whose last order is N≥0 is rejected
+        ``OUT_OF_ORDER_WRITE`` — and the sink isolates that as a silent
+        :attr:`degraded_appends`, so the resumed conversation would stop being
+        tracked without ever raising. Reseeding from
+        ``get_messages(...)[-1].order + 1`` makes post-resume appends land at the
+        right order and continue the log.
+
+        Idempotent + safe on an empty thread (no messages → stays 0, so the
+        first append lands at order 0). Returns the seeded next order. A store
+        read failure is isolated like an append failure (the resume must not be
+        broken by a transient read error): it leaves ``_next_order`` unchanged
+        and is recorded as a degradation rather than raised into the resume path.
+        """
+        try:
+            messages = self._store.get_messages(self._thread_id)
+        except Exception:  # noqa: BLE001  (resume read isolation — see docstring)
+            self.degraded_appends += 1
+            _log.warning(
+                "resume reseed read failed for thread %s (next_order unchanged)",
+                self._thread_id,
+                exc_info=True,
+            )
+            return self._next_order
+        if messages:
+            self._next_order = messages[-1].order + 1
+        return self._next_order
+
     def append_event(self, event: Event) -> None:
         """Map ``event`` onto a ``ThreadMessage`` and append it to the durable
         store — a non-fatal side-effect.
@@ -167,7 +202,7 @@ class DurableAppendSink:
             participant_type="studio_agent",
             content=_content_for_event(event),
             role=role,
-            created_at=_now_iso(),
+            created_at=now_iso(),
             order=order,
         )
         try:
@@ -215,7 +250,7 @@ class DurableAppendSink:
         summary = summarise_memory(raw_content, max_tokens=budget)
 
         version = self._next_memory_version()
-        now = _now_iso()
+        now = now_iso()
         memory = ThreadMemory(
             thread_id=self._thread_id,
             version=version,

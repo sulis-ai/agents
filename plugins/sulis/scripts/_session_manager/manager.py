@@ -78,8 +78,15 @@ from _session_manager.recovery import (
     ReauthTicket,
     RecoveryDriver,
 )
+from _session_manager.durable_sink import DurableAppendSink, now_iso
 from _session_manager.session import Session
 from _session_manager.spawn_env import PROXY_ENDPOINT_ENV, child_spawn_env
+from _session_manager.thread_contract import (
+    THREAD_NOT_FOUND,
+    Thread,
+    ThreadMemory,
+    ThreadStore,
+)
 from _session_manager.state import Health, SessionState, SessionStatus
 from _session_manager.viewer import Viewer, ViewerRegistry
 
@@ -110,6 +117,23 @@ def _default_recovery_driver_factory(**kwargs: object) -> RecoveryDriver:
     single wiring line. The keyword capabilities are the ones
     :meth:`SessionManager._make_recovery_driver` binds per session."""
     return RecoveryDriver(**kwargs)  # type: ignore[arg-type]
+
+
+def _default_thread_store_factory(change_id: str) -> ThreadStore:
+    """Build the durable local :class:`ThreadStore` for ``change_id`` (ADR-002 /
+    ADR-004) — the default binding the durable sink writes into.
+
+    The default the manager uses when no ``thread_store_factory`` tuning kwarg is
+    injected, mirroring ``_default_recovery_driver_factory``. The
+    :class:`~_session_manager.thread_store_local.LocalThreadStore` import is
+    deferred to call time so the manager module carries no filesystem dependency
+    at import time and codes against the ``ThreadStore`` Protocol, not the
+    concrete adapter (the binding swaps to the hosted transport later behind the
+    same port, ADR-002). A test injects an in-memory contract store instead —
+    still a real ``ThreadStore`` (MEA-09)."""
+    from _session_manager.thread_store_local import LocalThreadStore
+
+    return LocalThreadStore(change_id)
 
 
 class SessionManager:
@@ -191,6 +215,20 @@ class SessionManager:
             "recovery_driver_factory", _default_recovery_driver_factory
         )
         self._recovery_drivers: dict[str, RecoveryDriver] = {}
+        # CH-GJ9KQR WP-007 durable second sink (ADR-004). The session pump's
+        # in-memory ``EventLog`` stays the live-tail log; this adds a SECOND
+        # sink that appends each content-bearing Event to the durable thread
+        # store (the authoritative persisted record). The store binding is an
+        # injectable factory — the ``recovery_driver_factory`` precedent — so a
+        # test drives the real sink against an in-memory contract store without
+        # touching the founder's filesystem. The default builds the durable
+        # local adapter (WP-002) for the session's bound change. One sink per
+        # open key; built at ``open``, reseeded on ``_respawn`` (resume,
+        # WP-004 ADV-2), torn down at ``close``.
+        self._thread_store_factory: Callable[[str], ThreadStore] = self._tuning.get(  # type: ignore[assignment]
+            "thread_store_factory", _default_thread_store_factory
+        )
+        self._durable_sinks: dict[str, DurableAppendSink] = {}
         # The last command submitted per key — captured by ``send`` so the
         # recovery driver's ``send`` capability can re-submit *the stopped turn*
         # (not an empty turn) on a transient-blip retry. Additive read-only
@@ -313,6 +351,11 @@ class SessionManager:
             # (ADR-001 error-event seam). Done here, beside the guard attach, so
             # the very first turn is recoverable.
             self._attach_recovery(session)
+            # CH-GJ9KQR WP-007: register the durable second sink on the same
+            # ``on_event`` seam BEFORE the pumps run, so the very first decoded
+            # Event is tracked durably (ADR-004). Additive over the guard +
+            # recovery fan-out (the live-tail path is byte-for-byte unchanged).
+            self._attach_durable_sink(session)
             session.start_pumps()
             # The spawn succeeded: INITIALIZING → READY (§2.7 normal entry).
             session.to_state(SessionState.READY)
@@ -446,6 +489,10 @@ class SessionManager:
             # with no recovery state — ``pop`` is a no-op.
             self._recovery_drivers.pop(key, None)
             self._last_command.pop(key, None)
+            # CH-GJ9KQR WP-007: drop the per-session durable sink so a long-lived
+            # manager accumulates no stale sink state (mirrors the recovery
+            # driver above). A key with no sink — ``pop`` is a no-op.
+            self._durable_sinks.pop(key, None)
         if registry is not None:
             registry.close()
         if session is None:
@@ -539,14 +586,141 @@ class SessionManager:
         if driver is None:
             driver = self._make_recovery_driver(session)
             self._recovery_drivers[session.key] = driver
-        guard_observer = session.on_event
+        self._chain_on_event(session, self._on_error_event)
+
+    @staticmethod
+    def _chain_on_event(
+        session: Session, observer: Callable[[object, Event], None]
+    ) -> None:
+        """Chain ``observer`` onto ``session.on_event`` ADDITIVELY — the one
+        definition of "add a second observer to the event seam".
+
+        Captures the existing observer (if any) and installs a fan-out that
+        calls the **prior** observer first, then ``observer``. Order matters:
+        the prior fan-out (guard watchdog / recovery) must keep working
+        byte-unchanged before the new observer runs. The two wave-4 attach sites
+        — recovery (:meth:`_attach_recovery`) and the durable sink
+        (:meth:`_attach_durable_sink`) — share this exact chaining shape; it is
+        extracted here at the 2-consumer threshold (EP-03 / Blue) so the
+        prior-first ordering invariant lives in exactly one place.
+
+        The ``observer`` param is typed with a ``object`` first arg (the widest
+        of the two call sites: the recovery hook is ``(Session, Event)``, the
+        durable sink's :meth:`DurableAppendSink.as_event_observer` is
+        ``(object, Event)`` — it ignores the session). ``object`` admits both
+        under a strict type-checker, so the seam type does not disagree with
+        either caller.
+        """
+        prior = session.on_event
 
         def _fan_out(s: Session, event: Event) -> None:
-            if guard_observer is not None:
-                guard_observer(s, event)
-            self._on_error_event(s, event)
+            if prior is not None:
+                prior(s, event)
+            observer(s, event)
 
         session.on_event = _fan_out
+
+    # ── CH-GJ9KQR WP-007 durable second sink + resume reseed (ADR-004) ──────
+
+    def _attach_durable_sink(self, session: Session) -> None:
+        """Register the durable second sink on ``session``'s ``on_event`` seam
+        (ADR-004) — additive, beside the guard + recovery fan-out.
+
+        One thread per change (ADR-004): the thread id is the session key (the
+        same change-keyed identity the manager already uses). Ensures the
+        thread record exists in the store, builds (or reuses, on a restart) a
+        :class:`DurableAppendSink` bound to it, **reseeds its ``_next_order``
+        from the store high-water mark** (WP-004 ADV-2 — so a restart that
+        rebinds to a non-empty log continues the order rather than degrading
+        OUT_OF_ORDER_WRITE), and chains the sink observer onto ``on_event``
+        ADDITIVELY: the existing observer fires first (the live-tail path is
+        byte-for-byte unchanged), then the durable append runs as an isolated
+        side-effect (it never raises into the pump, ADR-004 / WP-004 ADV-1).
+
+        Idempotent on a restart: ``replace_process`` keeps the same Session, so
+        a re-attach reuses the per-key sink and re-chains over the (still
+        guard/recovery-owned) ``on_event``. The reseed is what makes resume
+        correct — it is run on every attach, so first-open is a no-op (empty
+        log → next_order stays 0) and a restart picks up where the log left off.
+        """
+        thread_id = session.key
+        store = self._durable_store_for(session.key)
+        self._ensure_thread_record(store, thread_id)
+
+        sink = self._durable_sinks.get(session.key)
+        if sink is None:
+            sink = DurableAppendSink(store, thread_id=thread_id)
+            self._durable_sinks[session.key] = sink
+        # Resume reseed (WP-004 ADV-2): align the next order with the durable
+        # log's high-water mark on every attach (no-op on an empty thread).
+        sink.seed_next_order_from_store()
+
+        # Chain the durable observer additively — the prior fan-out (guard +
+        # recovery) fires first, then the durable append runs as an isolated
+        # side-effect (``append_event`` never raises into the pump, ADR-004 /
+        # WP-004 ADV-1). Same chaining shape the recovery attach uses.
+        self._chain_on_event(session, sink.as_event_observer())
+
+    def _durable_store_for(self, key: str) -> ThreadStore:
+        """The durable :class:`ThreadStore` binding for ``key``'s bound change,
+        from the injectable factory (the default builds the local adapter)."""
+        return self._thread_store_factory(key)
+
+    def _ensure_thread_record(self, store: ThreadStore, thread_id: str) -> None:
+        """Create the thread record if it does not exist yet (idempotent).
+
+        The durable log + memory are keyed by the thread record; the append-only
+        store needs the Thread to exist before checkpoint/read ops are meaningful.
+        A ``get_thread`` that raises the contract's ``THREAD_NOT_FOUND`` means
+        "not created yet" → put a minimal local-binding Thread (ADR-002:
+        ``platform_id='local'``); any already-present record is left untouched.
+
+        Only ``THREAD_NOT_FOUND`` is treated as "absent → create" — a genuine
+        store/IO fault (any other category) is propagated, NOT silently masked
+        by a ``put_thread`` (so a real read fault surfaces honestly rather than
+        being papered over with a fresh record, consistent with the contract's
+        three-category error model).
+        """
+        try:
+            store.get_thread(thread_id)
+            return
+        except ExpectedError as exc:
+            if exc.code != THREAD_NOT_FOUND:
+                raise
+            # absent thread → fall through and create it (see docstring)
+        now = now_iso()
+        store.put_thread(
+            Thread(
+                id=thread_id,
+                platform_id="local",
+                topic=None,
+                activity_summary=None,
+                created_at=now,
+                updated_at=now,
+                participant_count=1,
+                resumed_from=None,
+            )
+        )
+
+    def checkpoint(self, key: str) -> ThreadMemory | None:
+        """Regenerate the bound thread's ``ThreadMemory`` from the durable log —
+        the Working-Set-crystallisation-boundary hook (WP-004 ADV-1).
+
+        Called OFF the live event hot path (at a crystallisation boundary, NOT
+        inside the ``on_event`` fan-out) so a checkpoint error can never stall
+        the live pump. Delegates to the per-key sink's
+        :meth:`DurableAppendSink.checkpoint`, which reuses the WP-003
+        ``summarise_memory`` (one definition of the structured summary) and
+        bumps the monotonic memory version.
+
+        Returns the regenerated :class:`ThreadMemory`, or ``None`` if no session
+        (and so no sink) is open for ``key`` — a no-op rather than an error, so a
+        crystallisation tick over a key whose session has since closed is safe.
+        """
+        sink = self._durable_sinks.get(key)
+        if sink is None:
+            return None
+        return sink.checkpoint()
 
     def _make_recovery_driver(self, session: Session) -> RecoveryDriver:
         """Build the recovery driver for ``session`` via the injected factory,
@@ -750,6 +924,15 @@ class SessionManager:
         across the restart (restart-is-not-a-new-key applied to scrollback)."""
         process, master_fd = self._spawn_process(session.adapter, session.spec)
         session.replace_process(process, master_fd)
+        # CH-GJ9KQR WP-007 resume reseed (WP-004 ADV-2): the durable observer
+        # survives ``replace_process`` (it lives on the same Session's
+        # ``on_event``), but its ``_next_order`` must be realigned to the durable
+        # log's high-water mark so post-restart appends continue the order rather
+        # than colliding (silent OUT_OF_ORDER_WRITE degradation). Reseed off the
+        # hot path here, on the restart seam — the resume is from OUR store.
+        sink = self._durable_sinks.get(session.key)
+        if sink is not None:
+            sink.seed_next_order_from_store()
 
     def _maintenance_tick(self) -> None:
         """One pass of the periodic maintenance loop (§2.7), filled by WP-006.

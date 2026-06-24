@@ -224,6 +224,24 @@ def test_sink_failure_never_propagates_into_the_pump(tmp_path: Path) -> None:
     assert sink.degraded_appends == 1
 
 
+def test_reseed_read_failure_is_isolated_not_raised(tmp_path: Path) -> None:
+    """A store-read failure during the resume reseed (WP-004 ADV-2) is isolated
+    like an append failure — it must NEVER raise into the resume path. The reseed
+    leaves ``_next_order`` unchanged and records a degradation, so a transient
+    read error on resume degrades tracking rather than breaking the restart."""
+
+    class _BoomReadStore:
+        def get_messages(self, thread_id, since=None, limit=None):  # noqa: ANN001
+            raise RuntimeError("store unreadable")
+
+    sink = DurableAppendSink(_BoomReadStore(), thread_id=_THREAD_ID)
+    # Must not raise — resume isolation is the contract.
+    seeded = sink.seed_next_order_from_store()
+    # Unchanged (still 0) and the failure is observable as a degradation count.
+    assert seeded == 0
+    assert sink.degraded_appends == 1
+
+
 def test_observer_adapts_to_on_event_callback_signature(tmp_path: Path) -> None:
     """The sink exposes an ``as_event_observer()`` adapter matching the session's
     ``on_event(session, event)`` registered-callback seam (manager wires it
