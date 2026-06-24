@@ -68,3 +68,24 @@ change's provider-independent-resume Scenario.
 
 - Branch: wp/create-portable-agent-context/wp-007-integration-seam-close-and-resume-drive (deleted post-merge)
 - Completed: `2026-06-24T18:50:48Z` (Step 12 by calling session)
+
+## Post-merge correction (CH-GJ9KQR remediation, 2026-06-24)
+
+> A `/sulis:prove` consumer-level reality check found that this WP's drive
+> (`test_provider_independent_resume.py`) exercises the assembler **directly** —
+> it constructs `DurableAppendSink` / `ContextPayloadAssembler` and calls
+> `seed_payload_for_resume` itself, never going through `SessionManager`. It
+> proved the **component**, not the **live path**. The headline capability
+> ("Resume recovers rich context from OUR store") is built as components but
+> NOT connected into the live system: `seed_payload_for_resume` and
+> `ContextPayloadAssembler` are referenced ONLY in tests; the live
+> `manager._respawn` / `_attach_durable_sink` only reseed the order counter and
+> never assemble or inject the payload.
+>
+> This WP's test is retained as a valid **component-level contract test**. The
+> **live-path acceptance** for the headline capability moves to **WP-009**
+> (live assemble→inject resume wiring with real Working Set + brain readers),
+> whose Red MUST drive the real `SessionManager` spawn/resume path and observe
+> the rich payload reaching the brief with REAL Working Set + brain content.
+> **WP-010** closes the related OpenAI-key redaction blind spot on the
+> store-write surface.

@@ -78,6 +78,14 @@ the brain.
             from: brief + Working Set + brain entities
                   + structured summary (from the log)
 
+        ⚠ The `◀── assembled payload ──` brief-injection arrow above is the
+        LIVE WIRING delivered by WP-009 (the manager's composition root
+        constructs the assembler with REAL Working Set + brain readers and
+        composes the rendered payload into the change's pre_prompt.txt sidecar at
+        the spawn/resume seam). WP-003/004/007 built + component-tested the
+        assembler; WP-009 connects it to the live `SessionManager` spawn/resume
+        path. Until WP-009 ships, the assembler is reachable only from tests.
+
         Discovery seam (ADR-005):
           - payload pointer (inline, rich-by-default)
           - thread_context MCP tool (read-only, raw-on-demand)
@@ -160,9 +168,11 @@ will own those — flagged for that future WP, not this change).
 | Append-only invariant | A characterisation/integration test asserting a rewrite/out-of-order write is rejected. | integration |
 | Redaction-on-write | A test feeding a token-shaped secret through `append_message` and asserting the stored bytes are scrubbed. | integration |
 | `ContextPayloadAssembler` | Tests asserting each tier stays within budget; standard tier carries the summary not the raw dump; payload is vendor-neutral (no Claude-JSONL structure). | unit |
-| **Provider-independent resume** (the load-bearing journey) | Integration test: run a thread, capture decisions, end it, **make the provider transcript unavailable**, resume → assert the agent comes back with the rich payload and the raw log is intact from **our** store. | integration / drive |
+| **Provider-independent resume — component level** | Integration test: run a thread, capture decisions, end it, **make the provider transcript unavailable**, assemble the payload → assert the rich payload and the raw log are intact from **our** store. Drives the assembler directly (WP-007 `test_provider_independent_resume.py`). | integration / drive |
+| **Provider-independent resume — LIVE path** (the load-bearing acceptance) | Integration test driving the real `SessionManager` spawn/resume path with `spec.brief_change_id` set, the durable store factory pointed at a tmp store, a real `.changes/*.WORKING-SET.md` + a real brain entity present, and the provider transcript unavailable → **observe the rich payload reaching the brief** (the `pre_prompt.txt` / argv element the adapter resolves), carrying REAL Working Set + brain content (not empty-lambda output), within the standard-tier budget, vendor-neutral. (WP-009 `test_live_resume_injection.py`.) **This is the live-path acceptance — a live-path observation, not a component call.** | integration / drive |
 | `thread_context` MCP tool | Conformance test (mirrors `test_safe_tools_mcp_contract.py`): read-only, change-scoped, three-category errors, ops match the contract read surface. | contract |
-| Seam-close (CF-12) | The contract WP + producer + consumer reaching done triggers the real-data drive over the covering Scenarios (esp. provider-independent resume). | seam-close |
+| OpenAI-key redaction-on-write | A test feeding a realistic `sk-proj-…` / legacy `sk-…` OpenAI key through `append_message` and asserting the stored bytes are scrubbed (the verified `_secret_patterns` blind spot). (WP-010.) | unit + integration |
+| Seam-close (CF-12) | The contract WP + producer + consumer reaching done triggers the real-data drive over the covering Scenarios. **The headline provider-independent-resume Scenario is closed at the LIVE level by WP-009**, not the component-level WP-007 drive (which a `/sulis:prove` reality check found exercised the assembler directly, not the live system). | seam-close |
 
 ---
 
@@ -176,10 +186,20 @@ will own those — flagged for that future WP, not this change).
 | Session-pump durable-append sink + resume payload-seed | REINFORCE-Instrument over existing pump | `backend` |
 | `thread_context` MCP discovery tool (read-only) | EXPAND-Create | `backend` |
 | Cockpit raw-view re-point (optional, behind the same read ops) | SUBSTITUTE-Strangle (transcript read → store read) | `frontend` |
-| Integration: mock→real + conformance + resume drive | — | `composite` |
+| Integration: mock→real + conformance + resume drive (component level) | — | `composite` |
 | Thread mint-candidate record (no mint) | — | `docs` |
+| **Live assemble→inject resume wiring** (manager spawn/resume seam + real Working Set + brain readers) | REINFORCE-Instrument over the existing spawn/pump path | `backend` (WP-009) |
+| **OpenAI-key scrub on write** (widen the shared secret catalogue) | REINFORCE-Harden | `backend` (WP-010) |
 
 See `work-packages/INDEX.md` for the sequenced graph.
+
+> **Remediation note (2026-06-24).** A `/sulis:prove` consumer-level reality
+> check found the headline capability ("resume recovers rich context from OUR
+> store") was built as components but NOT connected into the live system — the
+> §3.2 brief-injection arrow was designed but never wired into
+> `SessionManager`. WP-009 (live wiring) + WP-010 (OpenAI-key scrub) close the
+> gaps; the live-path acceptance for the headline moves from WP-007 (component
+> drive) to WP-009 (live `SessionManager` drive).
 
 ---
 
