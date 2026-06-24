@@ -269,19 +269,28 @@ class ThreadStore(Protocol):
 # separator-bearing id (``../..``, ``a/b``) can never escape the threads dir.
 # Validated **in the convention** so every producer WP inherits the guard
 # rather than each re-deriving (or forgetting) it (CF-11; security lens).
-_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
+# Matched with ``re.fullmatch`` (below), NOT a ``^...$`` anchor: in Python
+# ``$`` also matches just before a trailing ``\n``, so ``^[A-Za-z0-9_-]+$``
+# would accept ``"abc\n"`` — an id carrying an embedded newline into a
+# constructed path/filename. ``fullmatch`` requires the WHOLE string to match,
+# closing that gap (WP-001 security advisory, folded in at WP-002 — the first
+# durable on-disk consumer of this guard).
+_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]+")
 
 
 def validate_store_id(store_id: str) -> str:
     """Return ``store_id`` if it is a safe path component, else raise.
 
-    A safe id matches ``^[A-Za-z0-9_-]+$`` — no path separators, no ``.``, no
-    ``..``, so it cannot traverse out of the threads dir when joined into a
-    path or a filename. Raises :class:`ExpectedError` (``INVALID_ID``): a
-    deterministic refusal, the op declined the input (CF-03). The path/filename
-    helpers call this, so the guard is impossible to bypass via the convention.
+    A safe id is a **full-string** match of ``[A-Za-z0-9_-]+`` — no path
+    separators, no ``.``, no ``..``, **and no trailing/embedded newline** (the
+    ``re.fullmatch`` anchors the whole string, unlike ``$`` which accepts a
+    trailing ``\\n``). So it cannot traverse out of the threads dir when joined
+    into a path or a filename, nor smuggle a newline into a constructed path.
+    Raises :class:`ExpectedError` (``INVALID_ID``): a deterministic refusal,
+    the op declined the input (CF-03). The path/filename helpers call this, so
+    the guard is impossible to bypass via the convention.
     """
-    if not _ID_PATTERN.match(store_id):
+    if not _ID_PATTERN.fullmatch(store_id):
         raise ExpectedError(
             INVALID_ID,
             f"store id {store_id!r} is not a safe path component "

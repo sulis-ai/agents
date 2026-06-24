@@ -203,11 +203,34 @@ def test_get_messages_signature_carries_since_and_limit() -> None:
 # Today there is one subject: the in-memory stub.
 
 
-@pytest.fixture(params=[tc.InMemoryThreadStore])
-def store(request: pytest.FixtureRequest):
+# Each param is a builder ``tmp_path -> ThreadStore`` so the in-memory stub
+# (no args) and the durable local adapter (needs a tmp store root) share one
+# fixture without a per-test branch. WP-002 adds the durable adapter as the
+# second builder; the SAME test bodies below run against both subjects.
+def _build_in_memory(_tmp_path: Path):
+    return tc.InMemoryThreadStore()
+
+
+def _build_local(tmp_path: Path):
+    # Import here (not at module top) so the contract module stays importable
+    # even if a future refactor moves the adapter — and to keep the contract
+    # test's only hard dependency the contract itself.
+    from _session_manager.thread_store_local import LocalThreadStore
+
+    # ``change_id`` is a valid store id; ``root`` isolates the durable store to
+    # the test's tmp dir (the contract pins the production path to ~/.sulis).
+    return LocalThreadStore(change_id="CH-GJ9KQR", root=tmp_path / "threads")
+
+
+@pytest.fixture(
+    params=[_build_in_memory, _build_local],
+    ids=["in-memory", "local-durable"],
+)
+def store(request: pytest.FixtureRequest, tmp_path: Path):
     """The store-under-test. The single seam WP-002 extends to run these test
-    bodies against its durable adapter as well."""
-    return request.param()
+    bodies against its durable adapter as well (MEA-09: shared contract test,
+    no mocks at integration)."""
+    return request.param(tmp_path)
 
 
 def test_store_subject_conforms_to_the_port(store) -> None:
@@ -433,6 +456,22 @@ def test_store_id_validation_accepts_real_ids() -> None:
     """Real change/thread ids (alphanumerics, '-', '_') pass."""
     assert tc.validate_store_id("CH-GJ9KQR") == "CH-GJ9KQR"
     assert tc.validate_store_id("thr_01KVX26BDX") == "thr_01KVX26BDX"
+
+
+@pytest.mark.parametrize("bad_id", ["abc\n", "abc\nrm -rf", "\nabc", "abc\r"])
+def test_store_id_validation_rejects_trailing_newline(bad_id: str) -> None:
+    """WP-001 security advisory fold-in (WP-002): the id guard must use a
+    full-string anchor (``re.fullmatch`` / ``\\Z``), not ``$`` — which in
+    Python matches just before a trailing ``\\n``, so ``"abc\\n"`` slipped
+    through. This durable on-disk adapter builds paths/filenames on the guard,
+    so an id with an embedded/trailing newline is a deterministic refusal
+    (INVALID_ID), the same as a traversal-shaped id."""
+    with pytest.raises(ExpectedError) as exc:
+        tc.validate_store_id(bad_id)
+    assert exc.value.code == tc.INVALID_ID
+    # The path/filename helpers inherit the tightened guard.
+    with pytest.raises(ExpectedError):
+        tc.store_root_for_change(bad_id)
 
 
 # ── context payload pointer wiring (ADR-005) ───────────────────────────────
