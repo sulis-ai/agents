@@ -219,3 +219,11 @@ degrade-on-cold-memory assertion into the genuinely-unrecoverable case.
   `_compose_resume_brief` isolation envelope is unchanged), and the new
   cold-memory live-path test. WP-009 / WP-010 are done — no concurrency
   concern.
+
+> Note from WP-009/010 security review (ADV-1, fold in here since this WP touches
+> summarise_memory): the assembler trims messages + journal to the tier budget but
+> copies `participant_context` (the Working Set + brain text) through VERBATIM — a
+> large WORKING-SET.md ships an over-budget brief mislabelled as standard tier
+> (e.g. 100KB WS → ~25k tokens at a 1.5k budget). Trim participant_context into the
+> tier cap too (in summarise_memory / _fit_to_budget, or bound the read), so the
+> budget guarantee holds for a large Working Set, not just a large thread.
