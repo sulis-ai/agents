@@ -305,3 +305,97 @@ def test_payload_is_immutable_value(
     # ContextPayload is a frozen dataclass (contract); assembler returns a value.
     with pytest.raises(dataclasses.FrozenInstanceError):
         payload.tier = "full"  # type: ignore[misc]
+
+
+# ── CH-GJ9KQR WP-011: cold-memory on-demand regenerate + ADV-1 ctx trim ──────
+
+
+def _thread_only_store(thread_id: str = "cold-1") -> tc.InMemoryThreadStore:
+    """A store with a thread record but no memory checkpoint (the cold case)."""
+    s = tc.InMemoryThreadStore()
+    s.put_thread(
+        tc.Thread(
+            id=thread_id,
+            platform_id="local",
+            topic=None,
+            activity_summary=None,
+            created_at="2026-06-24T15:00:00Z",
+            updated_at="2026-06-24T15:00:00Z",
+            participant_count=1,
+        )
+    )
+    return s
+
+
+def _msg(thread_id: str, order: int, body: str) -> tc.ThreadMessage:
+    return tc.ThreadMessage(
+        id=f"{thread_id}-{order}",
+        participant_id="agent-1",
+        participant_type="studio_agent",
+        content=body,
+        role="observation",
+        created_at="2026-06-24T15:31:00Z",
+        order=order,
+    )
+
+
+def test_cold_memory_assemble_regenerates_from_messages() -> None:
+    """On MEMORY_NOT_FOUND with durable messages present, ``assemble`` regenerates
+    the structured summary on demand from the messages rather than raising."""
+    store = _thread_only_store("cold-1")
+    store.append_message("cold-1", _msg("cold-1", 0, "first durable line SENTINEL-AAA"))
+    store.append_message("cold-1", _msg("cold-1", 1, "second durable line"))
+
+    payload = ContextPayloadAssembler(store).assemble("cold-1", "standard")
+    bodies = " ".join(m.content for m in payload.memory.messages)
+    assert "SENTINEL-AAA" in bodies
+
+
+def test_cold_memory_assemble_no_messages_reraises_memory_not_found() -> None:
+    """A thread with NO messages AND no memory is genuinely unrecoverable —
+    ``assemble`` re-raises MEMORY_NOT_FOUND (degrade contract preserved)."""
+    store = _thread_only_store("cold-empty")
+    with pytest.raises(tc.ExpectedError) as exc:
+        ContextPayloadAssembler(store).assemble("cold-empty", "standard")
+    assert exc.value.code == tc.MEMORY_NOT_FOUND
+
+
+def test_assemble_propagates_non_memory_not_found_verbatim() -> None:
+    """A store read error that is NOT MEMORY_NOT_FOUND (e.g. THREAD_NOT_FOUND or
+    any other category) is propagated verbatim — the cold-memory branch only
+    catches MEMORY_NOT_FOUND, never a second error hierarchy."""
+
+    class _BoomStore(tc.InMemoryThreadStore):
+        def get_memory(self, thread_id: str) -> tc.ThreadMemory:
+            raise tc.ExpectedError(tc.THREAD_NOT_FOUND, "boom")
+
+    with pytest.raises(tc.ExpectedError) as exc:
+        ContextPayloadAssembler(_BoomStore()).assemble("x", "standard")
+    assert exc.value.code == tc.THREAD_NOT_FOUND
+
+
+def test_fit_participant_context_drops_non_string_value_to_honour_cap() -> None:
+    """A non-string participant-context value (e.g. the brain-entity list) that
+    alone overflows the budget is dropped wholesale — not partially serialisable
+    here, so the hard cap is honoured (WP-009 ADV-1)."""
+    from _session_manager.context_payload import _fit_participant_context
+
+    big_list = [{"name": "x" * 50} for _ in range(200)]  # >> any small budget
+    fitted, tokens = _fit_participant_context(
+        {"brain_entities": big_list, "change_id": "keep"}, max_tokens=10
+    )
+    assert tokens <= 10
+    assert "brain_entities" not in fitted  # the oversized non-string was dropped
+
+
+def test_fit_participant_context_truncates_string_into_budget() -> None:
+    """A large string value is head-truncated (not dropped) so it fits the cap
+    while staying present — the Working Set survives, trimmed."""
+    from _session_manager.context_payload import _fit_participant_context
+
+    fitted, tokens = _fit_participant_context(
+        {"working_set": "lorem ipsum " * 500}, max_tokens=20
+    )
+    assert tokens <= 20
+    assert "working_set" in fitted
+    assert fitted["working_set"].endswith("…")

@@ -490,7 +490,16 @@ class SessionManager:
 
         SIGTERM then SIGKILL, join the pumps, close the log. Closing an
         already-closed or unknown key is a no-op.
+
+        CH-GJ9KQR WP-011 — keep the memory fresh at the session-close boundary:
+        regenerate + persist the thread's checkpoint BEFORE the sink is dropped
+        (line below), so the NEXT resume reads a current, pre-built memory rather
+        than rebuilding it from scratch. Off the live event hot path (a close is
+        a lifecycle boundary, never the ``on_event`` fan-out) and fully isolated
+        (:meth:`_checkpoint_at_boundary`) — a checkpoint failure must NEVER stall
+        a close.
         """
+        self._checkpoint_at_boundary(key)
         with self._registry_lock:
             session = self._sessions.pop(key, None)
             # WP-004: drop + close the pty session's viewer registry so every
@@ -737,6 +746,34 @@ class SessionManager:
             return None
         return sink.checkpoint()
 
+    def _checkpoint_at_boundary(self, key: str) -> None:
+        """Take a memory checkpoint at a live lifecycle boundary, fully isolated
+        (CH-GJ9KQR WP-011 — the freshness move).
+
+        Wraps :meth:`checkpoint` so a regeneration/persist failure can NEVER
+        propagate into the boundary that called it (a session close or a
+        respawn): the checkpoint is a best-effort freshness optimisation, not a
+        correctness requirement (the on-demand regeneration in
+        ``ContextPayloadAssembler.assemble`` is the correctness floor — the next
+        resume rebuilds the summary from messages even if no checkpoint was
+        persisted). A no-session key is already a no-op in ``checkpoint``; this
+        additionally isolates any store fault during the regenerate/put.
+
+        Runs OFF the live event hot path by construction — its only callers are
+        the close + respawn lifecycle boundaries, never the ``on_event`` observer
+        fan-out (WP-004 ADV-1: move 2 is off the hot path)."""
+        try:
+            self.checkpoint(key)
+        except Exception:  # noqa: BLE001 — isolation: a boundary checkpoint must
+            # never stall close/respawn (freshness is best-effort; the on-demand
+            # build is the correctness floor).
+            _log.warning(
+                "boundary checkpoint failed for key %s (resume will regenerate "
+                "the summary on demand instead)",
+                key,
+                exc_info=True,
+            )
+
     def _make_recovery_driver(self, session: Session) -> RecoveryDriver:
         """Build the recovery driver for ``session`` via the injected factory,
         binding the WP-005 capabilities to this session (ADR-001/002).
@@ -936,7 +973,17 @@ class SessionManager:
         For a pty session the fresh spawn re-creates the PTY (a new
         ``os.openpty`` master, §2.12.3); the new master fd is handed to
         ``replace_process``, which closes the old master and keeps the scrollback
-        across the restart (restart-is-not-a-new-key applied to scrollback)."""
+        across the restart (restart-is-not-a-new-key applied to scrollback).
+
+        CH-GJ9KQR WP-011 — keep the memory fresh at the respawn boundary: take a
+        checkpoint over the durable log accumulated up to the death point BEFORE
+        the fresh spawn, so the resume compose ``_spawn_process`` runs (which
+        reads the thread's memory) sees a current, pre-built checkpoint rather
+        than regenerating from messages every restart. Isolated
+        (:meth:`_checkpoint_at_boundary`) and off the hot path — a checkpoint
+        failure must never block the restart (the on-demand build remains the
+        correctness floor)."""
+        self._checkpoint_at_boundary(session.key)
         process, master_fd = self._spawn_process(session.adapter, session.spec)
         session.replace_process(process, master_fd)
         # CH-GJ9KQR WP-007 resume reseed (WP-004 ADV-2): the durable observer
