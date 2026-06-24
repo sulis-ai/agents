@@ -1,0 +1,32 @@
+{
+  "wp": "WP-011",
+  "project": "portable-agent-context",
+  "timestamp": "2026-06-24T220803Z",
+  "branch": "wp/create-portable-agent-context/wp-011-cold-memory-resume-on-demand-summary",
+  "base": "change/create-portable-agent-context",
+  "verdict": "PASS",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "ruff_check": "clean",
+    "ruff_format": "clean",
+    "mypy": "advisory_no_gate_no_errors_in_changed_files"
+  },
+  "pr_hygiene": {
+    "scope": {"severity": "low", "commit_types": ["feat"], "module_fan_out": 1},
+    "size": {"severity": "low", "lines_added": 730, "lines_removed": 37, "files_changed": 7, "logic_surface_lines": 120},
+    "safety": {"severity": "none", "migrations": 0, "schemas": 0, "secrets": 0, "infra": 0},
+    "completeness": {"severity": "none", "new_source_without_test": 0}
+  },
+  "findings": {
+    "in_changes": {"critical": 0, "high": 0, "medium": 0, "low": 1},
+    "in_neighbours": {"critical": 0, "high": 0, "medium": 0, "low": 0}
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "status": "nothing_surfaced"},
+    "security": {"findings": 0, "status": "nothing_surfaced"},
+    "quality": {"findings": 1, "status": "one_low_watchlist"}
+  },
+  "draft_hardening_deltas": 0,
+  "auto_downgrade_triggers": [],
+  "addressed": true
+}

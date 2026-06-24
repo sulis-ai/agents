@@ -45,8 +45,10 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
+from _session_manager.events import ExpectedError
 from _session_manager.thread_contract import (
     ContextPayload,
+    MEMORY_NOT_FOUND,
     PayloadTier,
     RAW_FETCH_TOOL_NAME,
     ThreadMemoryContent,
@@ -69,6 +71,14 @@ BrainReader = Callable[[str], Sequence[Any]]
 # and ``_BRIEF_FRAGMENT_HEADER`` already use (EP-03).
 WORKING_SET_CONTEXT_KEY = "working_set"
 BRAIN_ENTITIES_CONTEXT_KEY = "brain_entities"
+
+# The tier budget the cold-memory on-demand regeneration summarises under — the
+# standard (default rich) tier, matching the checkpoint regeneration
+# (``durable_sink._CHECKPOINT_TIER``) so the on-demand build and the persisted
+# checkpoint produce the SAME structured summary (CH-GJ9KQR WP-011, EP-03). The
+# assembler then re-fits the enriched content to the REQUESTED tier in
+# ``_fit_to_budget``; this constant only bounds the raw message-summary step.
+_ON_DEMAND_TIER: PayloadTier = "standard"
 
 
 def estimate_tokens(text: str) -> int:
@@ -117,6 +127,57 @@ def _summarise_message(message: ThreadMessage, *, head_chars: int) -> ThreadMess
     )
 
 
+def _fit_participant_context(
+    ctx: dict[str, Any], *, max_tokens: int
+) -> tuple[dict[str, Any], int]:
+    """Trim ``ctx``'s values so their joined token cost is ``<= max_tokens``,
+    head-truncating the largest value first (WP-009 ADV-1).
+
+    The assembler folds the Working Set crystallisation + relevant brain entities
+    into ``participant_context`` (``working_set`` / ``brain_entities``). Before
+    this trim, :func:`summarise_memory` copied that context through VERBATIM
+    while only trimming messages + journal — so a large ``WORKING-SET.md`` (e.g.
+    100KB ≈ 25k tokens) shipped an over-budget brief mislabelled standard tier.
+    The budget is a true hard cap on the WHOLE content (TDD §4), so the
+    participant-context must be trimmed into it too.
+
+    Shrinking the largest value first is the minimum-loss order: it brings the
+    total under budget while preserving the most distinct keys. A trimmed string
+    value is head-truncated (an ellipsis marks the elision), mirroring the
+    message-body truncation — the full record stays reachable on demand via the
+    discovery pointer (ADR-005). A non-string value (e.g. the brain-entity list)
+    is measured via ``str(v)`` (the exact accounting :func:`content_tokens`
+    uses) and dropped wholesale only if it cannot be partially serialised here.
+    Returns the trimmed context and its post-trim token cost.
+    """
+
+    def _ctx_tokens(d: dict[str, Any]) -> int:
+        return estimate_tokens(" ".join(str(v) for v in d.values()))
+
+    fitted = dict(ctx)
+    # Largest-first: repeatedly shrink the single biggest value until the whole
+    # context fits. Each pass strictly reduces the biggest value's length or
+    # drops it, so the loop terminates.
+    while fitted and _ctx_tokens(fitted) > max_tokens:
+        biggest = max(fitted, key=lambda k: len(str(fitted[k])))
+        value = fitted[biggest]
+        if isinstance(value, str):
+            other = {k: v for k, v in fitted.items() if k != biggest}
+            room_tokens = max(0, max_tokens - _ctx_tokens(other))
+            keep_chars = room_tokens * 4
+            if keep_chars >= len(value):
+                keep_chars = len(value) - 1  # force progress
+            if keep_chars <= 0:
+                del fitted[biggest]
+            else:
+                fitted[biggest] = value[:keep_chars].rstrip() + " …"
+        else:
+            # Non-string (e.g. the brain-entity list): not partially serialisable
+            # here — drop it wholesale to honour the hard cap.
+            del fitted[biggest]
+    return fitted, _ctx_tokens(fitted)
+
+
 def summarise_memory(
     content: ThreadMemoryContent, *, max_tokens: int
 ) -> ThreadMemoryContent:
@@ -136,13 +197,20 @@ def summarise_memory(
        **oldest exploration-journal entries are dropped** (most-recent-wins)
        until the whole content fits. The journal is the highest-signal content,
        so it is trimmed last and only when the budget cannot hold it all.
+    4. The **participant-context values are head-truncated into the budget**
+       (WP-009 ADV-1): the Working Set + brain text are trimmed too, so the hard
+       cap holds for a large Working Set, not just a large thread.
 
     A free function (not an assembler method) so the WP-004 checkpoint
     regeneration reuses the same definition of "the thread's structured
     summary" (Blue / DRY).
     """
-    ctx = dict(content.participant_context)
-    ctx_tokens = estimate_tokens(" ".join(str(v) for v in ctx.values()))
+    # (0) Trim the participant-context values into the budget first (WP-009
+    #     ADV-1), so messages + journal get an honest remaining budget and the
+    #     whole-content cap holds even for a large Working Set.
+    ctx, ctx_tokens = _fit_participant_context(
+        dict(content.participant_context), max_tokens=max_tokens
+    )
 
     # (1) Head-truncate every message body.
     head_chars = 120
@@ -190,6 +258,28 @@ def summarise_memory(
         exploration_journal=journal,
         participant_context=ctx,
     )
+
+
+def regenerate_memory_content_from_store(
+    store: ThreadStore, thread_id: str, *, max_tokens: int
+) -> ThreadMemoryContent:
+    """Regenerate the thread's structured summary ON DEMAND from the durable
+    **messages** in ``store`` — the single definition of "build the memory's
+    content from the message log under a budget" (CH-GJ9KQR WP-011, EP-03 / DRY).
+
+    Reads ``store.get_messages(thread_id)`` and summarises them via
+    :func:`summarise_memory` under ``max_tokens``. This is the SAME content step
+    the session-pump checkpoint (:meth:`DurableAppendSink.checkpoint`) and the
+    cold-memory resume path (:meth:`ContextPayloadAssembler.assemble`, on
+    ``MEMORY_NOT_FOUND``) both reuse — so there is exactly one definition of "the
+    thread's structured summary", whether it is being persisted as a checkpoint
+    or assembled on the fly for a first resume.
+
+    Reads only through the :class:`ThreadStore` port (``get_messages``); touches
+    no filesystem/provider of its own (MEA-01 / WPB-01)."""
+    messages = store.get_messages(thread_id)
+    raw_content = ThreadMemoryContent(messages=list(messages))
+    return summarise_memory(raw_content, max_tokens=max_tokens)
 
 
 class ContextPayloadAssembler:
@@ -242,17 +332,27 @@ class ContextPayloadAssembler:
         tightest tier that fits** (TDD §4). The returned payload's ``tier``
         reflects what was actually delivered.
 
-        Propagates the contract's three-category errors verbatim (e.g.
-        ``MEMORY_NOT_FOUND`` for an unknown thread) — the assembler adds no
-        second error hierarchy.
+        **Cold-memory resume (CH-GJ9KQR WP-011, the load-bearing move).** When
+        no checkpoint memory exists yet (``MEMORY_NOT_FOUND``) — the COMMON
+        first-resume case, before any checkpoint has run — the assembler
+        regenerates the structured summary ON DEMAND from the thread's durable
+        messages (``regenerate_memory_content_from_store``, the SAME summary step
+        the checkpoint reuses) rather than failing. So the FIRST resume lands the
+        rich context. The genuinely-unrecoverable case (no memory AND no
+        messages) still raises ``MEMORY_NOT_FOUND`` — there is nothing to
+        regenerate from — so the live wiring's degrade-to-plain-brief isolation
+        (WP-004) stays pinned for that case.
+
+        Propagates the contract's three-category errors verbatim — the assembler
+        adds no second error hierarchy.
         """
-        memory = self._store.get_memory(thread_id)  # ExpectedError if absent
+        memory_content = self._memory_content_for(thread_id)
         enriched_context = self._participant_context_for(
-            thread_id, memory.content, tier
+            thread_id, memory_content, tier
         )
         base = ThreadMemoryContent(
-            messages=memory.content.messages,
-            exploration_journal=memory.content.exploration_journal,
+            messages=memory_content.messages,
+            exploration_journal=memory_content.exploration_journal,
             participant_context=enriched_context,
         )
 
@@ -265,6 +365,34 @@ class ContextPayloadAssembler:
         )
 
     # ── internals ──────────────────────────────────────────────────────────
+
+    def _memory_content_for(self, thread_id: str) -> ThreadMemoryContent:
+        """The thread's memory content — the saved checkpoint when one exists,
+        else regenerated ON DEMAND from the durable messages (CH-GJ9KQR WP-011).
+
+        Warm path: ``get_memory`` returns the saved checkpoint's content.
+        Cold path (``MEMORY_NOT_FOUND``): regenerate the structured summary from
+        the durable messages via ``regenerate_memory_content_from_store`` (the
+        ONE shared summary step) under the standard-tier budget — so a first
+        resume, before any checkpoint, still delivers the rich content. Only when
+        there are ALSO no messages (nothing to regenerate from) is the original
+        ``MEMORY_NOT_FOUND`` re-raised, preserving the degrade contract (WP-004)
+        for the genuinely-unrecoverable case."""
+        try:
+            return self._store.get_memory(thread_id).content
+        except ExpectedError as exc:
+            if exc.code != MEMORY_NOT_FOUND:
+                raise
+            regenerated = regenerate_memory_content_from_store(
+                self._store,
+                thread_id,
+                max_tokens=self.TIER_BUDGETS[_ON_DEMAND_TIER],
+            )
+            if not regenerated.messages:
+                # Nothing to regenerate from — genuinely unrecoverable; preserve
+                # the degrade contract by re-raising the original error.
+                raise
+            return regenerated
 
     def _participant_context_for(
         self, thread_id: str, content: ThreadMemoryContent, tier: PayloadTier

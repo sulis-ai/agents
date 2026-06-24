@@ -318,13 +318,22 @@ def test_live_spawn_composes_additively_over_default_brief(
         mgr.shutdown()
 
 
-def test_live_spawn_degrades_to_default_when_assembly_fails(
+def test_live_spawn_degrades_to_default_when_genuinely_unrecoverable(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """An assembly/reader failure must NEVER crash the spawn (WP-004 isolation):
-    with NO checkpoint memory in the store (assemble raises MEMORY_NOT_FOUND),
-    the spawn still succeeds and the brief degrades to the default — the rich
-    fragment is simply absent, never an exception into the spawn."""
+    """The genuinely-unrecoverable case must degrade to the default brief without
+    EVER crashing the spawn (WP-004 isolation).
+
+    Converted in WP-011: previously this seeded "no memory" alone and relied on
+    ``assemble`` raising ``MEMORY_NOT_FOUND`` to force the degrade. WP-011 makes
+    the cold-memory path regenerate the summary ON DEMAND from the durable
+    messages — so a thread with messages but no memory now yields the RICH brief
+    (covered by ``test_cold_memory_live_resume.py``). The remaining
+    unrecoverable case is a thread with **NO messages AND no memory**: there is
+    nothing to regenerate from, so the rich fragment is correctly absent and the
+    brief degrades to the default — never an exception into the spawn. This store
+    seeds only ``put_thread`` (no ``append_message``, no ``put_memory``), so it
+    is exactly that case."""
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
@@ -334,8 +343,8 @@ def test_live_spawn_degrades_to_default_when_assembly_fails(
     repo_root.mkdir()
     _write_working_set(repo_root)
 
-    # A store with a thread but NO memory checkpoint → assemble() raises
-    # MEMORY_NOT_FOUND. The live wiring must isolate that and degrade.
+    # A store with a thread but NO messages AND no memory → nothing to
+    # regenerate on demand. The live wiring must isolate that and degrade.
     store = LocalThreadStore(change_id=_CHANGE_ID, root=tmp_path / "threads")
     now = "2026-06-24T00:00:00Z"
     store.put_thread(

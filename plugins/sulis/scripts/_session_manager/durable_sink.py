@@ -24,11 +24,17 @@ catches store errors, records them as a degradation count, and returns — so th
 existing ``on_event`` fan-out and the live ``EventLog`` are unaffected whether or
 not the durable write succeeds.
 
-**Checkpoint regeneration reuses WP-003.** :meth:`DurableAppendSink.checkpoint`
-regenerates the thread's :class:`~_session_manager.thread_contract.ThreadMemory`
-via the SAME :func:`~_session_manager.context_payload.summarise_memory` function
-the assembler uses — one definition of "the thread's structured summary" (the
-separable Blue seam from WP-003) — bumping the monotonic version.
+**Checkpoint regeneration reuses the ONE shared summary step.**
+:meth:`DurableAppendSink.checkpoint` regenerates the thread's
+:class:`~_session_manager.thread_contract.ThreadMemory` via
+:func:`~_session_manager.context_payload.regenerate_memory_content_from_store`
+— the single "regenerate the structured summary from the store under a budget"
+definition (CH-GJ9KQR WP-011), which itself wraps the WP-003
+:func:`~_session_manager.context_payload.summarise_memory`. The cold-memory
+on-demand resume build (``ContextPayloadAssembler.assemble`` on
+``MEMORY_NOT_FOUND``) reuses the EXACT same step, so a persisted checkpoint and
+a first-resume on-demand build produce the SAME structured summary. The
+checkpoint bumps the monotonic version.
 
 **Resume seeds from OUR store, not the provider transcript (ADR-004).**
 :func:`seed_payload_for_resume` assembles a vendor-neutral
@@ -54,7 +60,7 @@ from _session_manager.context_payload import (
     BRAIN_ENTITIES_CONTEXT_KEY,
     ContextPayloadAssembler,
     WORKING_SET_CONTEXT_KEY,
-    summarise_memory,
+    regenerate_memory_content_from_store,
 )
 from _session_manager.events import Event
 from _session_manager.thread_contract import (
@@ -62,7 +68,6 @@ from _session_manager.thread_contract import (
     MessageRole,
     PayloadTier,
     ThreadMemory,
-    ThreadMemoryContent,
     ThreadMessage,
     ThreadStore,
 )
@@ -240,16 +245,18 @@ class DurableAppendSink:
         """Regenerate the thread's ``ThreadMemory`` from the durable log and
         persist it with a bumped, monotonic version.
 
-        Reuses the WP-003 :func:`summarise_memory` (the separable Blue seam) so
-        the checkpoint summary is the SAME definition of "the thread's structured
-        summary" the assembler uses. Reads the current messages from the store,
-        summarises them under the standard-tier budget, increments the version
-        over any existing checkpoint, and writes it back.
+        Reuses :func:`regenerate_memory_content_from_store` — the ONE shared
+        "regenerate the structured summary from the store under a budget" step
+        (CH-GJ9KQR WP-011, EP-03) — so the persisted checkpoint and the
+        cold-memory on-demand resume build (``ContextPayloadAssembler.assemble``)
+        produce the SAME structured summary. Summarises the current messages
+        under the standard-tier budget, increments the version over any existing
+        checkpoint, and writes it back.
         """
-        messages = self._store.get_messages(self._thread_id)
-        raw_content = ThreadMemoryContent(messages=list(messages))
         budget = ContextPayloadAssembler.TIER_BUDGETS[_CHECKPOINT_TIER]
-        summary = summarise_memory(raw_content, max_tokens=budget)
+        summary = regenerate_memory_content_from_store(
+            self._store, self._thread_id, max_tokens=budget
+        )
 
         version = self._next_memory_version()
         now = now_iso()

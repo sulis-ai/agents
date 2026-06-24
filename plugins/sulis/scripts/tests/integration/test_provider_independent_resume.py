@@ -220,18 +220,44 @@ def test_raw_log_intact_and_correctly_ordered_after_resume(
     assert [m.content for m in raw] == ["alpha", "beta", "gamma"]
 
 
-def test_resume_seed_without_checkpoint_surfaces_expected_error(
+def test_resume_seed_without_checkpoint_regenerates_on_demand(
     tmp_path: Path, monkeypatch
 ) -> None:
     """A resume seed on a thread that has messages but no checkpoint yet
-    surfaces the contract's Expected-category refusal (MEMORY_NOT_FOUND) — the
-    assembler's three-category error is propagated verbatim (no second
-    hierarchy), so the resume path fails honestly rather than silently."""
+    regenerates the structured summary ON DEMAND from the durable messages
+    (CH-GJ9KQR WP-011) — the COMMON first-resume case. Converted from the prior
+    "surfaces MEMORY_NOT_FOUND" contract: before WP-011 the assembler hard-
+    required a saved memory, so the first resume degraded; now it builds the
+    summary from the messages so the rich path fires before any checkpoint."""
     store = _store(tmp_path / "threads")
     store.put_thread(_thread())
     sink = DurableAppendSink(store, thread_id=_THREAD_ID)
-    sink.append_event(_chunk("no checkpoint taken", turn=0))
+    sink.append_event(_chunk("regenerated on demand", turn=0))
     del sink
+
+    _make_provider_transcript_unavailable(tmp_path, monkeypatch)
+
+    assembler = ContextPayloadAssembler(store)
+    payload = seed_payload_for_resume(assembler, thread_id=_THREAD_ID, tier="standard")
+    # The durable message body is carried in the regenerated summary — no
+    # checkpoint was ever taken.
+    bodies = [m.content for m in payload.memory.messages]
+    assert any("regenerated on demand" in b for b in bodies), (
+        "the cold-memory resume seed did not regenerate the summary from the "
+        "durable messages"
+    )
+
+
+def test_resume_seed_with_no_messages_and_no_memory_surfaces_expected_error(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The genuinely-unrecoverable case — a thread with NO messages AND no
+    checkpoint — still surfaces the contract's Expected-category refusal
+    (MEMORY_NOT_FOUND): there is nothing to regenerate on demand, so the
+    assembler propagates the three-category error verbatim and the live wiring's
+    degrade-to-plain-brief isolation (WP-004) stays pinned (CH-GJ9KQR WP-011)."""
+    store = _store(tmp_path / "threads")
+    store.put_thread(_thread())  # thread exists, but NO messages, NO memory
 
     _make_provider_transcript_unavailable(tmp_path, monkeypatch)
 
