@@ -1,0 +1,21 @@
+train_id: "train-2026-06-24T183400Z"
+started_at: "2026-06-24T18:34:00Z"
+completed_at: null
+outcome: "aborted"
+outcome_reason: "superseded by resume"
+batch_size: 2
+deploy_url: null
+deploy_workflow_run: null
+health_status: null
+smoke_verdict: null
+bundle:
+  - wp: WP-006
+    branch: wp/create-portable-agent-context/wp-006-cockpit-raw-view-repoint
+    pre_train_sha: null
+    rebased_to_sha: null
+    merge_sha_on_dev: null
+  - wp: WP-007
+    branch: wp/create-portable-agent-context/wp-007-integration-seam-close-and-resume-drive
+    pre_train_sha: null
+    rebased_to_sha: null
+    merge_sha_on_dev: null

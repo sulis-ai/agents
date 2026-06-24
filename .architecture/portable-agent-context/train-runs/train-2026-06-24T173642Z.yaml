@@ -1,0 +1,26 @@
+train_id: "train-2026-06-24T173642Z"
+started_at: "2026-06-24T17:36:42Z"
+completed_at: "2026-06-24T17:46:03Z"
+outcome: "success"
+batch_size: 3
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-24T17:42:02Z"
+bundle:
+  - wp: WP-002
+    branch: wp/create-portable-agent-context/wp-002-threadstore-local-adapter
+    pre_train_sha: ee007e5ada0dc792b8f9a84f8bd4425fb24da9a9
+    rebased_to_sha: ee007e5ada0dc792b8f9a84f8bd4425fb24da9a9
+    merge_sha_on_dev: d9c7e5c56712e1d6c6ee77b2d5ffeca27e8056a2
+  - wp: WP-003
+    branch: wp/create-portable-agent-context/wp-003-context-payload-assembler
+    pre_train_sha: e57f77764727fd835526a9e7856708327245f6d3
+    rebased_to_sha: 52dac2d1740de857a52adea2717fba3a53bfc842
+    merge_sha_on_dev: b186d81a1239f0a48931efc6e6409de7896868d7
+  - wp: WP-005
+    branch: wp/create-portable-agent-context/wp-005-thread-context-mcp-tool
+    pre_train_sha: a15a90f3c8a15d113b64680bd89561d251b4bd8a
+    rebased_to_sha: 20c4895b742813cd4879a8df359ee07c66192eeb
+    merge_sha_on_dev: 23ea48719380173efb03a5cc192d7e6ffa615ad9

@@ -1,0 +1,21 @@
+train_id: "train-2026-06-24T175845Z"
+started_at: "2026-06-24T17:58:45Z"
+completed_at: "2026-06-24T18:07:04Z"
+outcome: "success"
+batch_size: 2
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-24T18:03:59Z"
+bundle:
+  - wp: WP-004
+    branch: wp/create-portable-agent-context/wp-004-session-pump-durable-sink-and-resume-seed
+    pre_train_sha: 4d27790cdc207456b59c3023fdb3694c8de1e720
+    rebased_to_sha: 4d27790cdc207456b59c3023fdb3694c8de1e720
+    merge_sha_on_dev: be098d0102943597c95f8f0c3db1ec5e63a9a092
+  - wp: WP-008
+    branch: wp/create-portable-agent-context/wp-008-thread-mint-candidate-record
+    pre_train_sha: 56eba9bb3e384a51b945e745e817179067783893
+    rebased_to_sha: 037176953605d9b355aa936c202a4891549a83ee
+    merge_sha_on_dev: c1bc8d15b92cd147b7691484bd0f128cc291cd47
