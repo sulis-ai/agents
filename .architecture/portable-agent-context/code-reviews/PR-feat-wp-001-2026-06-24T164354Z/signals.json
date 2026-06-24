@@ -1,0 +1,27 @@
+{
+  "pr": "feat/wp-001-thread-context-contract",
+  "base": "change/create-portable-agent-context",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "iterations": 2,
+  "findings": {
+    "in_changes": {
+      "critical": 0, "high": 0, "medium": 0, "low": 0,
+      "resolved_inline": { "medium": 2, "low": 6 }
+    },
+    "in_neighbours": { "critical": 0, "high": 0, "medium": 0, "low": 0 }
+  },
+  "lenses": {
+    "architecture": "prior findings resolved; dependency direction clean; no infra import; port is runtime-checkable Protocol; fixture is the WP-002 extension seam",
+    "security": "prior path-traversal finding resolved via validate_store_id (^[A-Za-z0-9_-]+$); no secrets; no fixture PII",
+    "quality": "prior findings resolved; no dead surface (STALE_MEMORY_VERSION + INVALID_ID + MEMORY_NOT_FOUND all raised+tested); O(N^2) stub scan benign-in-context"
+  },
+  "hygiene": {
+    "scope": "single-concern (contract WP) — clean",
+    "size": { "lines_added": 973, "files_changed": 4 },
+    "safety": { "migrations": 0, "schema_idl": 0, "secrets": 0, "infra": 0 },
+    "completeness": { "new_source_with_tests": true }
+  },
+  "deltas_drafted": 0,
+  "resolution": "all findings addressed inline across 2 iterations; 0 remediation WPs; 0 exceptions"
+}
