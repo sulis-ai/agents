@@ -1,0 +1,10 @@
+{
+  "pr": "wp-007-integration-seam-close-and-resume-drive",
+  "scope": {"commit_type_spread": ["feat"], "module_fan_out": 2, "severity": "low"},
+  "size": {"lines_added": 391, "lines_removed": 9, "files_changed": 9, "severity": "low"},
+  "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "low"},
+  "completeness": {"new_source_without_test": 0, "api_change_without_schema": false, "severity": "low"},
+  "build_verification": {"ruff_delta_errors": 0},
+  "verdict": "PASS",
+  "findings": {"critical": 0, "high_in_changes_addressed": 1, "medium_addressed": 3, "low_addressed": 2, "watch_list": 1}
+}

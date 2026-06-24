@@ -17,6 +17,16 @@
         "python",
         "${CLAUDE_PLUGIN_ROOT}/scripts/sulis-safe-tools-mcp"
       ]
+    },
+    "sulis-thread-context": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "${CLAUDE_PLUGIN_ROOT}/scripts",
+        "python",
+        "${CLAUDE_PLUGIN_ROOT}/scripts/sulis-thread-context-mcp"
+      ]
     }
   }
 }
