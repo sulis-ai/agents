@@ -378,6 +378,10 @@ export function createApp(deps: CreateAppDeps): Application {
     "/api/changes/:id/transcript",
     createTranscriptRouter({
       changeStore: deps.changeStore,
+      // CH-GJ9KQR WP-006 — the raw view reads OUR durable ThreadStore first
+      // (under `{sulisStateDir}/changes/{id}/threads/`), falling back to the
+      // provider transcript when the store has no log yet (strangle).
+      sulisStateDir: deps.sulisStateDir,
       claudeProjectsDir: deps.claudeProjectsDir,
     }),
   );
