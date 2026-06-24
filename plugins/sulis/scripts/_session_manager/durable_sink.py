@@ -51,7 +51,9 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 
 from _session_manager.context_payload import (
+    BRAIN_ENTITIES_CONTEXT_KEY,
     ContextPayloadAssembler,
+    WORKING_SET_CONTEXT_KEY,
     summarise_memory,
 )
 from _session_manager.events import Event
@@ -292,3 +294,81 @@ def seed_payload_for_resume(
     no second error hierarchy.
     """
     return assembler.assemble(thread_id, tier=tier)
+
+
+# The brief fragment's section marker (vendor-neutral, provider-agnostic). The
+# manager composes this fragment ADDITIVELY beneath the change's default brief
+# (WP-009): the rich Sulis-owned context augments the default; it never replaces
+# the change-binding / recon pointer the default carries. PUBLIC (no underscore)
+# so the manager's idempotent compose reuses the EXACT same delimiter to strip a
+# previously-composed fragment before appending a fresh one (one definition of
+# "where the resumed-context block begins", EP-03) — the producer and the
+# idempotency-stripper cannot drift.
+BRIEF_FRAGMENT_HEADER = "── Resumed context (from your durable Sulis store) ──"
+
+
+def render_payload_brief(payload: ContextPayload) -> str:
+    """Render an assembled :class:`ContextPayload` into a vendor-neutral brief
+    fragment — the ONE definition of "render the payload into the brief"
+    (WP-009; EP-03, extracted as a named function so the manager's spawn/resume
+    seam has a single render seam, and a future second call site reuses it).
+
+    The fragment is plain, provider-agnostic text (NO Claude-JSONL structure):
+    the rich Working Set crystallisation + relevant brain entities (folded into
+    ``participant_context`` by the assembler), the structured message summary,
+    and the exploration journal — plus the raw-on-demand discovery pointer (the
+    thread id + the ``thread_context`` tool name, ADR-005) telling the agent
+    where the full record lives. Within the assembler's tier budget by
+    construction (the assembler already trimmed the content to fit).
+    """
+    content = payload.memory
+    ctx = content.participant_context
+    lines: list[str] = [BRIEF_FRAGMENT_HEADER]
+
+    working_set = ctx.get(WORKING_SET_CONTEXT_KEY)
+    if working_set:
+        lines.append("")
+        lines.append("Your live reasoning state (the Working Set):")
+        lines.append(str(working_set).rstrip())
+
+    brain_entities = ctx.get(BRAIN_ENTITIES_CONTEXT_KEY)
+    if brain_entities:
+        lines.append("")
+        lines.append("Relevant building blocks from your brain:")
+        for entity in brain_entities:
+            name = _brain_entity_label(entity)
+            if name:
+                lines.append(f"  - {name}")
+
+    if content.exploration_journal:
+        lines.append("")
+        lines.append("Decisions captured this thread:")
+        for entry in content.exploration_journal:
+            lines.append(f"  - {entry.content}")
+
+    if content.messages:
+        lines.append("")
+        lines.append("Conversation summary (most recent):")
+        for message in content.messages:
+            body = message.content.strip()
+            if body:
+                lines.append(f"  - {body}")
+
+    lines.append("")
+    lines.append(
+        f"The full, correctly-ordered record is in your durable store "
+        f"(thread {payload.thread_id}); fetch the raw log on demand via the "
+        f"{payload.raw_fetch_tool} tool."
+    )
+    return "\n".join(lines)
+
+
+def _brain_entity_label(entity: object) -> str:
+    """A human-readable label for a brain entity (its ``name``, else ``id``).
+
+    A brain entity is a plain JSON-LD dict (vendor-neutral); the founder/agent-
+    facing label is its ``name`` when present, falling back to its ``id``. A
+    non-dict or label-less entity yields ``""`` (skipped by the caller)."""
+    if isinstance(entity, dict):
+        return str(entity.get("name") or entity.get("id") or "")
+    return ""

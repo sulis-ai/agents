@@ -36,11 +36,13 @@ stayed lean.
 
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import threading
 import time
 from collections.abc import Callable
+from pathlib import Path
 from typing import Iterator
 
 from _session_manager.adapter import ProviderAdapter, SessionSpec
@@ -78,7 +80,18 @@ from _session_manager.recovery import (
     ReauthTicket,
     RecoveryDriver,
 )
-from _session_manager.durable_sink import DurableAppendSink, now_iso
+from _session_manager.context_payload import ContextPayloadAssembler
+from _session_manager.durable_sink import (
+    BRIEF_FRAGMENT_HEADER,
+    DurableAppendSink,
+    now_iso,
+    render_payload_brief,
+    seed_payload_for_resume,
+)
+from _session_manager.resume_readers import (
+    make_brain_reader,
+    make_working_set_reader,
+)
 from _session_manager.session import Session
 from _session_manager.spawn_env import PROXY_ENDPOINT_ENV, child_spawn_env
 from _session_manager.thread_contract import (
@@ -99,6 +112,8 @@ from _session_manager.viewer import Viewer, ViewerRegistry
 # no-egress shim (ADR-005) — and, in production, the L3 sandbox — allow loopback
 # as the single sanctioned egress.
 DEFAULT_SAFE_FETCH_PROXY_ENDPOINT = "http://127.0.0.1:8080"
+
+_log = logging.getLogger("sulis.session_manager.manager")
 
 # Default per-session scrollback ceiling for a pty session (contract §2.11.3,
 # the Armor ceiling — bounded memory is a MUST): 1 MiB is generous for a terminal
@@ -1028,6 +1043,169 @@ class SessionManager:
         behind the hook (Blue: WP-004 core flow untouched)."""
         return None
 
+    # ── CH-GJ9KQR WP-009 live assemble→inject resume wiring (TDD §3.2) ──────
+
+    def _compose_resume_brief(self, spec: SessionSpec) -> None:
+        """Assemble the rich resume payload over OUR durable store and compose it
+        into the change's brief sidecar — the live realisation of the TDD §3.2
+        ``◀── assembled payload ──`` arrow (WP-009, ADR-004/005).
+
+        The composition root (WPB-07): builds a :class:`ContextPayloadAssembler`
+        bound to the change's :class:`ThreadStore` (via the same injectable
+        :meth:`_durable_store_for` the durable sink uses) with the **real**
+        Working Set + brain readers injected (WP-009 GAP-2 — the readers are pure
+        functions of the change worktree, so the assembler still touches no
+        filesystem itself, MEA-01 / WPB-01), assembles the standard-tier payload
+        from OUR store (``seed_payload_for_resume``, NEVER the provider
+        transcript), renders it to a vendor-neutral fragment, and composes it
+        **additively** beneath the change's default brief in
+        ``~/.sulis/changes/{change_id}/pre_prompt.txt`` — the EXACT sidecar the
+        adapter's ``spawn_argv`` resolves at spawn.
+
+        **Off the live event hot path + fully isolated (WP-004 ADV-1).** This
+        runs at the spawn/resume seam (inside :meth:`_spawn_process`), never
+        inside the ``on_event`` observer fan-out — so a payload-assembly error
+        cannot stall the live pump. EVERY failure mode (no brief target, no
+        checkpoint memory yet → ``MEMORY_NOT_FOUND``, a store/reader fault, a
+        sidecar write error) is caught and degrades to the existing default
+        brief: the rich fragment is simply absent, and the spawn proceeds
+        unchanged. It NEVER raises into the spawn.
+        """
+        change_id = (spec.brief_change_id or "").strip()
+        if not change_id:
+            return  # no brief target — nothing to compose (frozen callers)
+        # Defence-in-depth (path traversal): validate ``change_id`` as a real
+        # change ULID BEFORE it is joined into the sidecar filesystem path — at
+        # parity with the pty adapter's READ path
+        # (``claude_pty._read_pre_prompt``), which gates the identical join
+        # behind the same check. ``SessionSpec.__post_init__`` only rejects a
+        # leading ``-`` / control chars, so ``..`` / ``/`` segments would
+        # otherwise survive to a ``mkdir`` + ``write_text`` outside
+        # ``~/.sulis/changes/``. A malformed id degrades (no compose) rather than
+        # turning into a path — fail closed, the same isolation posture. Reuses
+        # ``_wpxlib.validate_change_ulid`` (EP-03), deferred to call time so the
+        # manager carries no import-time dependency on it.
+        try:
+            from _wpxlib import validate_change_ulid
+
+            ok, _reason = validate_change_ulid(change_id)
+        except Exception:  # noqa: BLE001 — validator unavailable → fail closed
+            ok = False
+        if not ok:
+            _log.warning(
+                "resume brief skipped: brief_change_id is not a valid change "
+                "ULID (degrading to the default brief; spawn proceeds)"
+            )
+            return
+        try:
+            store = self._durable_store_for(change_id)
+            assembler = ContextPayloadAssembler(
+                store,
+                working_set_reader=make_working_set_reader(spec.cwd, change_id),
+                brain_reader=make_brain_reader(spec.cwd),
+            )
+            payload = seed_payload_for_resume(assembler, thread_id=change_id)
+            fragment = render_payload_brief(payload)
+        except Exception:  # noqa: BLE001 — isolation: degrade to the default brief
+            _log.warning(
+                "resume payload assembly failed for change %s (degrading to the "
+                "default brief; spawn proceeds)",
+                change_id,
+                exc_info=True,
+            )
+            return
+        self._compose_into_sidecar(change_id, fragment)
+
+    def _compose_into_sidecar(self, change_id: str, fragment: str) -> None:
+        """Compose ``fragment`` ADDITIVELY but IDEMPOTENTLY into the change's
+        brief sidecar.
+
+        The rich payload AUGMENTS the change's default brief; it never clobbers
+        the change-binding / recon pointer the default carries (WP Contract:
+        additive over ``_default_change_pre_prompt``). When the sidecar does not
+        exist, the launcher's default brief is seeded first (reused, EP-03) and
+        the fragment appended — so the spawn is never left with ONLY the rich
+        fragment and no change binding.
+
+        **Idempotent across re-spawns (load-bearing).** ``_spawn_process`` —
+        and so this compose — runs on EVERY spawn, including ``_respawn``
+        (restart-on-death + login-expiry resume, the very paths this WP serves).
+        A naive append would stack a fresh fragment beneath the prior one on each
+        resume, growing the brief without bound and defeating the assembler's
+        token budget (the per-fragment cap does not bound the SUM). So before
+        appending, any previously-composed fragment is stripped: the base is
+        truncated at :data:`BRIEF_FRAGMENT_HEADER` (the one delimiter the
+        renderer and this stripper share, EP-03), keeping only the content above
+        it (the default brief / launcher binding). The result is exactly ONE
+        resumed-context block, no matter how many times the session respawns.
+
+        Isolated: a sidecar resolve/read/write fault is caught and logged — the
+        spawn proceeds with whatever brief already exists (or none)."""
+        try:
+            sidecar = self._brief_sidecar_path(change_id)
+            sidecar.parent.mkdir(parents=True, exist_ok=True)
+            existing = (
+                sidecar.read_text(encoding="utf-8")
+                if sidecar.is_file()
+                else self._default_brief(change_id)
+            )
+            # Idempotency: drop any prior resumed-context fragment (split at the
+            # shared header) before appending the fresh one — a re-spawn replaces
+            # rather than stacks.
+            base = existing.split(BRIEF_FRAGMENT_HEADER, 1)[0]
+            composed = base.rstrip() + "\n\n" + fragment + "\n"
+            sidecar.write_text(composed, encoding="utf-8")
+        except Exception:  # noqa: BLE001 — isolation: spawn proceeds regardless
+            _log.warning(
+                "composing resume brief into the sidecar failed for change %s "
+                "(spawn proceeds with the existing brief)",
+                change_id,
+                exc_info=True,
+            )
+
+    @staticmethod
+    def _brief_sidecar_path(change_id: str) -> Path:
+        """The change's brief sidecar — the EXACT path the launcher writes and
+        the pty adapter (``claude_pty._read_pre_prompt``) reads
+        (``~/.sulis/changes/{change_id}/{_PRE_PROMPT_SIDECAR}``).
+
+        Reuses the launcher's :data:`~_terminal_launcher._PRE_PROMPT_SIDECAR`
+        filename constant (imported, not duplicated, EP-03) so the manager
+        composes into the SAME file the adapter resolves at spawn — a re-point of
+        the constant follows here for free, exactly as it does in the adapter. A
+        launcher import failure degrades to the conventional filename rather than
+        crashing the compose (isolation)."""
+        try:
+            import _terminal_launcher
+
+            name = _terminal_launcher._PRE_PROMPT_SIDECAR
+        except (ImportError, AttributeError):
+            # The launcher module/constant is unavailable — degrade to the
+            # conventional filename rather than crash the compose. Narrow to the
+            # two failures an intra-package import can actually raise.
+            name = "pre_prompt.txt"
+        return Path.home() / ".sulis" / "changes" / change_id / name
+
+    @staticmethod
+    def _default_brief(change_id: str) -> str:
+        """The change's default opening brief — reused from the launcher
+        (``_terminal_launcher._default_change_pre_prompt``, EP-03) so a sidecar
+        seeded here carries the SAME change-binding / recon pointer the launcher
+        writes. Import is deferred to call time so the manager carries no
+        launcher dependency at import time; a launcher import failure degrades to
+        a minimal binding line rather than crashing the compose."""
+        try:
+            import _terminal_launcher
+
+            return _terminal_launcher._default_change_pre_prompt(change_id)
+        except (ImportError, AttributeError):
+            # The launcher module/function is unavailable — degrade to a minimal
+            # change-binding line rather than crash the compose.
+            return (
+                f"You are Sulis, focused on the change bound to this session "
+                f"(id: {change_id})."
+            )
+
     # ── internal helpers ────────────────────────────────────────────────────
 
     def _child_env(self, spec: SessionSpec) -> dict[str, str]:
@@ -1082,6 +1260,14 @@ class SessionManager:
 
         Errors: Protocol ``SPAWN_FAILED`` (the pipe spawn failed); Internal
         ``PTY_OPEN_FAILED`` (``os.openpty`` / the pty spawn failed, §2.15)."""
+        # CH-GJ9KQR WP-009: ASSEMBLE the rich resume payload from OUR durable
+        # store and COMPOSE it into the change's brief sidecar BEFORE the adapter
+        # resolves the brief (``spawn_argv`` reads ``pre_prompt.txt``, ADR-004/
+        # 005). This is the live realisation of the TDD §3.2 brief-injection
+        # arrow. Fully isolated: any failure degrades to the existing default
+        # brief — it never raises into the spawn (WP-004 ADV-1, applied at the
+        # spawn/resume seam, OFF the live event hot path).
+        self._compose_resume_brief(spec)
         argv = adapter.spawn_argv(spec)
         if spec.io_mode == "pty":
             return self._spawn_pty_process(argv, spec)
