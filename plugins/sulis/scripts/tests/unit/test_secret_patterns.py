@@ -190,3 +190,111 @@ def test_empty_text_yields_no_hits():
 
 def test_clean_text_yields_no_hits():
     assert find_secrets("the quick brown fox jumps over the lazy dog") == []
+
+
+# ─── robustness: optional detect-secrets dependency (cockpit plain-python3) ────
+#
+# Regression (CH-G3Y4RM): the cockpit server spawns a PLAIN ``python3`` to run
+# the chat-turn scrub (``_session_manager`` -> ``find_secrets``), and that
+# interpreter has no ``detect_secrets`` on its path (it is a uv-locked dep, not
+# installed in the bare-python3 env). The module-level ``from detect_secrets...``
+# import therefore raised ``ModuleNotFoundError`` at import time, crashing the
+# append ("chat turn append failed"). The fix: the detect_secrets import is
+# OPTIONAL — when it is unavailable the outbound-scrub union degrades to the
+# in-house catalogue ALONE (which still redacts real provider key shapes), and
+# ``find_secrets`` must NEVER raise.
+#
+# These tests simulate the absence with a meta-path finder that blocks
+# ``detect_secrets`` from importing, then reimport ``_secret_patterns`` in that
+# environment — the same condition the cockpit's plain python3 hits.
+
+import importlib  # noqa: E402
+import sys  # noqa: E402
+
+import pytest  # noqa: E402
+
+
+class _BlockDetectSecrets:
+    """A ``sys.meta_path`` finder that makes ``detect_secrets`` unimportable,
+    reproducing the cockpit plain-python3 environment where the package is
+    absent."""
+
+    def find_spec(self, name, path=None, target=None):
+        if name == "detect_secrets" or name.startswith("detect_secrets."):
+            raise ModuleNotFoundError(f"No module named '{name}'")
+        return None
+
+
+@pytest.fixture
+def _secret_patterns_without_detect_secrets():
+    """Reimport ``_secret_patterns`` with ``detect_secrets`` blocked, yielding
+    the freshly-imported module. Restores the real module + meta_path after."""
+    blocker = _BlockDetectSecrets()
+    saved_modules = {
+        name: mod
+        for name, mod in list(sys.modules.items())
+        if name == "detect_secrets"
+        or name.startswith("detect_secrets.")
+        or name == "_secret_patterns"
+    }
+    for name in saved_modules:
+        del sys.modules[name]
+    sys.meta_path.insert(0, blocker)
+    try:
+        module = importlib.import_module("_secret_patterns")
+        yield module
+    finally:
+        sys.meta_path.remove(blocker)
+        for name in list(sys.modules):
+            if name == "_secret_patterns" or name == "detect_secrets" \
+                    or name.startswith("detect_secrets."):
+                del sys.modules[name]
+        sys.modules.update(saved_modules)
+        importlib.import_module("_secret_patterns")
+
+
+def test_module_imports_when_detect_secrets_absent(
+    _secret_patterns_without_detect_secrets,
+):
+    """``_secret_patterns`` imports cleanly even when detect_secrets is missing
+    — the import must not be fatal (cockpit plain-python3 regression)."""
+    module = _secret_patterns_without_detect_secrets
+    assert hasattr(module, "find_secrets")
+
+
+def test_find_secrets_redacts_catalogue_secret_when_detect_secrets_absent(
+    _secret_patterns_without_detect_secrets,
+):
+    """With detect_secrets unavailable, ``find_secrets`` STILL detects a
+    catalogue-shaped provider key (Stripe ``sk_live_…``) — the catalogue layer
+    keeps the real key shapes redacted on its own."""
+    module = _secret_patterns_without_detect_secrets
+    hits = module.find_secrets(f"key = {_STRIPE_KEY}")
+    assert any(_STRIPE_KEY in h.value for h in hits)
+
+
+def test_find_secrets_catches_aws_secret_assignment_when_detect_secrets_absent(
+    _secret_patterns_without_detect_secrets,
+):
+    """An AWS secret-access-key in an env-assignment (``AWS_SECRET_ACCESS_KEY=…``,
+    a catalogue ``env-secret`` shape) is still caught by the catalogue alone when
+    detect_secrets is absent.
+
+    Note: a bare AWS access-key *id* (``AKIA`` + 16 chars) is detect-secrets'
+    AWSKeyDetector's job and is shorter than the catalogue ``long-token`` floor,
+    so it is NOT catalogue-detectable on its own — the realistic AWS shape the
+    catalogue does cover is the credentials-line assignment, asserted here."""
+    module = _secret_patterns_without_detect_secrets
+    aws_secret = "wJalrXUtnFEMI" + "K7MDENG" + "bPxRfiCYEXAMPLEKEY"
+    line = f"AWS_SECRET_ACCESS_KEY={aws_secret}"
+    hits = module.find_secrets(line)
+    assert any(h.category == "env-secret" and aws_secret in h.value for h in hits)
+
+
+def test_find_secrets_does_not_raise_when_detect_secrets_absent(
+    _secret_patterns_without_detect_secrets,
+):
+    """The append path must never crash on the missing optional enhancer —
+    ``find_secrets`` returns cleanly (possibly empty) on benign text."""
+    module = _secret_patterns_without_detect_secrets
+    assert module.find_secrets("an ordinary chat turn with no secrets") == []
