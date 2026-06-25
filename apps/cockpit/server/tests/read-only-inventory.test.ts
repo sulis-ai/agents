@@ -63,6 +63,12 @@ const MUTATION_VERB_PATTERNS = [
 // The relay registers a mutation verb (`router.post`); the bridge calls
 // `spawn` (the process start). Anything else with either shape is a violation.
 const RELAY_ROUTE_BASENAME = "chat.ts";
+// WP-002 (ADR-002/003) — the per-product chat routes are a SANCTIONED write
+// path: GET /:scope/thread is read, but PUT /:scope/provider + POST
+// /:scope/message register write verbs (the provider persist + the SSE relay).
+// They ride the SAME SessionBridge as the relay; this is the chat seam's
+// per-product sibling, allow-listed alongside chat.ts.
+const CHAT_SCOPE_ROUTE_BASENAME = "chatScope.ts";
 const BRIDGE_ADAPTER_BASENAME = "StreamJsonSessionBridge.ts";
 // WP-010 fix-forward (ADR-007 amended) — the deterministic cold-start mint's
 // confirm-gated ACT path. It is the SECOND sanctioned process-start AND the
@@ -87,6 +93,12 @@ const STARTER_BASENAME = "SulisChangeStarter.ts";
 // settings router (routes/settings.ts) carries the mutation verbs but starts no
 // process and writes no file itself; it delegates to this one adapter.
 const SETTINGS_ADAPTER_BASENAME = "SpineSettingsAdapter.ts";
+// WP-002 (ADR-002/003) — the durable chat store adapter persists the picker's
+// chosen provider per scope (`participant_context.provider`) on PUT /provider:
+// an atomic temp-write + rename + mkdir under the chat root. This is the one
+// sanctioned write of the per-product chat seam (the AI-03 remember), allow-
+// listed BY PATH alongside the other adapter write sites.
+const CHAT_SCOPE_ADAPTER_BASENAME = "LocalChatScopeStore.ts";
 
 // WP-006 (ADR-019) — the Settings router is the THIRD sanctioned write-verb
 // file (parity with the chat relay + the operator-action route). It carries the
@@ -300,6 +312,7 @@ describe("read-only inventory (TDD §13.7)", () => {
     // files.
     const WRITE_VERB_ALLOW = new Set([
       RELAY_ROUTE_BASENAME,
+      CHAT_SCOPE_ROUTE_BASENAME,
       ADVANCED_ROUTE_BASENAME,
       SETTINGS_ROUTE_BASENAME,
       CHANGES_ROUTE_BASENAME,
@@ -320,6 +333,7 @@ describe("read-only inventory (TDD §13.7)", () => {
     expect([...writeVerbFiles].sort()).toEqual(
       [
         RELAY_ROUTE_BASENAME,
+        CHAT_SCOPE_ROUTE_BASENAME,
         ADVANCED_ROUTE_BASENAME,
         SETTINGS_ROUTE_BASENAME,
         CHANGES_ROUTE_BASENAME,
@@ -408,6 +422,9 @@ describe("read-only inventory (TDD §13.7)", () => {
       // It NEVER writes the founder's folder (the disk-safety sentinel proves
       // remove + unlink leave it untouched). Allow-listed BY PATH.
       SETTINGS_ADAPTER_BASENAME,
+      // WP-002 (ADR-002/003) — the chat-store adapter persists the per-scope
+      // provider choice (the AI-03 remember). Allow-listed BY PATH.
+      CHAT_SCOPE_ADAPTER_BASENAME,
     ]);
     const offenders: string[] = [];
     const writeFiles = new Set<string>();
@@ -427,6 +444,7 @@ describe("read-only inventory (TDD §13.7)", () => {
         SPINE_MINTER_BASENAME,
         TURN_SUMMARIES_BASENAME,
         SETTINGS_ADAPTER_BASENAME,
+        CHAT_SCOPE_ADAPTER_BASENAME,
       ].sort(),
     );
   });
@@ -485,6 +503,7 @@ describe("read-only inventory (TDD §13.7)", () => {
     expect(writeVerbFiles.sort()).toEqual(
       [
         RELAY_ROUTE_BASENAME,
+        CHAT_SCOPE_ROUTE_BASENAME,
         ADVANCED_ROUTE_BASENAME,
         SETTINGS_ROUTE_BASENAME,
         CHANGES_ROUTE_BASENAME,
@@ -521,6 +540,7 @@ describe("read-only inventory (TDD §13.7)", () => {
     expect(writeVerbFiles.sort()).toEqual(
       [
         RELAY_ROUTE_BASENAME,
+        CHAT_SCOPE_ROUTE_BASENAME,
         ADVANCED_ROUTE_BASENAME,
         SETTINGS_ROUTE_BASENAME,
         CHANGES_ROUTE_BASENAME,

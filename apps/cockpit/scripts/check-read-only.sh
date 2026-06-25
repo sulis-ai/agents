@@ -114,6 +114,11 @@ specific class of mutation is absent from the active source tree.
        - server/routes/advanced.ts (ADR-015 named exception): its two operator
          POST routes — reveal-in-finder + stop-process — are explicit operator
          actions, not edits to any read surface.
+       - server/routes/chatScope.ts (WP-002, ADR-002/003): the per-product chat
+         routes — PUT /provider + POST /message — the chat relay's per-product
+         sibling, riding the SAME SessionBridge (the message route relays a turn;
+         the provider PUT persists the picker's choice via the one allow-listed
+         chat-store adapter write).
      Every other route is GET-only.
      Why: the cockpit is read-only everywhere except the chat write seam and
      the explicitly-audited operator-action routes.
@@ -229,6 +234,15 @@ SETTINGS_ROUTE_REL="server/routes/settings.ts"
 # process-start exception; every OTHER file with a mutation verb still violates.
 CHANGES_ROUTE_REL="server/routes/changes.ts"
 
+# WP-002 (ADR-002/003) — the per-product chat seam. The routes file carries the
+# PUT /provider + POST /message mutation verbs (the per-product sibling of the
+# chat relay, riding the SAME SessionBridge); the store adapter carries the one
+# sanctioned FS write (the AI-03 per-scope provider remember — an atomic
+# temp-write + rename under the chat root). Each is allow-listed BY PATH with
+# the same single-audited-site discipline as the chat relay + settings sites.
+CHAT_SCOPE_ROUTE_REL="server/routes/chatScope.ts"
+CHAT_SCOPE_ADAPTER_REL="server/adapters/LocalChatScopeStore.ts"
+
 # Accumulate per-rule hits across all files.
 declare -a fs_hits=() git_spawn_hits=() git_verb_hits=() kill_hits=() http_hits=() bind_hits=() proc_hits=() ws_hits=()
 
@@ -253,7 +267,7 @@ for f in "${SOURCE_FILES[@]}"; do
   #    it writes a hashed cache file of Haiku-generated turn summaries. This is
   #    a derived cache outside the cockpit's read surface — never a worktree or
   #    transcript write.
-  if [ "$rel" != "server/adapters/SpineEmitterMinter.ts" ] && [ "$rel" != "$TURN_SUMMARIES_REL" ] && [ "$rel" != "$SETTINGS_ADAPTER_REL" ]; then
+  if [ "$rel" != "server/adapters/SpineEmitterMinter.ts" ] && [ "$rel" != "$TURN_SUMMARIES_REL" ] && [ "$rel" != "$SETTINGS_ADAPTER_REL" ] && [ "$rel" != "$CHAT_SCOPE_ADAPTER_REL" ]; then
     while IFS= read -r line; do
       [ -n "$line" ] && fs_hits+=("$rel: $line")
     done < <(printf '%s\n' "$stripped" | grep -nE \
@@ -383,7 +397,10 @@ for f in "${SOURCE_FILES[@]}"; do
       #    WP-006 (ADR-019) also allow-lists settings.ts: the THIRD sanctioned
       #    write surface — its settings CRUD verbs delegate to the one allow-
       #    listed adapter (it starts no process, writes no file itself).
-      if [ "$rel" != "$RELAY_ROUTE_REL" ] && [ "$rel" != "$ADVANCED_ROUTE_REL" ] && [ "$rel" != "$SETTINGS_ROUTE_REL" ] && [ "$rel" != "$CHANGES_ROUTE_REL" ]; then
+      #    WP-002 (ADR-002/003) also allow-lists chatScope.ts: the per-product
+      #    chat routes (PUT /provider + POST /message) — the chat relay's
+      #    per-product sibling, riding the SAME SessionBridge. Allow-listed BY PATH.
+      if [ "$rel" != "$RELAY_ROUTE_REL" ] && [ "$rel" != "$ADVANCED_ROUTE_REL" ] && [ "$rel" != "$SETTINGS_ROUTE_REL" ] && [ "$rel" != "$CHANGES_ROUTE_REL" ] && [ "$rel" != "$CHAT_SCOPE_ROUTE_REL" ]; then
         while IFS= read -r line; do
           [ -n "$line" ] && http_hits+=("$rel: $line")
         done < <(printf '%s\n' "$stripped" | grep -nE \
