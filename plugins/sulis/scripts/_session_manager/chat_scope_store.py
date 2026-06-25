@@ -42,6 +42,7 @@ still cannot traverse out of the chat root.
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -52,9 +53,19 @@ from .thread_contract import (
     ExpectedError,
     ThreadMemory,
     ThreadMemoryContent,
+    ThreadMessage,
     validate_store_id,
 )
 from .thread_store_local import LocalThreadStore
+
+# The two wire roles the chat round-trip persists: the founder ("user") and the
+# running agent ("assistant"). They map onto the shipped ThreadMessage
+# `participant_type` union ("user" / "studio_agent"), reused verbatim (ADR-002).
+ChatTurnRole = Literal["user", "assistant"]
+_ROLE_TO_PARTICIPANT: dict[ChatTurnRole, str] = {
+    "user": "user",
+    "assistant": "studio_agent",
+}
 
 # The closed provider union — the two registered daemon keys (ADR-003;
 # session_manager_daemon.py:638 registers "pty"=Claude, "agy"=Antigravity). The
@@ -208,6 +219,57 @@ def read_remembered_provider(
         raise
     value = memory.content.participant_context.get("provider")
     return value if isinstance(value, str) else None
+
+
+def append_turn(
+    chat_scope: str,
+    role: ChatTurnRole,
+    content: str,
+    thread_id: str = "chat",
+    chat_root: Path | None = None,
+) -> None:
+    """Append one chat turn to the scope's durable thread — the persistence
+    round-trip (WP-004; folded CONCERN DAT-PERSIST-01).
+
+    Today nothing appends chat turns at runtime, so ``get_messages`` is always
+    empty and per-product history is not real. This closes the round-trip by
+    persisting each turn through the SHIPPED ``LocalThreadStore.append_message``
+    — which applies redaction-on-write (``_scrub_message``) before any byte lands
+    — so (a) the scope's history actually persists and ``getThread`` returns it,
+    and (b) chat content is scrubbed of secrets on the way to disk.
+
+    The turn is appended at the next monotonic offset (the log is offset-ordered,
+    append-only — both invariants reused verbatim, ADR-002). The wire ``role``
+    ("user" | "assistant") maps onto the shipped ``ThreadMessage`` participant
+    union ("user" | "studio_agent"). The scope is validated + keyed via
+    :func:`resolve_chat_thread` (which calls :func:`_scope_key`), so a hostile
+    scope is refused before any path is touched.
+    """
+    if role not in _ROLE_TO_PARTICIPANT:
+        raise ExpectedError(
+            INVALID_ID,
+            f"chat turn role {role!r} must be one of {tuple(_ROLE_TO_PARTICIPANT)}",
+        )
+    store = resolve_chat_thread(chat_scope, chat_root=chat_root)
+    # Next monotonic offset: one past the last persisted message's order (the
+    # store's append guard rejects a non-increasing order, so this is the only
+    # safe next value). A fresh thread starts at order 1.
+    existing = store.get_messages(thread_id)
+    next_order = (existing[-1].order + 1) if existing else 1
+    participant = _ROLE_TO_PARTICIPANT[role]
+    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    store.append_message(
+        thread_id,
+        ThreadMessage(
+            id=uuid.uuid4().hex,
+            participant_id=f"chat_{participant}",
+            participant_type=participant,  # type: ignore[arg-type]  # narrowed by the role map
+            content=content,
+            role=None,
+            created_at=now,
+            order=next_order,
+        ),
+    )
 
 
 def resolve_provider(

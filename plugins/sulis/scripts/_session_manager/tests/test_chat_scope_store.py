@@ -33,6 +33,7 @@ import pytest
 
 from _session_manager import thread_contract as tc
 from _session_manager.chat_scope_store import (
+    append_turn,
     chat_store_root_for_scope,
     read_remembered_provider,
     remember_provider,
@@ -149,3 +150,73 @@ def test_hostile_scope_is_refused(tmp_path: Path) -> None:
     ):
         with pytest.raises(ExpectedError):
             chat_store_root_for_scope(hostile, chat_root=tmp_path)
+
+
+# ── WP-004 seam-close: the persistence round-trip (folded CONCERN DAT-PERSIST-01)
+# Today nothing appends chat turns to the per-product scope thread at runtime, so
+# ``get_messages`` is always empty and per-product history is not real. WP-004
+# closes the round-trip: ``append_turn`` persists each chat turn through the
+# REDACTING store path (``LocalThreadStore.append_message`` -> ``_scrub_message``)
+# so (a) history actually persists per scope and (b) redaction-on-write applies
+# to chat content. Scenario 1 (switch product -> see that product's history)
+# depends on this being real.
+
+
+def test_append_turn_persists_and_round_trips(tmp_path: Path) -> None:
+    """A user turn then an agent turn are persisted to the scope's durable thread
+    and read back, in order, by the SAME scope — closing the round-trip
+    ``getThread`` reads (DAT-PERSIST-01)."""
+    append_turn(_SCOPE_A, "user", "what changed today?", chat_root=tmp_path)
+    append_turn(_SCOPE_A, "assistant", "three changes shipped", chat_root=tmp_path)
+
+    store = resolve_chat_thread(_SCOPE_A, chat_root=tmp_path)
+    msgs = store.get_messages(_THREAD)
+    # The wire roles ("user"/"assistant") map onto the shipped participant union
+    # ("user"/"studio_agent"); the round-trip preserves order + content.
+    assert [(m.participant_type, m.content) for m in msgs] == [
+        ("user", "what changed today?"),
+        ("studio_agent", "three changes shipped"),
+    ]
+    # Offsets are monotonic (the log is offset-ordered) so a later read is stable.
+    assert [m.order for m in msgs] == sorted(m.order for m in msgs)
+    assert len({m.order for m in msgs}) == len(msgs)
+    assert len({m.id for m in msgs}) == len(msgs)
+
+
+def test_append_turn_history_is_per_scope(tmp_path: Path) -> None:
+    """Appended turns never blend across scopes — switching products returns that
+    product's OWN conversation (Scenario 1)."""
+    append_turn(_SCOPE_A, "user", "hello from A", chat_root=tmp_path)
+    append_turn(_SCOPE_B, "user", "hello from B", chat_root=tmp_path)
+
+    store_a = resolve_chat_thread(_SCOPE_A, chat_root=tmp_path)
+    store_b = resolve_chat_thread(_SCOPE_B, chat_root=tmp_path)
+    assert [m.content for m in store_a.get_messages(_THREAD)] == ["hello from A"]
+    assert [m.content for m in store_b.get_messages(_THREAD)] == ["hello from B"]
+
+
+def test_append_turn_redacts_secrets_on_write(tmp_path: Path) -> None:
+    """Chat content passes through redaction-on-write — a secret in a turn is
+    scrubbed before the bytes land on disk (DAT-PERSIST-01: the REDACTING path)."""
+    secret = "sk-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghij"  # noqa: S105 (test fixture)
+    append_turn(_SCOPE_A, "user", f"my key is {secret} keep it safe", chat_root=tmp_path)
+
+    # The secret is gone from the read-back content...
+    store = resolve_chat_thread(_SCOPE_A, chat_root=tmp_path)
+    content = store.get_messages(_THREAD)[0].content
+    assert secret not in content
+    assert "[redacted-secret]" in content
+    # ...and gone from the persisted bytes (the on-disk log), not just the read.
+    # The log is `{thread_id}.messages.jsonl` under the scope's threads root.
+    log_path = (
+        chat_store_root_for_scope(_SCOPE_A, chat_root=tmp_path)
+        / f"{_THREAD}.messages.jsonl"
+    )
+    assert secret not in log_path.read_text(encoding="utf-8")
+
+
+def test_append_turn_rejects_hostile_scope(tmp_path: Path) -> None:
+    """A hostile scope is refused before any path is keyed (the on-disk backstop
+    behind the wire-level ``parseChatScope``)."""
+    with pytest.raises(ExpectedError):
+        append_turn("product:../../etc/passwd", "user", "x", chat_root=tmp_path)

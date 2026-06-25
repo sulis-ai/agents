@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""sulis-chat-append — persist one per-product chat turn to the durable thread.
+
+The runtime entrypoint the cockpit's `LocalChatScopeStore` shells to so each
+chat turn is persisted through the REDACTING store path (CH-G3Y4RM WP-004;
+folded CONCERN DAT-PERSIST-01). It is a thin CLI over
+`_session_manager.chat_scope_store.append_turn`, which appends the turn via the
+shipped `LocalThreadStore.append_message` — applying redaction-on-write
+(secret-scrub) before any byte lands on disk. Keeping persistence on the Python
+path means the secret catalogue stays single-source (EP-03): the cockpit never
+re-implements redaction in TypeScript.
+
+Usage:
+  sulis-chat-append --scope product:<id> --role user|assistant [--chat-root DIR]
+  # the turn CONTENT is read from STDIN (so a secret never lands in argv /
+  # the process table; multiline content is handled natively).
+
+Outputs a structured JSON envelope to stdout. Exit codes: 0 success, 1 expected
+failure (bad scope / role), 2 internal error.
+
+Specification: .architecture/product-wide-chat/adrs/ADR-002-per-product-thread-keying.md
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+# Make `_session_manager` importable the same way the other vendored scripts do.
+sys.path.insert(0, str(Path(__file__).parent))
+
+from _session_manager.chat_scope_store import append_turn  # noqa: E402
+from _session_manager.thread_contract import ExpectedError  # noqa: E402
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="sulis-chat-append")
+    parser.add_argument("--scope", required=True, help="the wire chat scope (product:<id>)")
+    parser.add_argument(
+        "--role",
+        required=True,
+        choices=["user", "assistant"],
+        help="who the turn is from",
+    )
+    parser.add_argument(
+        "--thread-id",
+        default="chat",
+        help="the per-scope thread id (one thread per scope; default 'chat')",
+    )
+    parser.add_argument(
+        "--chat-root",
+        default=None,
+        help="override the chat-store root (defaults to ~/.sulis/chat); the test seam",
+    )
+    args = parser.parse_args(argv)
+
+    # The turn content is read from stdin so a secret never reaches the argv /
+    # process table, and multiline content survives intact.
+    content = sys.stdin.read()
+
+    chat_root = Path(args.chat_root) if args.chat_root else None
+    try:
+        append_turn(
+            args.scope,
+            args.role,
+            content,
+            thread_id=args.thread_id,
+            chat_root=chat_root,
+        )
+    except ExpectedError as exc:
+        json.dump({"ok": False, "error": str(exc), "code": exc.code}, sys.stdout)
+        sys.stdout.write("\n")
+        return 1
+    except Exception as exc:  # noqa: BLE001 — surface internals as exit 2
+        json.dump({"ok": False, "error": f"internal: {exc}"}, sys.stdout)
+        sys.stdout.write("\n")
+        return 2
+
+    json.dump({"ok": True, "data": {"scope": args.scope, "role": args.role}}, sys.stdout)
+    sys.stdout.write("\n")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,51 @@
+{
+  "pr": "wp-004-integration-seam-close",
+  "timestamp": "2026-06-25T230305Z",
+  "base": "change/create-product-wide-chat",
+  "head": "wp/create-product-wide-chat/wp-004-integration-seam-close",
+  "verdict": "PASS",
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "typecheck": "clean",
+    "lint": "clean",
+    "ruff": "clean"
+  },
+  "diff": {
+    "files_changed": 17,
+    "lines_added": 563,
+    "lines_removed": 29
+  },
+  "hygiene": {
+    "scope": "low",
+    "size": "low",
+    "safety": "none",
+    "completeness": "low"
+  },
+  "lenses": {
+    "architecture": { "in_changes": 0, "in_neighbours": 0 },
+    "security": { "in_changes": 0, "in_neighbours": 0 },
+    "quality": { "in_changes": 1, "in_neighbours": 0, "note": "user-turn persist not fail-soft — FIXED INLINE" }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "lens": "quality",
+      "severity": "medium",
+      "file": "apps/cockpit/server/routes/chatScope.ts",
+      "summary": "user-turn appendTurn + groundCwd awaited unguarded; a transient durable-write failure would 500 the whole chat message. Assistant-turn append was already fail-soft.",
+      "resolution": "fixed-inline",
+      "detail": "wrapped groundCwd + user appendTurn in the same fail-soft try/catch as the assistant append; re-ran route+contract+adapter suites (42/42 green), typecheck+lint clean"
+    }
+  ],
+  "draft_deltas": [],
+  "self_attestation": {
+    "CR-01": true,
+    "CR-02": true,
+    "CR-03": true,
+    "CR-04": true,
+    "CR-05": true,
+    "CR-06": true,
+    "CR-07": true,
+    "CR-09": true
+  }
+}

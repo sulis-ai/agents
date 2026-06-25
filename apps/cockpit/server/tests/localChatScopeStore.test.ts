@@ -48,12 +48,14 @@ describe("LocalChatScopeStore — provider remember/resolve", () => {
   });
 
   it("ignores a corrupt remembered value and falls back to pty", async () => {
-    // Write a memory record with a non-registered provider directly.
+    // Write a memory record with a non-registered provider directly. The
+    // record filename is keyed by the THREAD id ("chat"), matching the Python
+    // LocalThreadStore the adapter binds (DAT-PERSIST-01 alignment).
     const key = REAL_SCOPE.replace(/:/g, "_");
     const dir = join(chatRoot, key, "threads");
     await mkdir(dir, { recursive: true });
     await writeFile(
-      join(dir, `${key}.memory.json`),
+      join(dir, `chat.memory.json`),
       JSON.stringify({
         thread_id: "chat",
         version: 1,
@@ -99,7 +101,9 @@ describe("LocalChatScopeStore — getThread", () => {
       "", // blank line tolerated
       "{not json", // malformed line skipped
     ].join("\n");
-    await writeFile(join(dir, `${key}.messages.jsonl`), lines, "utf8");
+    // The message log filename is keyed by the THREAD id ("chat") — the Python
+    // LocalThreadStore convention the adapter now reads (DAT-PERSIST-01).
+    await writeFile(join(dir, `chat.messages.jsonl`), lines, "utf8");
 
     const thread = await store.getThread(REAL_SCOPE);
     expect(thread.messages).toHaveLength(2);

@@ -189,11 +189,35 @@ async function handleMessage(
     // daemon path and recorded for the scope; the relay itself streams the reply.
     await deps.store.resolveProvider(scope, null);
 
+    // Ground the relay cwd to a REAL directory for the scope (WP-004, folded
+    // ADV-CWD-01): ensure the scope's chat-store dir exists so the session runs
+    // in a real, scope-keyed place rather than the server's own dir (the prior
+    // `resolveChange(scope) === null → cwd:""`). The grounded dir also backs the
+    // durable thread the turns below persist to.
+    //
+    // Persist the user turn BEFORE relaying (WP-004, folded DAT-PERSIST-01) —
+    // through the store's REDACTING append path, so per-product history is real.
+    // BOTH are fail-soft: a durable-write hiccup (e.g. the vendored CLI is
+    // transiently unavailable) must NOT take chat down — the reply still
+    // streams, that turn just isn't persisted. Availability of the conversation
+    // outranks durability of one turn (the same posture the assistant-turn
+    // append below already takes).
+    try {
+      await deps.store.groundCwd(scope);
+      await deps.store.appendTurn(scope, "user", prompt);
+    } catch {
+      // Logged-and-tolerated: the relay proceeds; this turn is not persisted.
+    }
+
     // The session key for a chat scope IS the scope (one thread per scope,
     // ADR-002).
     let streamOpened = false;
+    // Accumulate the reply text so it can be persisted as the assistant turn
+    // after the stream closes (the durable thread is the per-product history).
+    let replyText = "";
     const sink: RelaySink = {
       emit: (event: ChatStreamEvent) => {
+        if (event.type === "chunk") replyText += event.text;
         if (!streamOpened) {
           openSseHeaders(res);
           streamOpened = true;
@@ -212,6 +236,19 @@ async function handleMessage(
       outcome = streamOpened
         ? { kind: "interrupted" }
         : { kind: "unreachable", detail: "relay threw before streaming" };
+    }
+
+    // Persist the assistant turn ONLY when the relay actually produced a reply
+    // (FR-N5 parity: never synthesise/persist an empty or absent reply). A
+    // persistence failure must not break the already-delivered stream, so it is
+    // swallowed after the reply has been streamed to the client.
+    if (replyText.length > 0) {
+      try {
+        await deps.store.appendTurn(scope, "assistant", replyText);
+      } catch {
+        // The reply already streamed to the client; a durable-write hiccup is
+        // logged-and-tolerated, not surfaced as a failed turn.
+      }
     }
 
     finishMessage(res, outcome, streamOpened);

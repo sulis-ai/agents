@@ -395,6 +395,13 @@ describe("read-only inventory (TDD §13.7)", () => {
         // session_manager_daemon.py)`). The spawn MOVED here from index.ts's
         // retired ephemeral host; the gate follows the spawn (the WP-007 Contract).
         DAEMON_ENSURE_BASENAME,
+        // WP-004 (ADR-002, DAT-PERSIST-01) — the per-product chat store execFiles
+        // the vendored `sulis-chat-append` to persist each chat turn through the
+        // REDACTING Python store path (keeping the secret catalogue single-source;
+        // the cockpit never re-implements redaction in TS). A WRITE seam (it
+        // persists the durable thread), not a read view; allow-listed BY PATH,
+        // parity with the settings/mint/starter adapters.
+        CHAT_SCOPE_ADAPTER_BASENAME,
       ]);
       if (SANCTIONED_PROCESS_STARTERS.has(basename(f))) {
         continue;
@@ -668,6 +675,12 @@ describe("read-only inventory (TDD §13.7)", () => {
       TURN_SUMMARIES_BASENAME,
       DAEMON_ENSURE_BASENAME,
       TERMINAL_SIDECAR_BASENAME,
+      // WP-004 (DAT-PERSIST-01) — the per-product chat store is a sanctioned
+      // WRITE seam (it execFiles `sulis-chat-append` to persist the durable
+      // thread through the redacting path), not a read view; named here so the
+      // NFR-SEC-05 "a read view starts nothing" assertion holds for every OTHER
+      // file.
+      CHAT_SCOPE_ADAPTER_BASENAME,
     ]);
     const readViewOffenders: string[] = [];
     for (const f of files) {
