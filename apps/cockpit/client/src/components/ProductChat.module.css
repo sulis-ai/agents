@@ -1,0 +1,67 @@
+/* WP-003 — <ProductChat> transcript styles. Token-only, light + dark. */
+
+.thread {
+  flex: 1;
+  overflow: auto;
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reply {
+  align-self: stretch;
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  font-weight: var(--weight-label);
+  margin-bottom: 4px;
+}
+
+.ai {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: var(--radius-badge);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.replyText {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--accent);
+  animation: blink 1s steps(2, start) infinite;
+}
+
+@keyframes blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* Reduced-motion: the caret holds steady (no blink). */
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+  }
+}

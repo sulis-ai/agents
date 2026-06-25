@@ -1,0 +1,24 @@
+{
+  "pr": "wp-003-frontend-chat-dock",
+  "verdict": "Request changes",
+  "build_verification": { "typecheck": "clean", "lint": "clean", "errors_introduced": 0 },
+  "hygiene": {
+    "scope": { "severity": "low", "note": "single feature surface; one feat WP" },
+    "size": { "severity": "medium", "lines": 1927, "files": 17, "note": "one coherent frontend surface against one contract; SEA kept it one WP deliberately" },
+    "safety": { "severity": "none", "migrations": 0, "schemas": 0, "secrets": 0, "infra": 0 },
+    "completeness": { "severity": "none", "new_source": 7, "new_tests": 6 }
+  },
+  "findings": {
+    "in_changes": [
+      { "id": "F-01", "severity": "high", "lens": "architecture + quality", "file": "apps/cockpit/client/src/components/ProductChatDock.tsx", "issue": "chat.send relay built+tested but never wired to composer; 'Enter to send' hint has no handler; only Start work (chat->card) exists. ProductChat streamed-reply path unreachable." },
+      { "id": "F-02", "severity": "medium", "lens": "quality", "file": "apps/cockpit/client/src/api/useProductChat.ts", "issue": "pendingProvider optimistic state never resets and is not keyed by scope; shadows real provider after refetch and across product switches." },
+      { "id": "F-03", "severity": "medium", "lens": "architecture", "file": "apps/cockpit/client/src/api/useProductChat.ts", "issue": "switchProvider has no try/catch; failed PUT -> unhandled rejection + un-rolled-back optimistic state, no error surfaced." },
+      { "id": "F-04", "severity": "low", "lens": "a11y", "file": "apps/cockpit/client/src/components/ProductChatDock.module.css", "issue": ".chip lacks :focus-visible ring (WCAG 2.4.7)." },
+      { "id": "F-05", "severity": "low", "lens": "quality", "file": "apps/cockpit/client/src/lib/providerName.ts", "issue": "providerName() accessor is dead code." },
+      { "id": "F-06", "severity": "low", "lens": "quality", "file": "apps/cockpit/client/src/components/ProductChatDock.tsx", "issue": "headerGlyph computed only to feed a hidden unasserted span." },
+      { "id": "F-07", "severity": "low", "lens": "quality", "file": "apps/cockpit/client/src/components/ProductChatDock.tsx", "issue": "useStartFromIntent return not memoized -> propose effect runs every render (masked by null-reset guard); cardProductId not reset in handleSwitch (masked by callers re-setting)." }
+    ],
+    "in_neighbours": []
+  },
+  "resolution": "All in-scope. F-01,F-02,F-03,F-04,F-05 fixed inline; F-06,F-07 fixed inline (cheap robustness). Re-review confirms zero findings."
+}

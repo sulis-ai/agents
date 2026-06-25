@@ -64,6 +64,13 @@ export interface ProductControlProps {
   onRemove?: () => void;
   /** Explicit a11y name for the trigger (e.g. "Add this change to a product"). */
   triggerLabel?: string;
+  /**
+   * Override the trigger/menu `data-testid` prefix so the ONE primitive can be
+   * placed in more than one home and still be addressed precisely (WP-003: the
+   * agent picker reuses this primitive — no second popover — and aliases the
+   * testids to "agent-picker-*"). Defaults to "product-control".
+   */
+  testIdPrefix?: string;
 }
 
 // ─── glyph tiles ────────────────────────────────────────────────────────────
@@ -189,6 +196,7 @@ export function ProductControl({
   onManageProducts,
   onRemove,
   triggerLabel,
+  testIdPrefix = "product-control",
 }: ProductControlProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -322,7 +330,7 @@ export function ProductControl({
             ? UNASSIGNED_TRIGGER_LABEL
             : undefined)
         }
-        data-testid="product-control-trigger"
+        data-testid={`${testIdPrefix}-trigger`}
         onClick={() => setOpen((v) => !v)}
         onKeyDown={onTriggerKeyDown}
       >
@@ -351,7 +359,7 @@ export function ProductControl({
       {open && (
         <div
           className={styles.pmenu}
-          data-testid="product-control-menu"
+          data-testid={`${testIdPrefix}-menu`}
           onKeyDown={onMenuKeyDown}
         >
           {/* The typeahead sits in the popover header, OUTSIDE role="menu": a
