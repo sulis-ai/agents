@@ -1,0 +1,7 @@
+change_id: 01KVX26BDXGJ9KQRJ11HACHMZV
+primitive: create
+tier: minor
+touches_plugin: true
+summary: |
+  Portable, Sulis-owned agent context: per-thread message log + tiered context-payload assembler + denyable read-only thread_context tool, wired into live spawn/resume so sessions resume from our durable store rather than the provider transcript. Conforms to the platform thread-sdk contract (local-first hybrid).
+created_at: 2026-06-25T14:07:06Z

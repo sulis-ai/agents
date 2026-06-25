@@ -1,0 +1,23 @@
+Scenario-required exemption — CH-GJ9KQR (portable-agent-context)
+
+Reason: This change is founder_facing: false — overwhelmingly internal backend
+plumbing (thread store, context-payload assembler, thread_context MCP tool,
+session-manager wiring). It introduces NO new user-facing UI. The single path
+that tripped the user-surface signal is apps/cockpit/client/src/api/useTranscript.test.ts
+— a TEST file for an existing hook. The one user-visible touch (WP-006) is a
+behaviour-preserving, server-side re-point of the EXISTING cockpit transcript
+view to read from our durable store instead of the provider's transcript files;
+the view's behaviour is unchanged.
+
+Testability (the gate's intent) IS met in substance:
+- Cockpit tests cover the touched surface: readThreadStore.test.ts (projection,
+  traversal refusal, malformed-skip, ordering, empty), routes.transcript.test.ts
+  (store-first + fallback), useTranscript.test.ts (store-backed read). 1613/1613
+  cockpit tests green.
+- The live flows were driven end-to-end via /sulis:prove (3 rounds, 9 scenarios
+  driven green, 0 blocked) — incl. message persistence, raw-on-demand, redaction,
+  and provider-independent rich-context resume.
+
+No new user journey was introduced; the authored .scenarios.jsonld is absent only
+because the change was specified founder_facing: false (no deep specify pass).
+Exemption recorded by Sulis at ship time, disclosed to the founder.
