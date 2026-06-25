@@ -6,7 +6,7 @@ primitive: reinforce-harden
 group: reinforce
 title: Make detect_secrets optional in the shared scrub (degrade to the catalogue)
 status: step-7-complete
-dependsOn: [WP-004]
+dependsOn: []
 implements:
   - "spec:create-product-wide-chat#redaction-on-write"
 verification:

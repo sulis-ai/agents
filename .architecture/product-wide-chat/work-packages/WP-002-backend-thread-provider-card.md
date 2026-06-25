@@ -66,3 +66,8 @@ a provider resolver, and route handlers.
 - [ ] Provider resolution is one function with explicit fallback order (boring, no implicit
       magic); `UNKNOWN_PROVIDER` remains the daemon backstop.
 - [ ] No new external call without the existing timeout/CB the daemon + store already enforce.
+
+## Acceptance Evidence
+
+- Branch: wp/create-product-wide-chat/wp-002-backend-thread-provider-card (deleted post-merge)
+- Completed: `2026-06-25T22:16:59Z` (Step 12 by calling session)

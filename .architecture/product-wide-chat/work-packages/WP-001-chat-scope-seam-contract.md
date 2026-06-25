@@ -65,3 +65,8 @@ shape; the contract documents that the overview chat (`product:__all__`) must su
 - [ ] No duplicated scope vocabulary — `__all__`/`__unassigned__` sentinels are defined once
       and reused from `lib/productCounts.ts` where they already exist (no second source).
 - [ ] Types are explicit and boring (no string-typed provider free-form; the union is closed).
+
+## Acceptance Evidence
+
+- Branch: wp/create-product-wide-chat/wp-001-chat-scope-seam-contract (deleted post-merge)
+- Completed: `2026-06-25T21:24:46Z` (Step 12 by calling session)

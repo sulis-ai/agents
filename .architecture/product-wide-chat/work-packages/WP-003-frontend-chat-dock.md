@@ -67,3 +67,8 @@ composer family; does NOT rebuild a chat.
       board reads.
 - [ ] Post-build visual check vs `product-wide-chat.html` (light + dark) recorded
       (UX_VISUAL_DESIGN_STANDARD); discrepancies fixed or noted.
+
+## Acceptance Evidence
+
+- Branch: wp/create-product-wide-chat/wp-003-frontend-chat-dock (deleted post-merge)
+- Completed: `2026-06-25T22:16:59Z` (Step 12 by calling session)
