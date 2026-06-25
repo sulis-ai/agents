@@ -30,6 +30,8 @@ built but not yet registered on a live session):
 from __future__ import annotations
 
 import sys
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -190,5 +192,202 @@ def test_respawn_reseeds_next_order_so_appends_continue(tmp_path: Path) -> None:
         msgs = store.get_messages(_KEY)
         assert [m.order for m in msgs] == [0, 1, 2]
         assert [m.content for m in msgs] == ["pre 0", "pre 1", "post 2"]
+    finally:
+        mgr.shutdown()
+
+
+# ── REGRESSION (CH-GJ9KQR hotfix) — the durable side-channel must NEVER stall
+# or break the live open/attach/feed round-trip, whether the durable store
+# RAISES, HANGS, or hits a restricted filesystem (full WP-004 ADV-1 isolation,
+# extended from exceptions-only to also cover hangs/blocking).
+#
+# The regression: ``SessionManager.open`` ran ``_attach_durable_sink`` (which
+# does real store I/O — get/put the thread record, reseed from the log) and the
+# ``_respawn`` reseed synchronously on the open/restart path, under the registry
+# lock, BEFORE ``start_pumps`` and before the open result is returned — with NO
+# isolation. On a runner where ``~/.sulis`` is restricted, slow, or contended
+# (the cockpit-e2e environment, where the daemon writes the REAL ~/.sulis, not
+# the test's isolated temp dir), the durable attach RAISED (daemon errored, never
+# replied) or BLOCKED (open never returned) → the WS `open` round-trip timed out.
+#
+# The contract these pin: a live session opens, its event seam fires, and the
+# live-tail path is byte-for-byte unaffected, regardless of the durable store's
+# fate. The durable capability degrades (no second sink for that session); the
+# live session never does.
+
+
+class _RaisingStore:
+    """A valid ``ThreadStore`` shape whose every op raises an UNEXPECTED
+    (non-``ExpectedError``) error — the restricted-/broken-filesystem analogue
+    (e.g. ``PermissionError`` / ``OSError`` from a ``mkdir`` into a read-only
+    ``~/.sulis``). The attach-time wiring must isolate this so ``open`` still
+    returns a live session."""
+
+    def get_thread(self, thread_id: str):  # noqa: ANN201
+        raise OSError("read-only filesystem: cannot stat ~/.sulis/changes/.../threads")
+
+    def put_thread(self, thread) -> None:  # noqa: ANN001
+        raise OSError("read-only filesystem: cannot mkdir ~/.sulis/changes/.../threads")
+
+    def get_messages(self, thread_id: str, since=None, limit=None):  # noqa: ANN001,ANN201
+        raise OSError("read-only filesystem")
+
+    def append_message(self, thread_id: str, message) -> None:  # noqa: ANN001
+        raise OSError("read-only filesystem")
+
+    def get_memory(self, thread_id: str):  # noqa: ANN201
+        raise OSError("read-only filesystem")
+
+    def put_memory(self, thread_id: str, memory) -> None:  # noqa: ANN001
+        raise OSError("read-only filesystem")
+
+
+class _HangingStore:
+    """A valid ``ThreadStore`` shape whose reads/writes BLOCK (the slow/contended
+    or stuck-FS analogue). Each op waits on an event that the test never sets, so
+    a synchronous, unbounded call would hang forever. The attach-time wiring must
+    bound this so ``open`` still returns within a small budget."""
+
+    def __init__(self) -> None:
+        self._never = threading.Event()
+        #: True once at least one op started blocking — proves the hang path ran.
+        self.blocked = False
+
+    def _block(self):  # noqa: ANN202
+        self.blocked = True
+        # Wait on an event that is never set → blocks until the (daemon) worker
+        # thread is abandoned. A generous cap keeps a wedged test from hanging CI
+        # forever, but it is far longer than the attach budget so the bound — not
+        # this cap — is what releases ``open``.
+        self._never.wait(timeout=30.0)
+        raise OSError("filesystem call never completed (test hang)")
+
+    def get_thread(self, thread_id: str):  # noqa: ANN201
+        return self._block()
+
+    def put_thread(self, thread) -> None:  # noqa: ANN001
+        self._block()
+
+    def get_messages(self, thread_id: str, since=None, limit=None):  # noqa: ANN001,ANN201
+        return self._block()
+
+    def append_message(self, thread_id: str, message) -> None:  # noqa: ANN001
+        self._block()
+
+    def get_memory(self, thread_id: str):  # noqa: ANN201
+        return self._block()
+
+    def put_memory(self, thread_id: str, memory) -> None:  # noqa: ANN001
+        self._block()
+
+
+def _manager_with_store_factory(factory) -> SessionManager:  # noqa: ANN001
+    """A manager bound to an arbitrary durable-store ``factory`` (the failing /
+    hanging fakes below), maintenance off. A short attach timeout so the
+    hang-isolation test asserts quickly without waiting on the production
+    default."""
+    return SessionManager(
+        {"claude": _AliveChildAdapter()},
+        start_maintenance=False,
+        thread_store_factory=factory,
+        durable_attach_timeout=1.0,
+    )
+
+
+def test_open_completes_when_durable_store_attach_raises(tmp_path: Path) -> None:
+    """When the durable store RAISES at attach time (restricted/broken FS), the
+    live session still opens — the durable wiring is isolated; the live-tail path
+    is unaffected. The session is alive and its event seam fires."""
+    mgr = _manager_with_store_factory(lambda change_id: _RaisingStore())
+    try:
+        session = mgr.open(_KEY, _spec(tmp_path))
+        # The open returned a live session despite the store raising.
+        assert mgr.is_alive(session)
+        assert session.on_event is not None
+
+        # The live event seam still works (firing it does not raise — the durable
+        # observer either was never attached, or is itself isolated).
+        seen: list[str] = []
+        prior = session.on_event
+
+        def _spy(s, event: Event) -> None:
+            if event.kind == "chunk":
+                seen.append(event.text or "")
+            if prior is not None:
+                prior(s, event)
+
+        session.on_event = _spy
+        session.on_event(session, _chunk("live line", turn=0))
+        assert seen == ["live line"]
+    finally:
+        mgr.shutdown()
+
+
+def test_open_completes_when_durable_store_attach_hangs(tmp_path: Path) -> None:
+    """When the durable store HANGS at attach time (slow/contended/stuck FS), the
+    live open still returns WITHIN A BOUND — it does not block on the durable
+    side-channel. This is the byte-for-byte regression: the cockpit-e2e `open`
+    round-trip timed out because the attach blocked the open path."""
+    store = _HangingStore()
+    mgr = _manager_with_store_factory(lambda change_id: store)
+    try:
+        started = time.monotonic()
+        session = mgr.open(_KEY, _spec(tmp_path))
+        elapsed = time.monotonic() - started
+
+        # Open returned a LIVE session well inside the round-trip budget — it was
+        # not blocked on the hanging store (attach timeout is 1.0s; allow margin).
+        assert mgr.is_alive(session)
+        assert elapsed < 5.0, (
+            f"open blocked on the hanging durable store ({elapsed:.1f}s)"
+        )
+
+        # The live seam still fires (the hang did not break the live pump).
+        session.on_event(session, _chunk("after a hang", turn=0))
+    finally:
+        mgr.shutdown()
+
+
+def test_live_event_seam_unaffected_when_durable_sink_degraded(
+    tmp_path: Path,
+) -> None:
+    """When the durable attach degrades (store raises), a content event reaching
+    the live seam is delivered to the existing fan-out byte-for-byte — the
+    live-tail path never depends on the durable second sink succeeding."""
+    mgr = _manager_with_store_factory(lambda change_id: _RaisingStore())
+    try:
+        session = mgr.open(_KEY, _spec(tmp_path))
+        delivered: list[str] = []
+        prior = session.on_event
+
+        def _spy(s, event: Event) -> None:
+            if event.kind == "chunk":
+                delivered.append(event.text or "")
+            if prior is not None:
+                prior(s, event)
+
+        session.on_event = _spy
+        # Fire several events as the live pump would — none raise into the pump,
+        # and every one reaches the live observer.
+        session.on_event(session, _chunk("one", turn=0))
+        session.on_event(session, _chunk("two", turn=1))
+        assert delivered == ["one", "two"]
+    finally:
+        mgr.shutdown()
+
+
+def test_respawn_reseed_isolated_against_store_failure(tmp_path: Path) -> None:
+    """A restart whose durable reseed RAISES (broken FS at restart time) must not
+    break the respawn — the live session is replaced and stays alive; the durable
+    reseed failure is isolated (WP-004 ADV-1, applied to the restart seam too)."""
+    mgr = _manager_with_store_factory(lambda change_id: _RaisingStore())
+    try:
+        session = mgr.open(_KEY, _spec(tmp_path))
+        assert mgr.is_alive(session)
+        # Drive the restart seam directly — the reseed inside it must be isolated.
+        mgr._respawn(session)  # noqa: SLF001
+        assert mgr.is_alive(session)
+        # The live seam still fires after the restart.
+        session.on_event(session, _chunk("after restart", turn=0))
     finally:
         mgr.shutdown()

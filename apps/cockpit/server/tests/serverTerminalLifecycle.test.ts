@@ -160,17 +160,22 @@ function openWs(url: string): Promise<WebSocket> {
 
 /** Collect WS text messages until `pred` matches one, or the budget elapses.
  *
- *  Budget = 25s (was 8s): the FIRST round-trip in each test is an `open`, which
- *  triggers a COLD start — the daemon is cold-spawned, binds its AF_UNIX socket,
- *  and forks the real fake-pty child — before the result streams back. On a
- *  loaded CI runner that cold-start exceeds 8s (observed deterministically), so
- *  8s raced the cold-start, not a logic fault (the same round-trip passes on a
- *  warm/faster runner). 25s gives the cold-start realistic headroom while still
- *  sitting inside the 30s vitest testTimeout; every assertion is unchanged. */
+ *  Budget = 8s: the FIRST round-trip in each test is an `open`, which cold-starts
+ *  the daemon (spawn, bind its AF_UNIX socket, fork the fake-pty child) before
+ *  the result streams back. That cold-start completes quickly — 8s is generous
+ *  headroom for it, well inside the 30s vitest testTimeout.
+ *
+ *  NOTE (CH-GJ9KQR): an earlier 8s→25s bump here was a wrong "slow cold-start"
+ *  hypothesis. The real cause was a regression — the durable-context wiring
+ *  (`_attach_durable_sink` / the respawn reseed) ran UNISOLATED synchronous
+ *  ~/.sulis store I/O on the daemon's `open`/restart path, so on a restricted/
+ *  contended runner the open HUNG (no budget would have saved it). That wiring
+ *  is now bounded + isolated in the session manager, so the open round-trip
+ *  completes quickly again and 8s is the right budget. */
 function waitForMessage(
   ws: WebSocket,
   pred: (parsed: Record<string, unknown>) => boolean,
-  budgetMs = 25_000,
+  budgetMs = 8_000,
 ): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(

@@ -43,7 +43,7 @@ import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, TypeVar
 
 from _session_manager.adapter import ProviderAdapter, SessionSpec
 from _session_manager.classifier import RecoveryClass, classify
@@ -115,11 +115,27 @@ DEFAULT_SAFE_FETCH_PROXY_ENDPOINT = "http://127.0.0.1:8080"
 
 _log = logging.getLogger("sulis.session_manager.manager")
 
+# Result type for the bounded-isolation runner — so a caller's work callable
+# flows its own return type through (no ``object`` cast at the call site).
+_T = TypeVar("_T")
+
 # Default per-session scrollback ceiling for a pty session (contract §2.11.3,
 # the Armor ceiling — bounded memory is a MUST): 1 MiB is generous for a terminal
 # screen + deep scrollback; appending past it drops oldest bytes. Overridable via
 # the ``scrollback_capacity_bytes`` tuning kwarg.
 DEFAULT_SCROLLBACK_CAPACITY_BYTES = 1024 * 1024
+
+# CH-GJ9KQR hotfix — default bound (seconds) on the durable-sink attach-time
+# store I/O (build store + ensure thread record + reseed) on the open/restart
+# path. The durable store writes the real ``~/.sulis`` filesystem; on a
+# restricted/slow/contended runner that can block. The live session must never
+# wait on the durable side-channel, so the attach is bounded: past this budget
+# (or on any error) it degrades to "no durable sink for this session" and the
+# live open proceeds (WP-004 ADV-1 isolation, extended to cover hangs). 5s is
+# generous for a healthy local append (sub-millisecond) while keeping a wedged
+# store from ever stalling a live terminal open. Overridable via the
+# ``durable_attach_timeout`` tuning kwarg.
+DEFAULT_DURABLE_ATTACH_TIMEOUT = 5.0
 
 
 def _default_recovery_driver_factory(**kwargs: object) -> RecoveryDriver:
@@ -244,6 +260,19 @@ class SessionManager:
             "thread_store_factory", _default_thread_store_factory
         )
         self._durable_sinks: dict[str, DurableAppendSink] = {}
+        # CH-GJ9KQR hotfix — the bound (seconds) the durable-sink attach-time
+        # store I/O (build store + ensure the thread record + reseed) is allowed
+        # before the OPEN/RESTART path abandons it and degrades to "no durable
+        # sink for this session" (WP-004 ADV-1 isolation, extended from
+        # exceptions to also cover HANGS/blocking). The durable store touches the
+        # real ``~/.sulis`` filesystem, which on a restricted/slow/contended
+        # runner can block — and this work runs synchronously on the open path,
+        # under the registry lock, before the open result is returned. The live
+        # session must NEVER wait on it. A generous boring default (a healthy
+        # local FS append is sub-millisecond); overridable for tests.
+        self._durable_attach_timeout: float = float(
+            self._tuning.get("durable_attach_timeout", DEFAULT_DURABLE_ATTACH_TIMEOUT)
+        )
         # The last command submitted per key — captured by ``send`` so the
         # recovery driver's ``send`` capability can re-submit *the stopped turn*
         # (not an empty turn) on a transient-blip retry. Additive read-only
@@ -666,24 +695,127 @@ class SessionManager:
         guard/recovery-owned) ``on_event``. The reseed is what makes resume
         correct — it is run on every attach, so first-open is a no-op (empty
         log → next_order stays 0) and a restart picks up where the log left off.
-        """
-        thread_id = session.key
-        store = self._durable_store_for(session.key)
-        self._ensure_thread_record(store, thread_id)
 
-        sink = self._durable_sinks.get(session.key)
+        **CH-GJ9KQR hotfix — the attach NEVER stalls or breaks the live open
+        (WP-004 ADV-1 isolation, extended from exceptions to HANGS).** The
+        store-touching work (build the store binding, ensure the thread record,
+        build + reseed the sink) is real ``~/.sulis`` filesystem I/O running
+        synchronously on the open path, under the registry lock, BEFORE the
+        pumps run and before the open result is returned. On a restricted, slow,
+        or contended runner that I/O can RAISE (read-only FS) or BLOCK
+        indefinitely — either of which previously stalled the live WS
+        open/attach/feed round-trip. So the store-touching work is run under
+        :meth:`_isolated_durable_attach`: a bounded, exception-isolated wrapper.
+        If it raises OR exceeds the attach budget, the session opens WITHOUT a
+        durable sink (the capability degrades; the live-tail path is unchanged)
+        and the spawn proceeds. The durable observer is chained ONLY when the
+        sink was built successfully — so a degraded attach adds no observer at
+        all (no failing side-channel on the seam either).
+        """
+        sink = self._isolated_durable_attach(session.key)
         if sink is None:
-            sink = DurableAppendSink(store, thread_id=thread_id)
-            self._durable_sinks[session.key] = sink
-        # Resume reseed (WP-004 ADV-2): align the next order with the durable
-        # log's high-water mark on every attach (no-op on an empty thread).
-        sink.seed_next_order_from_store()
+            return  # durable attach degraded — the live session opens unchanged
 
         # Chain the durable observer additively — the prior fan-out (guard +
         # recovery) fires first, then the durable append runs as an isolated
         # side-effect (``append_event`` never raises into the pump, ADR-004 /
         # WP-004 ADV-1). Same chaining shape the recovery attach uses.
         self._chain_on_event(session, sink.as_event_observer())
+
+    def _isolated_durable_attach(self, key: str) -> DurableAppendSink | None:
+        """Build + reseed the per-key durable sink under a bound, fully isolated.
+
+        Returns the ready :class:`DurableAppendSink`, or ``None`` if the
+        store-touching attach work raised or exceeded
+        :attr:`_durable_attach_timeout`. This is the one place the durable
+        side-channel's open-path I/O is allowed to fail without touching the
+        live session — see :meth:`_attach_durable_sink` for why (the store hits
+        the real ``~/.sulis`` filesystem, which can raise or block on a
+        restricted/slow runner, and this runs synchronously on the open path).
+
+        The work runs via :meth:`_run_isolated_bounded`, which executes it on a
+        short-lived worker thread and abandons it (degrading to ``None``) if it
+        outlives the budget — so a HANG cannot stall the caller. A persisted sink
+        from a prior attach over the same key is reused (restart idempotency); a
+        successful build is cached for the key.
+        """
+
+        def _build() -> DurableAppendSink:
+            thread_id = key
+            store = self._durable_store_for(key)
+            self._ensure_thread_record(store, thread_id)
+            sink = self._durable_sinks.get(key)
+            if sink is None:
+                sink = DurableAppendSink(store, thread_id=thread_id)
+            # Resume reseed (WP-004 ADV-2): align the next order with the durable
+            # log's high-water mark on every attach (no-op on an empty thread).
+            sink.seed_next_order_from_store()
+            return sink
+
+        sink = self._run_isolated_bounded(
+            _build,
+            timeout=self._durable_attach_timeout,
+            what=f"durable sink attach for key {key}",
+        )
+        if sink is None:
+            return None
+        # Cache only on a successful build — a degraded attach leaves no stale
+        # half-built sink for the key (a later attach over the same key retries
+        # cleanly).
+        self._durable_sinks[key] = sink
+        return sink
+
+    def _run_isolated_bounded(
+        self,
+        work: Callable[[], _T],
+        *,
+        timeout: float,
+        what: str,
+    ) -> _T | None:
+        """Run ``work`` on a worker thread, bounded by ``timeout`` and fully
+        isolated — return its result, or ``None`` if it raised or timed out.
+
+        The isolation primitive the durable side-channel uses on the open /
+        restart path (WP-004 ADV-1, extended to cover hangs): a store call that
+        RAISES is caught (logged, ``None``); a store call that BLOCKS past
+        ``timeout`` is abandoned (the daemon worker thread is left to die on its
+        own — it cannot block process exit and holds no manager lock — and we
+        degrade to ``None``). ``signal.alarm`` is deliberately NOT used: it is
+        main-thread-only, and the daemon serves requests on worker threads, so a
+        signal-based timeout would not fire here.
+
+        ``work`` MUST NOT mutate manager state that the caller then reads
+        racily — it returns a value the caller installs after the bound clears.
+        (The durable build only touches the injected store + a local sink, both
+        safe to abandon.)
+        """
+        result: _T | None = None
+        failed = False
+
+        def _runner() -> None:
+            nonlocal result, failed
+            try:
+                result = work()
+            except Exception:  # noqa: BLE001 — isolation: any fault degrades to None
+                failed = True
+                _log.warning("%s failed (degrading)", what, exc_info=True)
+
+        worker = threading.Thread(target=_runner, name="durable-attach", daemon=True)
+        worker.start()
+        worker.join(timeout)
+        if worker.is_alive():
+            # Blocked past the budget — abandon the worker (daemon thread; it
+            # holds no manager lock) and degrade. The live session opens now.
+            _log.warning(
+                "%s exceeded the %.1fs attach budget (degrading; the live "
+                "session opens without the durable side-channel)",
+                what,
+                timeout,
+            )
+            return None
+        if failed:
+            return None
+        return result
 
     def _durable_store_for(self, key: str) -> ThreadStore:
         """The durable :class:`ThreadStore` binding for ``key``'s bound change,
@@ -992,9 +1124,22 @@ class SessionManager:
         # log's high-water mark so post-restart appends continue the order rather
         # than colliding (silent OUT_OF_ORDER_WRITE degradation). Reseed off the
         # hot path here, on the restart seam — the resume is from OUR store.
+        #
+        # CH-GJ9KQR hotfix — bound + isolate the reseed exactly as the open-path
+        # attach is (WP-004 ADV-1, extended to hangs). ``seed_next_order_from_store``
+        # already isolates a store *raise* internally, but a store that BLOCKS on
+        # a restricted/slow runner would stall the restart synchronously. Run it
+        # under the same bounded, abandon-on-hang wrapper so a wedged store can
+        # never stall a live respawn; on timeout/error the reseed is skipped (the
+        # sink keeps its prior ``_next_order`` — at worst a post-restart append
+        # degrades to a counted OUT_OF_ORDER_WRITE, never a stalled restart).
         sink = self._durable_sinks.get(session.key)
         if sink is not None:
-            sink.seed_next_order_from_store()
+            self._run_isolated_bounded(
+                sink.seed_next_order_from_store,
+                timeout=self._durable_attach_timeout,
+                what=f"durable reseed on respawn for key {session.key}",
+            )
 
     def _maintenance_tick(self) -> None:
         """One pass of the periodic maintenance loop (§2.7), filled by WP-006.
