@@ -918,3 +918,83 @@ export type SettingsErrorCode =
   | "PATH_NOT_A_REPO"
   | "WRITE_FAILED"
   | "IMMUTABLE_IMPLICIT";
+
+// ─── WP-001 — per-product chat-scope seam (the client↔server contract) ────────
+//
+// TDD §2.3 — the contract-first seam (CF-05/07). This is the wire shape the
+// per-product chat client sends and the server resolves; WP-002 (backend) and
+// WP-003 (frontend) build against it in parallel. No behaviour ships with these
+// types — only the shape + its conformance test (chatScope.contract.test.ts).
+//
+//   GET  /api/chat/:scope/thread    → ChatThreadResponse
+//   POST /api/chat/:scope/message   { prompt } → SSE ChatStreamEvent (reused)
+//   PUT  /api/chat/:scope/provider  { provider } → ChatProviderResult
+//   POST /api/changes/start-from-intent   (REUSED verbatim — ADR-004, no new shape)
+//
+// The scope vocabulary (ADR-002) is `product:{id}` | `product:__all__` |
+// (reserved) `product:__unassigned__`. The bare `__all__`/`__unassigned__`
+// sentinels live ONCE in `client/src/lib/productCounts.ts` and are reused by
+// the `parseChatScope` validator in `shared/chatScope.ts` (no second source).
+
+/**
+ * The durable chat thread's scope (ADR-002) — the wire key the client sends and
+ * the server resolves to a per-product thread root. One of three forms:
+ *
+ *   - `product:{productId}`     → a real product's chat (productId is the
+ *                                 colon-bearing `dna:product:<ulid>`).
+ *   - `product:__all__`         → the cross-product overview chat.
+ *   - `product:__unassigned__`  → reserved (Phase-2 triage chat; key reserved
+ *                                 now so the store layout doesn't fork later).
+ *
+ * Always validate an inbound string through `parseChatScope` (shared/chatScope.ts)
+ * before treating it as a `ChatScope` — the template-literal type does not
+ * itself reject path traversal.
+ */
+export type ChatScope = `product:${string}`;
+
+/**
+ * The session provider for a product's chat (ADR-003). A CLOSED union — the
+ * agent picker selects exactly one of these registered daemon keys; the client
+ * never sends a free-form string (the daemon's `UNKNOWN_PROVIDER` is the
+ * backstop, and unknown/absent falls back to `pty`).
+ *
+ *   - `pty` → Claude.
+ *   - `agy` → Antigravity.
+ */
+export type ChatProvider = "pty" | "agy";
+
+/**
+ * `GET /api/chat/:scope/thread` — the scope's durable transcript plus its
+ * resolved provider. `messages` reuses the existing `TranscriptMessage` union
+ * (no new message shape). `productId` is `null` for the overview chat
+ * (`product:__all__`), otherwise the product the scope resolves to.
+ */
+export interface ChatThreadResponse {
+  messages: TranscriptMessage[];
+  provider: ChatProvider;
+  productId: string | null;
+}
+
+/**
+ * `POST /api/chat/:scope/message` request body. The reply streams back as SSE
+ * `ChatStreamEvent` (`state | chunk* | complete | error`) — the EXISTING chat
+ * stream union, reused not forked.
+ */
+export interface ChatMessageRequest {
+  prompt: string;
+}
+
+/** `PUT /api/chat/:scope/provider` request body — the picker's chosen provider. */
+export interface ChatProviderRequest {
+  provider: ChatProvider;
+}
+
+/**
+ * `PUT /api/chat/:scope/provider` result. AI-03: the choice applies to NEW work
+ * (the next session open), never re-homing a live run — so `applied` is the
+ * fixed literal `"new-work"`, not a boolean (the contract states the guarantee).
+ */
+export interface ChatProviderResult {
+  provider: ChatProvider;
+  applied: "new-work";
+}
