@@ -26,6 +26,10 @@ import type {
   OnboardingStreamEvent,
   StartFromIntentRequest,
   StartFromIntentStreamEvent,
+  ChatScope,
+  ChatProvider,
+  ChatThreadResponse,
+  ChatProviderResult,
 } from "../../../shared/api-types";
 
 /**
@@ -381,3 +385,63 @@ export const streamStartFromIntent: StreamStartFromIntentFn = async (
   if (!res.body) return;
   await readSseStream<StartFromIntentStreamEvent>(res.body, onEvent);
 };
+
+// ─── WP-003 — the per-product chat-scope funnel (ADR-001/002/003) ────────────
+//
+// The dock speaks the WP-001 contract (`/api/chat/:scope/*`). These three
+// funnels are the ONLY home for those `fetch` calls (the client inventory gate
+// allow-lists exactly api/client.ts), and each is typed by + injectable as a
+// `*Fn` so the dock + its hook are testable without the network.
+
+/** `GET /api/chat/:scope/thread` — the scope's durable transcript + provider. */
+export type FetchChatThreadFn = (scope: ChatScope) => Promise<ChatThreadResponse>;
+
+export const fetchChatThread: FetchChatThreadFn = (scope) =>
+  apiGet<ChatThreadResponse>(`/api/chat/${encodeURIComponent(scope)}/thread`);
+
+/**
+ * `POST /api/chat/:scope/message` — opens/relays the scope's session on its
+ * resolved provider and streams the reply as the EXISTING `ChatStreamEvent`
+ * union (reused, not forked). Mirrors `streamChat` exactly, keyed by scope.
+ */
+export type StreamProductChatFn = (
+  scope: ChatScope,
+  prompt: string,
+  onEvent: (event: ChatStreamEvent) => void,
+) => Promise<void>;
+
+export const streamProductChat: StreamProductChatFn = async (
+  scope,
+  prompt,
+  onEvent,
+) => {
+  const res = await fetch(`/api/chat/${encodeURIComponent(scope)}/message`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt }),
+  });
+
+  if (!res.ok) {
+    const { code, message } = await readErrorBody(res);
+    onEvent({ type: "error", code: asChatErrorCode(code), message });
+    return;
+  }
+
+  if (!res.body) return;
+  await readSseStream<ChatStreamEvent>(res.body, onEvent);
+};
+
+/**
+ * `PUT /api/chat/:scope/provider` — the agent picker's chosen provider. AI-03:
+ * the result's `applied` is the fixed literal `"new-work"` (the choice applies
+ * to the next session open, never re-homing a live run).
+ */
+export type PutChatProviderFn = (
+  scope: ChatScope,
+  provider: ChatProvider,
+) => Promise<ChatProviderResult>;
+
+export const putChatProvider: PutChatProviderFn = (scope, provider) =>
+  apiPut<ChatProviderResult>(`/api/chat/${encodeURIComponent(scope)}/provider`, {
+    provider,
+  });
