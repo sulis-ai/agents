@@ -1,3 +1,9 @@
+## v0.168.0 — 2026-06-25
+
+**Minor — release-train batch.**
+
+- Portable, Sulis-owned agent context: per-thread message log + tiered context-payload assembler + denyable read-only thread_context tool, wired into live spawn/resume so sessions resume from our durable store rather than the provider transcript. Conforms to the platform thread-sdk contract (local-first hybrid).
+
 ## v0.167.2 — 2026-06-17
 
 **Patch — release-train batch.**
