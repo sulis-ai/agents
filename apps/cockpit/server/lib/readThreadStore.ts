@@ -34,21 +34,10 @@ import { join } from "node:path";
 
 // eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits; the rule's `../../*` pattern is intended to block escapes out of apps/cockpit/, which `import/no-restricted-paths` already enforces correctly)
 import type { TranscriptMessage } from "../../shared/api-types";
-
-/**
- * A ThreadMessage as the durable LocalThreadStore writes it to the JSONL log
- * (`dataclasses.asdict` of `thread_contract.ThreadMessage`). Mirrors the pinned
- * contract field-for-field; we read the fields the raw view needs.
- */
-interface StoredThreadMessage {
-  id: string;
-  participant_id: string;
-  participant_type: "studio_agent" | "user";
-  content: string;
-  role: "question" | "answer" | "observation" | "decision" | null;
-  created_at: string;
-  order: number;
-}
+// WP-002 (BLUE/EP-03) — the durable-message → wire projection is shared with
+// the per-product chat store (LocalChatScopeStore.ts); extracted at the
+// 2-consumer threshold so the on-disk read contract lives once.
+import { projectStoredMessage } from "./projectStoredMessage";
 
 /**
  * Safe-path-component guard, mirroring the store's convention
@@ -107,35 +96,4 @@ export async function readThreadStore(
     if (projected !== null) messages.push(projected);
   }
   return messages;
-}
-
-/**
- * Project one stored ThreadMessage onto a `TranscriptMessage`. Returns `null`
- * for a record missing the required identity fields.
- *
- * Projection (vendor-neutral — no Claude-JSONL structure):
- *   - `uuid`      ← the message id (`{thread_id}-{order}`, stable + unique).
- *   - `timestamp` ← `created_at`.
- *   - `studio_agent` → an `assistant` message carrying its content as a single
- *     text block (the agent/tool record the raw view renders).
- *   - `user`         → a `user` message carrying its content as text.
- */
-function projectStoredMessage(record: unknown): TranscriptMessage | null {
-  if (typeof record !== "object" || record === null) return null;
-  const r = record as Partial<StoredThreadMessage>;
-
-  if (typeof r.id !== "string" || typeof r.created_at !== "string") return null;
-  const content = typeof r.content === "string" ? r.content : "";
-
-  if (r.participant_type === "user") {
-    return { kind: "user", uuid: r.id, timestamp: r.created_at, text: content };
-  }
-  // Default (studio_agent and any other participant) renders as an assistant
-  // record — the durable log is overwhelmingly agent/tool content.
-  return {
-    kind: "assistant",
-    uuid: r.id,
-    timestamp: r.created_at,
-    blocks: [{ kind: "text", text: content }],
-  };
 }
