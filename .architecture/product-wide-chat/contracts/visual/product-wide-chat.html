@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Per-product chat — visual contract (cockpit)</title>
+
+<!-- L-13: the type tokens reference Inter / Satoshi / JetBrains Mono. Load the
+     webfonts the cockpit actually uses so the founder signs off on what they SEE,
+     not on "tokens match". Inter + JetBrains Mono from Google Fonts; Satoshi
+     (display) has no free webfont CDN, so the --font-display stack falls back to
+     system-ui exactly as the cockpit does in environments without the licensed
+     Satoshi face — this mockup shows the true rendered result, not a prettier lie. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<style>
+/* ──────────────────────────────────────────────────────────────────────────
+   TOKENS — copied VERBATIM from apps/cockpit/client/src/tokens.css (v4.2.0).
+   No invented hex. Light :root + dark override block, exactly as the cockpit
+   ships them. (UXD-04 / WPF-07)
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  --background:#fafafa; --foreground:#171717; --card:#ffffff; --card-foreground:#171717;
+  --popover:#ffffff; --popover-foreground:#171717; --muted:#f5f5f5; --muted-foreground:#737373;
+  --secondary:#f5f5f5; --secondary-foreground:#171717; --border:#e5e5e5; --border-muted:#f0f0f0; --input:#e5e5e5;
+  --primary:#2563EB; --primary-foreground:#FFFFFF; --accent:#2D7D90; --accent-foreground:#FFFFFF;
+  --destructive:#DC2626; --destructive-foreground:#FFFFFF; --positive:#16A34A; --positive-foreground:#FFFFFF;
+  --warning:#B45309; --warning-foreground:#121212; --ring:#2563EB; --brand-gold:#C9A962; --brand-depth:#1E3A5F;
+  --bg-positive:#F0FDF4; --bg-positive-border:#BBF7D0; --bg-destructive:#FEF2F2; --bg-destructive-border:#FECACA;
+  --bg-warning:#FFFBEB; --bg-warning-border:#FDE68A;
+  --stage-recon:#8B7355; --stage-specify:#6366F1; --stage-design:#2D7D90; --stage-implement:#2563EB; --stage-review:#9333EA; --stage-ship:#15803D;
+  --radius-interactive:4px; --radius-button:9999px; --radius-container:4px; --radius-badge:9999px; --radius-media:4px;
+  --font-sans:'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display:'Satoshi', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono:'JetBrains Mono', 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
+  --weight-body:400; --weight-heading:300; --weight-label:500;
+  --bg-card:var(--card); --bg-muted:var(--muted); --border-light:var(--border-muted);
+  --font:var(--font-sans); --radius:var(--radius-container); --text:var(--foreground);
+  --text-secondary:#525252; --text-muted:var(--muted-foreground);
+  --shadow-float:0 6px 20px rgba(23,23,23,0.08);
+}
+:root[data-theme="dark"] {
+  --background:#121419; --foreground:#e8e6e3; --card:#262a32; --card-foreground:#e8e6e3;
+  --popover:#2b3038; --popover-foreground:#e8e6e3; --muted:#1b1e24; --muted-foreground:#a3a09b;
+  --secondary:#2f343d; --secondary-foreground:#e8e6e3; --border:#3a3f4a; --border-muted:#2a2e36; --input:#3a3f4a;
+  --primary:#5b9bff; --primary-foreground:#0b1220; --accent:#4fb3c9; --accent-foreground:#07181c;
+  --destructive:#f0686b; --destructive-foreground:#1a0b0c; --positive:#4caf68; --positive-foreground:#07210f;
+  --warning:#ffb627; --warning-foreground:#1f1402; --ring:#5b9bff; --brand-gold:#d8bd7e; --brand-depth:#6f9cc9;
+  --stage-recon:#7fb0ff; --stage-specify:#f0c75a; --stage-design:#b79cff; --stage-implement:#9bd86a; --stage-review:#f2a368; --stage-ship:#73d391;
+  --bg-positive:color-mix(in srgb, var(--positive) 16%, var(--card));
+  --bg-positive-border:color-mix(in srgb, var(--positive) 45%, var(--card));
+  --bg-destructive:color-mix(in srgb, var(--destructive) 16%, var(--card));
+  --bg-destructive-border:color-mix(in srgb, var(--destructive) 45%, var(--card));
+  --bg-warning:color-mix(in srgb, var(--warning) 24%, var(--card));
+  --bg-warning-border:color-mix(in srgb, var(--warning) 60%, var(--card));
+  --text-secondary:var(--muted-foreground);
+  --shadow-float:0 6px 20px rgba(0,0,0,0.55);
+}
+
+/* ── Page chrome for the mockup doc itself (not the product) ─────────────── */
+* { box-sizing:border-box; }
+body{ margin:0; background:var(--background); color:var(--foreground);
+  font-family:var(--font-sans); font-weight:var(--weight-body); line-height:1.5;
+  -webkit-font-smoothing:antialiased; }
+h1,h2,h3{ font-family:var(--font-display); font-weight:var(--weight-heading); margin:0; }
+.doc{ max-width:1180px; margin:0 auto; padding:28px 24px 80px; }
+.doc-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:8px; flex-wrap:wrap; }
+.doc h1{ font-size:26px; }
+.doc .lede{ color:var(--muted-foreground); font-size:14px; max-width:780px; margin:6px 0 0; }
+.themeBtn{ font-family:var(--font-sans); font-size:13px; font-weight:var(--weight-label);
+  border:1px solid var(--border); background:var(--card); color:var(--foreground);
+  border-radius:var(--radius-button); padding:8px 16px; cursor:pointer; }
+.themeBtn:focus-visible{ outline:2px solid var(--ring); outline-offset:2px; }
+.note{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius-container);
+  padding:14px 16px; font-size:13px; color:var(--text-secondary); margin:18px 0; }
+.note strong{ color:var(--foreground); }
+.note.decision{ border-color:var(--accent); }
+.note.decision .dtag{ display:inline-block; font-size:10px; font-weight:var(--weight-label); letter-spacing:.05em;
+  text-transform:uppercase; padding:2px 8px; border-radius:var(--radius-badge); margin-bottom:8px;
+  background:var(--accent); color:var(--accent-foreground); }
+.sectionLabel{ font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--muted-foreground); font-weight:var(--weight-label); margin:40px 0 6px; }
+.walk{ font-size:13px; color:var(--text-secondary); max-width:840px; margin:0 0 14px; }
+.walk b{ color:var(--foreground); font-weight:var(--weight-label); }
+
+/* ════════════════════════════════════════════════════════════════════════
+   THE PRODUCT CHROME — frame that simulates the cockpit window
+   ════════════════════════════════════════════════════════════════════════ */
+.app{ border:1px solid var(--border); border-radius:var(--radius-container); overflow:hidden;
+  background:var(--background); box-shadow:var(--shadow-float); margin-bottom:6px; }
+
+/* Top bar — matches WorkspaceTopBar: 48px, start button, switcher, tab strip, gear+toggle */
+.topbar{ height:48px; display:flex; align-items:center; gap:10px; padding:0 10px;
+  background:var(--card); border-bottom:1px solid var(--border); }
+.startBtn{ display:inline-flex; align-items:center; gap:7px; height:32px; padding:0 12px;
+  background:var(--primary); color:var(--primary-foreground); border:none;
+  border-radius:var(--radius-button); font-family:var(--font-sans); font-size:13px;
+  font-weight:var(--weight-label); cursor:pointer; }
+.startBtn svg{ width:15px; height:15px; }
+.startBtn .hint{ font-size:11px; opacity:.8; }
+
+/* THE PRODUCT SWITCHER — the load-bearing element this pass elevates. Picking a
+   product here re-scopes BOTH the board AND the chat. Reuses the real
+   ProductControl scope-trigger idiom: monogram/grid/dashed tile + "Viewing
+   <scope>" + chevron. (CL-05 — one product vocabulary; EP-03 — reuse, not new.) */
+.pswitch{ display:inline-flex; align-items:center; gap:9px; height:34px; padding:0 10px;
+  border:1px solid var(--border); background:var(--card); border-radius:var(--radius);
+  cursor:pointer; font-family:var(--font-sans); position:relative; }
+.pswitch[aria-expanded="true"]{ background:var(--muted); border-color:var(--input); }
+.tile{ width:22px; height:22px; flex:none; border-radius:5px; display:grid; place-items:center;
+  border:1px solid var(--border); font-size:10px; font-weight:700; background:var(--muted); color:var(--text-secondary); }
+.tile.all svg{ width:13px; height:13px; color:var(--text-secondary); }
+.tile.none{ background:transparent; border-style:dashed; border-color:var(--input); color:var(--text-muted); }
+.tile.none svg{ width:11px; height:11px; }
+.pswitch .pmeta{ display:flex; flex-direction:column; line-height:1.15; text-align:left; }
+.pswitch .plabel{ font-size:10px; color:var(--muted-foreground); }
+.pswitch .pname{ font-size:13px; font-weight:var(--weight-label); color:var(--foreground); }
+.pswitch .chev{ width:13px; height:13px; color:var(--muted-foreground); }
+/* the popover that opens from the switcher — shown OPEN in the hero so the founder
+   sees the scope list that drives both board + chat */
+.pmenu{ position:absolute; top:40px; left:0; width:260px; background:var(--popover);
+  border:1px solid var(--border); border-radius:var(--radius-container); box-shadow:var(--shadow-float);
+  padding:6px; z-index:8; }
+.pmsearch{ display:flex; align-items:center; gap:7px; padding:6px 8px; border-bottom:1px solid var(--border-muted);
+  margin:0 0 5px; color:var(--muted-foreground); }
+.pmsearch svg{ width:14px; height:14px; }
+.pmsearch input{ border:none; background:transparent; outline:none; font-family:var(--font-sans);
+  font-size:12px; color:var(--foreground); width:100%; }
+.pmitem{ display:flex; align-items:center; gap:9px; width:100%; padding:7px 8px; border:none;
+  background:transparent; border-radius:var(--radius-interactive); cursor:pointer; text-align:left;
+  font-family:var(--font-sans); }
+.pmitem:hover{ background:var(--muted); }
+.pmitem.active{ background:var(--muted); }
+.pmitem .pmname{ font-size:12px; font-weight:var(--weight-label); color:var(--foreground); }
+.pmitem .pmcount{ margin-left:auto; font-size:11px; color:var(--muted-foreground); }
+.pmitem .tick{ width:15px; height:15px; color:var(--accent); flex:none; margin-left:auto; }
+.pmitem.active .pmcount{ margin-left:0; }
+.pmsep{ height:1px; background:var(--border-muted); margin:5px 2px; }
+
+.tabs{ display:flex; align-items:center; gap:4px; margin-left:4px; }
+.tab{ display:inline-flex; align-items:center; gap:7px; height:32px; padding:0 11px;
+  border-radius:var(--radius-interactive); font-size:13px; color:var(--text-secondary);
+  cursor:pointer; border:1px solid transparent; }
+.tab.active{ background:var(--muted); color:var(--foreground); border-color:var(--border); }
+.tab svg{ width:15px; height:15px; }
+.tab .dot{ width:8px; height:8px; border-radius:50%; }
+.spacer{ flex:1; }
+.iconbtn{ width:32px; height:32px; display:grid; place-items:center; border-radius:var(--radius-interactive);
+  border:1px solid transparent; background:transparent; color:var(--muted-foreground); cursor:pointer; }
+.iconbtn:hover{ background:var(--muted); }
+.iconbtn svg{ width:17px; height:17px; }
+.chatToggle{ display:inline-flex; align-items:center; gap:7px; height:32px; padding:0 12px;
+  border:1px solid var(--border); background:var(--card); color:var(--foreground);
+  border-radius:var(--radius-button); font-size:13px; font-weight:var(--weight-label); cursor:pointer; }
+.chatToggle svg{ width:15px; height:15px; }
+.chatToggle .liveDot{ width:7px; height:7px; border-radius:50%; background:var(--accent); }
+button:focus-visible, [tabindex]:focus-visible, a:focus-visible, .pswitch:focus-visible{ outline:2px solid var(--ring); outline-offset:2px; }
+
+/* The two-region body: board (central, primary) + chat dock (right) */
+.body{ display:grid; grid-template-columns:1fr 384px; min-height:560px; }
+.body.collapsed{ grid-template-columns:1fr 0; }
+
+/* ── Board (the OUTCOME surface — kept central, AI-01) ──────────────────── */
+.board{ padding:14px 16px; overflow:auto; background:var(--background); }
+.scopeStrip{ font-size:12px; color:var(--muted-foreground); margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.scopeStrip b{ color:var(--foreground); font-weight:var(--weight-label); }
+.scopeStrip .clear{ display:inline-flex; align-items:center; gap:4px; font-size:11px; color:var(--muted-foreground);
+  border:1px solid var(--border); background:var(--card); border-radius:var(--radius-button); padding:2px 8px; cursor:pointer; }
+.scopeStrip .clear svg{ width:11px; height:11px; }
+.lanes{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; align-items:start; }
+.lane h4{ display:flex; align-items:center; gap:7px; font-family:var(--font-sans); font-size:12px;
+  font-weight:var(--weight-label); color:var(--text-secondary); margin:0 0 8px; }
+.lane h4 .ldot{ width:9px; height:9px; border-radius:50%; }
+.lane h4 .cnt{ margin-left:auto; font-size:11px; color:var(--muted-foreground); font-weight:400; }
+.ccard{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius-container);
+  padding:11px 12px; margin-bottom:10px; }
+.ccard .ctitle{ font-size:13px; font-weight:var(--weight-label); }
+.ccard .cmeta{ display:flex; align-items:center; gap:8px; margin-top:8px; font-size:11px; color:var(--muted-foreground); }
+/* on the All-products board, each card shows WHICH product it belongs to */
+.ccard .pchipMini{ display:inline-flex; align-items:center; gap:5px; font-size:10px; color:var(--text-secondary);
+  border:1px solid var(--border); border-radius:var(--radius-badge); padding:2px 7px; }
+.ccard .pchipMini .t{ width:14px; height:14px; border-radius:3px; display:grid; place-items:center;
+  font-size:8px; font-weight:700; background:var(--muted); color:var(--text-secondary); }
+.ccard .pchipMini .t.none{ background:transparent; border:1px dashed var(--input); }
+.cbadge{ display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:2px 8px;
+  border-radius:var(--radius-badge); font-weight:var(--weight-label); }
+.ccard.fromChat{ border-color:var(--accent); }
+.fromChatTag{ display:inline-flex; align-items:center; gap:4px; font-size:10px; color:var(--accent);
+  font-weight:var(--weight-label); }
+.fromChatTag svg{ width:11px; height:11px; }
+
+/* ── Chat dock (the COORDINATION surface) ──────────────────────────────── */
+.chat{ display:flex; flex-direction:column; background:var(--card); border-left:1px solid var(--border);
+  min-width:0; }
+/* The chat header now ECHOES the active product's identity — same monogram tile
+   the switcher uses — so you always know WHOSE chat you're in. (The founder's ask.) */
+.chatHead{ display:flex; align-items:center; gap:9px; padding:9px 12px; border-bottom:1px solid var(--border-muted); }
+.chatHead .ptile{ width:24px; height:24px; flex:none; border-radius:6px; display:grid; place-items:center;
+  border:1px solid var(--border); font-size:10px; font-weight:700; background:var(--muted); color:var(--text-secondary); }
+.chatHead .ptile.all svg{ width:14px; height:14px; }
+.chatHead .ptile.none{ background:transparent; border-style:dashed; border-color:var(--input); color:var(--text-muted); }
+.chatHead .ptile.none svg{ width:12px; height:12px; }
+.chatHead .htxt{ min-width:0; }
+.chatHead .title{ font-size:13px; font-weight:var(--weight-label); }
+.chatHead .sub{ font-size:11px; color:var(--muted-foreground); }
+.chatHead .right{ margin-left:auto; display:flex; align-items:center; gap:8px; }
+.agentStatus{ display:inline-flex; align-items:center; gap:6px; font-size:11px;
+  padding:2px 8px; border-radius:var(--radius-badge); font-weight:var(--weight-label); }
+.agentStatus.working{ background:var(--bg-warning); border:1px solid var(--bg-warning-border); color:var(--warning); }
+.agentStatus.idle{ background:var(--muted); border:1px solid var(--border); color:var(--muted-foreground); }
+.agentStatus .sdot{ width:7px; height:7px; border-radius:50%; background:currentColor; }
+
+.thread{ flex:1; overflow:auto; padding:16px 14px; display:flex; flex-direction:column; gap:12px; }
+.msg{ font-size:13px; line-height:1.55; }
+.msg.you{ align-self:flex-end; max-width:85%; background:var(--muted); border:1px solid var(--border);
+  border-radius:var(--radius-container); padding:9px 12px; }
+.msg.sulis{ align-self:stretch; color:var(--foreground); }
+.msg.sulis .who{ display:flex; align-items:center; gap:6px; font-size:11px; color:var(--muted-foreground);
+  font-weight:var(--weight-label); margin-bottom:4px; }
+.msg.sulis .who .ai{ display:inline-flex; align-items:center; gap:4px; padding:1px 6px;
+  border-radius:var(--radius-badge); background:var(--muted); border:1px solid var(--border);
+  color:var(--text-secondary); font-size:10px; }
+.caret{ display:inline-block; width:2px; height:1.05em; margin-left:2px; vertical-align:text-bottom;
+  background:var(--accent); animation:blink 1s steps(2,start) infinite; }
+@keyframes blink{ to{ visibility:hidden; } }
+
+.activity{ border:1px solid var(--accent); border-radius:var(--radius-container);
+  background:var(--bg-positive); padding:10px 12px; font-size:12px; }
+.activity .arow{ display:flex; align-items:center; gap:8px; color:var(--foreground); }
+.activity .arow svg{ width:14px; height:14px; color:var(--positive); flex:none; }
+.activity .link{ display:inline-flex; align-items:center; gap:5px; margin-top:8px; font-size:12px;
+  font-weight:var(--weight-label); color:var(--primary); cursor:pointer; }
+.activity .link svg{ width:13px; height:13px; }
+
+.gate{ border:1px solid var(--border); border-radius:var(--radius-container); background:var(--muted);
+  padding:11px 12px; font-size:12px; }
+.gate p{ margin:0 0 9px; color:var(--text-secondary); }
+.gate .acts{ display:flex; gap:8px; }
+.btnPrimary{ background:var(--primary); color:var(--primary-foreground); border:none;
+  border-radius:var(--radius-button); padding:6px 14px; font-size:12px; font-weight:var(--weight-label);
+  font-family:var(--font-sans); cursor:pointer; }
+.btnGhost{ background:var(--card); color:var(--foreground); border:1px solid var(--border);
+  border-radius:var(--radius-button); padding:6px 14px; font-size:12px; font-weight:var(--weight-label);
+  font-family:var(--font-sans); cursor:pointer; }
+
+.honesty{ display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:var(--weight-label);
+  color:var(--muted-foreground); background:var(--muted); border:1px solid var(--border);
+  border-radius:var(--radius-interactive); padding:3px 9px; align-self:flex-start; }
+.honesty svg{ width:12px; height:12px; }
+
+/* ── Composer (dual-mode input, AI-02 + the agent picker, AI-07) ────────── */
+.composerWrap{ border-top:1px solid var(--border-muted); padding:10px 12px 12px; }
+.chips{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+.chip{ font-size:11px; padding:5px 10px; border:1px solid var(--border); background:var(--card);
+  color:var(--text-secondary); border-radius:var(--radius-button); cursor:pointer; font-family:var(--font-sans); }
+.chip:hover{ border-color:var(--primary); color:var(--foreground); }
+.field{ border:1px solid var(--border); border-radius:var(--radius-container); background:var(--card);
+  padding:8px 10px; }
+.field textarea{ width:100%; border:none; resize:none; background:transparent; color:var(--foreground);
+  font-family:var(--font-sans); font-size:13px; line-height:1.5; outline:none; min-height:38px; }
+.field textarea::placeholder{ color:var(--muted-foreground); }
+.composerFoot{ display:flex; align-items:center; gap:8px; margin-top:8px; }
+.slashhint{ font-size:10px; color:var(--muted-foreground); }
+.slashhint kbd{ font-family:var(--font-mono); font-size:10px; background:var(--muted);
+  border:1px solid var(--border); border-radius:3px; padding:0 4px; }
+.composerFoot .grow{ flex:1; }
+.send{ background:var(--primary); color:var(--primary-foreground); border:none;
+  border-radius:var(--radius-button); padding:7px 16px; font-size:12px; font-weight:var(--weight-label);
+  font-family:var(--font-sans); cursor:pointer; }
+
+/* THE AGENT PICKER — Claude ↔ Antigravity, at the FOOT of the composer (AI-07). */
+.agentPick{ position:relative; }
+.agentTrigger{ display:inline-flex; align-items:center; gap:7px; height:30px; padding:0 9px;
+  border:1px solid var(--border); background:var(--card); border-radius:var(--radius-button);
+  cursor:pointer; font-family:var(--font-sans); }
+.agentTrigger .glyph{ width:18px; height:18px; border-radius:5px; display:grid; place-items:center;
+  background:var(--muted); color:var(--text-secondary); font-size:9px; font-weight:600; }
+.agentTrigger .alabel{ font-size:11px; color:var(--muted-foreground); }
+.agentTrigger .aname{ font-size:12px; font-weight:var(--weight-label); }
+.agentTrigger .chev{ width:12px; height:12px; color:var(--muted-foreground); }
+.agentMenu{ position:absolute; bottom:38px; left:0; width:268px; background:var(--popover);
+  border:1px solid var(--border); border-radius:var(--radius-container); box-shadow:var(--shadow-float);
+  padding:6px; z-index:5; }
+.amitem{ display:flex; align-items:flex-start; gap:9px; width:100%; padding:8px 8px; border:none;
+  background:transparent; border-radius:var(--radius-interactive); cursor:pointer; text-align:left;
+  font-family:var(--font-sans); }
+.amitem:hover{ background:var(--muted); }
+.amitem .glyph{ width:24px; height:24px; border-radius:6px; display:grid; place-items:center;
+  background:var(--muted); color:var(--text-secondary); font-size:10px; font-weight:600; flex:none; }
+.amitem .atxt{ min-width:0; }
+.amitem .an{ font-size:12px; font-weight:var(--weight-label); color:var(--foreground); display:flex; align-items:center; gap:6px; }
+.amitem .ad{ font-size:11px; color:var(--muted-foreground); margin-top:1px; }
+.amitem .tick{ margin-left:auto; width:15px; height:15px; color:var(--accent); flex:none; }
+.amsep{ height:1px; background:var(--border-muted); margin:5px 2px; }
+.amfoot{ font-size:11px; color:var(--muted-foreground); padding:6px 8px 4px; }
+
+/* ── Two-product comparison row (Clinics chat vs Bakery Ops chat) ────────── */
+.compareRow{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.miniApp{ border:1px solid var(--border); border-radius:var(--radius-container); overflow:hidden;
+  background:var(--card); box-shadow:var(--shadow-float); }
+.miniApp .miniBar{ height:38px; display:flex; align-items:center; gap:8px; padding:0 9px;
+  background:var(--card); border-bottom:1px solid var(--border); }
+.miniApp .pswitch{ height:28px; }
+.miniApp .tile{ width:18px; height:18px; font-size:8px; }
+.miniApp .pswitch .pname{ font-size:11px; }
+.miniApp .pswitch .plabel{ font-size:9px; }
+.miniApp .miniBody{ display:grid; grid-template-columns:1fr 200px; min-height:300px; }
+.miniApp .miniBoard{ background:var(--background); padding:10px; }
+.miniApp .miniBoard .ttl{ font-size:11px; color:var(--muted-foreground); margin-bottom:8px; }
+.miniApp .miniBoard .ttl b{ color:var(--foreground); }
+.miniApp .miniBoard .mc{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius-interactive);
+  padding:7px 9px; margin-bottom:7px; font-size:11px; }
+.miniApp .miniChat{ background:var(--card); border-left:1px solid var(--border); display:flex; flex-direction:column; }
+.miniApp .miniChat .mch{ display:flex; align-items:center; gap:6px; padding:7px 9px; border-bottom:1px solid var(--border-muted); }
+.miniApp .miniChat .mch .ptile{ width:18px; height:18px; font-size:8px; }
+.miniApp .miniChat .mch .mt{ font-size:10px; font-weight:var(--weight-label); }
+.miniApp .miniChat .mch .ms{ font-size:9px; color:var(--muted-foreground); }
+.miniApp .miniChat .mbody{ flex:1; padding:10px 9px; display:flex; flex-direction:column; gap:8px; }
+.miniApp .miniChat .myou{ align-self:flex-end; max-width:88%; background:var(--muted); border:1px solid var(--border);
+  border-radius:var(--radius-interactive); padding:6px 8px; font-size:10px; }
+.miniApp .miniChat .msul{ font-size:10px; color:var(--text-secondary); }
+.miniCaption{ font-size:11px; color:var(--muted-foreground); margin-top:8px; text-align:center; }
+.miniCaption b{ color:var(--foreground); font-weight:var(--weight-label); }
+
+/* ── Empty / loading / error states ── */
+.states{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:12px; }
+.stateCard{ border:1px solid var(--border); border-radius:var(--radius-container); overflow:hidden;
+  background:var(--card); display:flex; flex-direction:column; min-height:300px; }
+.stateCard .sh{ padding:8px 11px; border-bottom:1px solid var(--border-muted); font-size:12px;
+  font-weight:var(--weight-label); display:flex; align-items:center; gap:8px; }
+.stateCard .sb{ flex:1; padding:18px 14px; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; text-align:center; gap:10px; }
+.stateCard .sb .icon{ width:34px; height:34px; color:var(--muted-foreground); }
+.stateCard .sb h5{ font-family:var(--font-sans); font-size:13px; font-weight:var(--weight-label); margin:0; }
+.stateCard .sb p{ font-size:12px; color:var(--muted-foreground); margin:0; max-width:240px; }
+.skel{ width:100%; display:flex; flex-direction:column; gap:9px; align-items:stretch; padding:0 4px; }
+.skelLine{ height:12px; border-radius:var(--radius-interactive);
+  background:linear-gradient(90deg,var(--muted),var(--border-muted),var(--muted));
+  background-size:200% 100%; animation:shimmer 1.3s linear infinite; }
+@keyframes shimmer{ to{ background-position:-200% 0; } }
+.skelLine.short{ width:60%; } .skelLine.med{ width:80%; }
+.errBox{ background:var(--bg-destructive); border:1px solid var(--bg-destructive-border);
+  border-radius:var(--radius-container); padding:12px; font-size:12px; color:var(--foreground); width:100%; }
+.errBox .et{ font-weight:var(--weight-label); display:flex; align-items:center; gap:7px; color:var(--foreground); }
+.errBox .et svg{ width:14px; height:14px; color:var(--destructive); }
+.errBox p{ margin:7px 0 10px; color:var(--text-secondary); }
+
+@media (prefers-reduced-motion: reduce){
+  .caret, .skelLine{ animation:none; }
+  .skelLine{ background:var(--muted); }
+}
+
+/* phasing */
+.phase{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:10px; }
+.phaseCard{ border:1px solid var(--border); border-radius:var(--radius-container); padding:14px; background:var(--card); }
+.phaseCard h3{ font-family:var(--font-sans); font-size:13px; font-weight:var(--weight-label); margin:0 0 8px;
+  display:flex; align-items:center; gap:8px; }
+.phaseCard ul{ margin:0; padding-left:18px; font-size:12px; color:var(--text-secondary); line-height:1.7; }
+.pill{ font-size:10px; padding:2px 8px; border-radius:var(--radius-badge); font-weight:var(--weight-label); }
+.pill.now{ background:var(--bg-positive); border:1px solid var(--bg-positive-border); color:var(--positive); }
+.pill.later{ background:var(--muted); border:1px solid var(--border); color:var(--muted-foreground); }
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div>
+      <h1>Per-product chat — one conversation per product, switched like the board</h1>
+      <p class="lede">Each product has its <b>own</b> chat. You switch products with the <b>same top-left switcher
+      you already use for the board</b> — and when you do, the board <b>and</b> the chat both move to that product
+      together. Pick "Clinics" and you see the Clinics board next to the Clinics conversation. Which AI powers the
+      chat (Claude or Antigravity) is still picked inside the chat. Rendered with the cockpit's real colours and
+      fonts, light and dark.</p>
+    </div>
+    <button class="themeBtn" id="themeBtn" type="button">Switch to dark</button>
+  </div>
+
+  <div class="note">
+    <strong>The correction this pass makes.</strong> Two earlier passes mis-scoped the chat — first as one
+    change, then as one global chat for everything. Both were wrong. The chat is scoped <strong>per
+    product</strong>, and you move between products' chats with the <strong>existing product switcher</strong> —
+    exactly the way you already move the board. One switch moves both. Each product keeps its own conversation
+    history. The Claude↔Antigravity choice still lives at the foot of the composer.
+  </div>
+
+  <!-- ════════════════ 1 · The switcher driving BOTH board + chat ════════════════ -->
+  <div class="sectionLabel">1 · One switcher, both surfaces — the everyday view (Clinics selected)</div>
+  <p class="walk"><b>What you'd do:</b> pick a product in the top-left switcher (shown open here). That single
+  choice scopes <b>the board on the left</b> and swaps in <b>that product's chat on the right</b> — its own history,
+  its own thread. The chat header shows the same product tile as the switcher, so you always know whose chat you're
+  in. Type into the chat; when your words mean "do some work", a <b>card appears on this product's board</b>.</p>
+
+  <div class="app">
+    <header class="topbar">
+      <button class="startBtn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Start something new <span class="hint">⌘N</span>
+      </button>
+
+      <!-- THE PRODUCT SWITCHER — shown OPEN so the founder sees the list that moves both surfaces -->
+      <div class="pswitch" role="button" tabindex="0" aria-haspopup="menu" aria-expanded="true" aria-label="Viewing Clinics, 6 changes. Switch product.">
+        <span class="tile">CL</span>
+        <span class="pmeta"><span class="plabel">Viewing</span><span class="pname">Clinics</span></span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        <div class="pmenu" role="presentation">
+          <div class="pmsearch">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" placeholder="Find a product…" aria-label="Find a product" />
+          </div>
+          <div role="menu" aria-label="Switch product (moves the board and the chat together)">
+            <button class="pmitem" role="menuitemradio" aria-checked="false" type="button">
+              <span class="tile all"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="6" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="18" cy="6" r="1.6"/><circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/><circle cx="6" cy="18" r="1.6"/><circle cx="12" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/></svg></span>
+              <span class="pmname">All products</span><span class="pmcount">23</span>
+            </button>
+            <button class="pmitem" role="menuitemradio" aria-checked="false" type="button">
+              <span class="tile none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+              <span class="pmname">Unassigned</span><span class="pmcount">4</span>
+            </button>
+            <button class="pmitem active" role="menuitemradio" aria-checked="true" type="button">
+              <span class="tile">CL</span>
+              <span class="pmname">Clinics</span><span class="pmcount">6</span>
+              <svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
+            <button class="pmitem" role="menuitemradio" aria-checked="false" type="button">
+              <span class="tile">BO</span>
+              <span class="pmname">Bakery Ops</span><span class="pmcount">9</span>
+            </button>
+            <button class="pmitem" role="menuitemradio" aria-checked="false" type="button">
+              <span class="tile">FL</span>
+              <span class="pmname">Fleet Logistics</span><span class="pmcount">4</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <nav class="tabs" aria-label="Open tabs">
+        <span class="tab active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Board</span>
+        <span class="tab"><span class="dot" style="background:var(--stage-implement)"></span>Patient intake form</span>
+      </nav>
+      <span class="spacer"></span>
+      <button class="chatToggle" id="chatToggleBtn" type="button" aria-pressed="true" aria-label="Hide chat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Chat <span class="liveDot" title="An agent is working"></span>
+      </button>
+      <span class="iconbtn" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+    </header>
+
+    <div class="body" id="appBody">
+      <!-- BOARD (central, primary) — scoped to Clinics -->
+      <div class="board">
+        <div class="scopeStrip">Viewing <b>Clinics</b> · 6 changes</div>
+        <div class="lanes">
+          <div class="lane">
+            <h4><span class="ldot" style="background:var(--stage-design)"></span>Design <span class="cnt">2</span></h4>
+            <div class="ccard">
+              <div class="ctitle">Appointment reminders</div>
+              <div class="cmeta"><span class="cbadge" style="background:var(--bg-warning);border:1px solid var(--bg-warning-border);color:var(--warning)">Waiting on you</span></div>
+            </div>
+            <div class="ccard fromChat">
+              <div class="ctitle">Patient intake form</div>
+              <div class="cmeta">
+                <span class="fromChatTag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Started from chat</span>
+              </div>
+            </div>
+          </div>
+          <div class="lane">
+            <h4><span class="ldot" style="background:var(--stage-implement)"></span>Implement <span class="cnt">3</span></h4>
+            <div class="ccard"><div class="ctitle">Booking calendar sync</div></div>
+            <div class="ccard"><div class="ctitle">SMS confirmation copy</div></div>
+            <div class="ccard"><div class="ctitle">Clinician roster import</div></div>
+          </div>
+          <div class="lane">
+            <h4><span class="ldot" style="background:var(--stage-ship)"></span>Ship <span class="cnt">1</span></h4>
+            <div class="ccard"><div class="ctitle">Waiting-room screen</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHAT DOCK — the CLINICS conversation. Header echoes the Clinics tile. -->
+      <aside class="chat" aria-label="Clinics chat">
+        <div class="chatHead">
+          <span class="ptile">CL</span>
+          <div class="htxt">
+            <div class="title">Clinics chat</div>
+            <div class="sub">Your conversation for this product</div>
+          </div>
+          <span class="right">
+            <span class="agentStatus working"><span class="sdot"></span>Working…</span>
+          </span>
+        </div>
+
+        <div class="thread">
+          <div class="msg you">Can you set up a patient intake form for the new clinic?</div>
+
+          <div class="msg sulis">
+            <div class="who">Sulis <span class="ai"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>Claude</span></div>
+            That's a piece of work, so I'll give it its own change under <b>Clinics</b> — tracked, self-contained,
+            and ready to turn into a working form. Nothing happens until you say go.
+          </div>
+
+          <div class="gate">
+            <p>Start a change for <b>“Patient intake form”</b> under Clinics?</p>
+            <div class="acts">
+              <button class="btnPrimary" type="button">Start this change</button>
+              <button class="btnGhost" type="button">Not now</button>
+            </div>
+          </div>
+
+          <div class="activity">
+            <div class="arow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              Started <b style="margin:0 4px">Patient intake form</b> — it's on the Clinics board now.
+            </div>
+            <span class="link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>Open the card</span>
+          </div>
+
+          <span class="honesty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>I only set it up — I won't touch it until you open it</span>
+        </div>
+
+        <div class="composerWrap">
+          <div class="chips">
+            <button class="chip" type="button">What needs my attention in Clinics?</button>
+            <button class="chip" type="button">What's in flight?</button>
+            <button class="chip" type="button">Start something new</button>
+          </div>
+          <div class="field">
+            <textarea placeholder="Ask anything about Clinics, or tell me what to start…   —   type / for commands"></textarea>
+          </div>
+          <div class="composerFoot">
+            <div class="agentPick">
+              <button class="agentTrigger" id="agentTrigger" type="button" aria-haspopup="menu" aria-expanded="true" aria-label="Choose which AI powers this chat">
+                <span class="glyph">CL</span>
+                <span class="alabel">Powered by</span><span class="aname">Claude</span>
+                <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="agentMenu" role="menu" aria-label="Choose the AI">
+                <button class="amitem" role="menuitemradio" aria-checked="true" type="button">
+                  <span class="glyph">CL</span>
+                  <span class="atxt"><span class="an">Claude</span><span class="ad">Careful, conversational. The default.</span></span>
+                  <svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                </button>
+                <button class="amitem" role="menuitemradio" aria-checked="false" type="button">
+                  <span class="glyph">AG</span>
+                  <span class="atxt"><span class="an">Antigravity</span><span class="ad">Faster, more autonomous runs.</span></span>
+                </button>
+                <div class="amsep" role="separator"></div>
+                <div class="amfoot">Switching applies to new work in this chat. Work already running keeps the agent it started with.</div>
+              </div>
+            </div>
+            <span class="grow"></span>
+            <span class="slashhint"><kbd>/</kbd> commands · <kbd>Enter</kbd> send</span>
+            <button class="send" type="button">Send</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <p class="miniCaption">The agent picker (open above) and switcher (open above) are both shown expanded so the
+  whole model is visible in one frame. In the live cockpit each opens on click.</p>
+
+  <!-- ════════════════ 2 · Two products, two conversations ════════════════ -->
+  <div class="sectionLabel">2 · Each product has its own chat — switch the product, swap the conversation</div>
+  <p class="walk">The same surface, with the switcher set to two different products. <b>The board changes and the
+  chat changes together.</b> Clinics' chat is about patient intake; Bakery Ops' chat is about a completely
+  separate conversation — its own history, never mixed. The header tile tells you which is which at a glance.</p>
+
+  <div class="compareRow">
+    <!-- Clinics mini -->
+    <div>
+      <div class="miniApp">
+        <div class="miniBar">
+          <div class="pswitch" aria-label="Viewing Clinics">
+            <span class="tile">CL</span>
+            <span class="pmeta"><span class="plabel">Viewing</span><span class="pname">Clinics</span></span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+        </div>
+        <div class="miniBody">
+          <div class="miniBoard">
+            <div class="ttl">Viewing <b>Clinics</b> · 6 changes</div>
+            <div class="mc">Appointment reminders</div>
+            <div class="mc">Patient intake form</div>
+            <div class="mc">Booking calendar sync</div>
+          </div>
+          <div class="miniChat">
+            <div class="mch"><span class="ptile">CL</span><div><div class="mt">Clinics chat</div><div class="ms">Claude</div></div></div>
+            <div class="mbody">
+              <div class="myou">Set up a patient intake form?</div>
+              <div class="msul">Giving it its own change under Clinics…</div>
+              <div class="myou">And chase the reminder copy.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="miniCaption"><b>Clinics</b> selected → Clinics board + Clinics conversation.</p>
+    </div>
+
+    <!-- Bakery Ops mini -->
+    <div>
+      <div class="miniApp">
+        <div class="miniBar">
+          <div class="pswitch" aria-label="Viewing Bakery Ops">
+            <span class="tile">BO</span>
+            <span class="pmeta"><span class="plabel">Viewing</span><span class="pname">Bakery Ops</span></span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+        </div>
+        <div class="miniBody">
+          <div class="miniBoard">
+            <div class="ttl">Viewing <b>Bakery Ops</b> · 9 changes</div>
+            <div class="mc">Daily wastage report</div>
+            <div class="mc">Supplier price import</div>
+            <div class="mc">Oven schedule board</div>
+          </div>
+          <div class="miniChat">
+            <div class="mch"><span class="ptile">BO</span><div><div class="mt">Bakery Ops chat</div><div class="ms">Antigravity</div></div></div>
+            <div class="mbody">
+              <div class="myou">How much did we waste last week?</div>
+              <div class="msul">Pulling the wastage numbers for Bakery Ops…</div>
+              <div class="myou">Start the supplier price import.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="miniCaption"><b>Bakery Ops</b> selected → its own board + its own conversation. Even its agent
+      choice (Antigravity) is remembered per product.</p>
+    </div>
+  </div>
+
+  <!-- ════════════════ 3 · The aggregate scopes — All / Unassigned ════════════════ -->
+  <div class="sectionLabel">3 · The "All products" and "Unassigned" scopes — what the chat shows there</div>
+
+  <div class="note decision">
+    <span class="dtag">Design decision — your call</span>
+    <strong>What should the chat be when you're not inside a single product?</strong> The switcher has two scopes
+    that aren't a single product: <strong>All products</strong> (everything) and <strong>Unassigned</strong>
+    (work not yet filed under a product). The recommended answer, shown below:
+    <ul style="margin:9px 0 0; padding-left:18px; line-height:1.7;">
+      <li><strong>All products → an overview chat.</strong> One cross-product conversation with Sulis: "what
+      needs me across everything?", "what shipped this week?". It can start work, and because no single product
+      is selected, it asks <em>which product</em> the new work belongs to before it files the card. It does
+      <strong>not</strong> blend the per-product histories into one stream — those stay separate.</li>
+      <li><strong>Unassigned → a triage chat.</strong> The conversation here is about the loose work that hasn't
+      been filed yet: "file these under a product", "what's this orphaned change?". Its natural job is sorting,
+      not building.</li>
+    </ul>
+    <span style="display:block; margin-top:9px;">This keeps every chat to one clear job and avoids a single
+    firehose. Tell me if you'd rather "All products" be a quieter read-only overview with no chat at all — that's
+    the main fork here.</span>
+  </div>
+
+  <div class="compareRow">
+    <!-- All products mini -->
+    <div>
+      <div class="miniApp">
+        <div class="miniBar">
+          <div class="pswitch" aria-label="Viewing All products">
+            <span class="tile all"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="6" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="18" cy="6" r="1.6"/><circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/><circle cx="6" cy="18" r="1.6"/><circle cx="12" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/></svg></span>
+            <span class="pmeta"><span class="plabel">Viewing</span><span class="pname">All products</span></span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+        </div>
+        <div class="miniBody">
+          <div class="miniBoard">
+            <div class="ttl">Viewing <b>All products</b> · 23 changes</div>
+            <div class="mc">Appointment reminders <span style="color:var(--muted-foreground)">· Clinics</span></div>
+            <div class="mc">Daily wastage report <span style="color:var(--muted-foreground)">· Bakery Ops</span></div>
+            <div class="mc">Route optimiser <span style="color:var(--muted-foreground)">· Fleet</span></div>
+          </div>
+          <div class="miniChat">
+            <div class="mch"><span class="ptile all"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="6" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="18" cy="6" r="1.6"/><circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/><circle cx="6" cy="18" r="1.6"/><circle cx="12" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/></svg></span><div><div class="mt">Overview chat</div><div class="ms">Across all products</div></div></div>
+            <div class="mbody">
+              <div class="myou">What needs me across everything?</div>
+              <div class="msul">3 things are waiting on you — in Clinics, Bakery Ops and Fleet…</div>
+              <div class="myou">Start a loyalty card idea.</div>
+              <div class="msul">Which product should that live under?</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="miniCaption"><b>All products</b> → a cross-product overview chat that asks which product new work
+      belongs to.</p>
+    </div>
+
+    <!-- Unassigned mini -->
+    <div>
+      <div class="miniApp">
+        <div class="miniBar">
+          <div class="pswitch" aria-label="Viewing Unassigned">
+            <span class="tile none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+            <span class="pmeta"><span class="plabel">Viewing</span><span class="pname">Unassigned</span></span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+        </div>
+        <div class="miniBody">
+          <div class="miniBoard">
+            <div class="ttl">Viewing <b>Unassigned</b> · 4 changes</div>
+            <div class="mc">Misc data cleanup</div>
+            <div class="mc">Old import script</div>
+            <div class="mc">Untitled idea</div>
+          </div>
+          <div class="miniChat">
+            <div class="mch"><span class="ptile none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg></span><div><div class="mt">Triage chat</div><div class="ms">Work not yet filed</div></div></div>
+            <div class="mbody">
+              <div class="myou">What's sitting here unfiled?</div>
+              <div class="msul">4 changes aren't under a product yet. Want me to file them?</div>
+              <div class="myou">Put "Misc data cleanup" under Clinics.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="miniCaption"><b>Unassigned</b> → a triage chat for sorting loose work into products.</p>
+    </div>
+  </div>
+
+  <!-- ════════════════ 4 · THE THREE STATES ════════════════ -->
+  <div class="sectionLabel">4 · The three states every surface must show — loading · empty · error</div>
+  <p class="walk">The chat dock in each of its three honest states (shown here for a product chat). <b>Empty</b> is
+  a product's first-run / fresh thread. <b>Loading</b> is while that product's history streams in after you switch
+  to it. <b>Error</b> is when the chat can't be reached — said plainly, with one clear retry, and never dressed up
+  as an answer. Your board and work stay safe regardless.</p>
+
+  <div class="states">
+    <div class="stateCard">
+      <div class="sh"><span class="ptile" style="width:18px;height:18px;font-size:8px;border-radius:4px">CL</span>Empty — a fresh Clinics chat</div>
+      <div class="sb">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <h5>What can I help with in Clinics?</h5>
+        <p>Ask about this product's work, or tell me what to start. Anything I set in motion shows up on the Clinics board.</p>
+        <div class="chips" style="justify-content:center">
+          <button class="chip" type="button">What needs my attention?</button>
+          <button class="chip" type="button">Start something new</button>
+        </div>
+      </div>
+    </div>
+    <div class="stateCard">
+      <div class="sh">Loading — history streaming in</div>
+      <div class="sb" style="justify-content:flex-start;align-items:stretch;padding-top:18px">
+        <div class="skel">
+          <div class="skelLine med"></div>
+          <div class="skelLine short"></div>
+          <div class="skelLine"></div>
+          <div class="skelLine med"></div>
+          <div class="skelLine short"></div>
+        </div>
+        <p style="margin-top:14px;align-self:center">Loading the Clinics conversation…</p>
+      </div>
+    </div>
+    <div class="stateCard">
+      <div class="sh">Error — can't reach the chat</div>
+      <div class="sb" style="justify-content:flex-start;padding-top:24px">
+        <div class="errBox" role="alert">
+          <span class="et"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>I couldn't reach this chat</span>
+          <p>Your work and board are safe — this is just the conversation connection. Try again in a moment.</p>
+          <button class="btnPrimary" type="button">Try again</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════ 5 · PHASING ════════════════ -->
+  <div class="sectionLabel">5 · Honest phasing — smallest coherent first surface vs the fuller vision</div>
+  <div class="phase">
+    <div class="phaseCard">
+      <h3>First surface <span class="pill now">build first</span></h3>
+      <ul>
+        <li>One chat <b>per product</b>, swapped by the existing switcher together with the board.</li>
+        <li>The chat header echoes the active product's tile (whose chat am I in).</li>
+        <li>Free-text + suggestion chips + the slash hint (the composer you already have).</li>
+        <li>The agent picker at the composer foot — Claude (default) ↔ Antigravity — naming the active agent.</li>
+        <li>"Talk → a change card appears on this product's board", with a click-through link.</li>
+        <li>The confirm gate before starting work; honest working/idle status; the three states.</li>
+        <li>"All products" overview chat (asks which product new work belongs to). Keep it simple.</li>
+      </ul>
+    </div>
+    <div class="phaseCard">
+      <h3>The fuller vision <span class="pill later">later</span></h3>
+      <ul>
+        <li>The "Unassigned" triage chat (sort loose work into products) — second, once All + per-product land.</li>
+        <li>Per-product memory transparency (see and correct what Sulis remembers about each product).</li>
+        <li>Multiple named threads within one product, each showing "agent working here".</li>
+        <li>An "Auto" agent option that picks Claude vs Antigravity per task.</li>
+        <li>Mid-run pause / stop on a running agent from the chat.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:26px">
+    <strong>Accessibility, checked against the real tokens (light + dark).</strong> Every state carries a word,
+    not colour alone — "Working…", "Started", "Powered by Claude", "Clinics chat", "I couldn't reach this chat".
+    The product tile reuses the switcher's never-colour-alone shapes (monogram letters / grid-of-dots for All /
+    dashed line for Unassigned), so scope is legible without relying on hue. The switcher and agent picker are
+    real menu buttons (<code>aria-haspopup="menu"</code> / <code>aria-expanded</code>) opening
+    <code>role="menu"</code> lists with <code>menuitemradio</code> + <code>aria-checked</code> rows, full
+    keyboard parity, ≥30px rows with a visible focus ring. Body text uses the cockpit's verified token pairings,
+    all clearing WCAG AA in both themes. Motion (streaming caret, skeleton shimmer) has a
+    <code>prefers-reduced-motion</code> fallback.
+  </div>
+
+</div>
+
+<script>
+  const root = document.documentElement, btn = document.getElementById('themeBtn');
+  btn.addEventListener('click', () => {
+    const dark = root.getAttribute('data-theme') === 'dark';
+    root.setAttribute('data-theme', dark ? 'light' : 'dark');
+    btn.textContent = dark ? 'Switch to dark' : 'Switch to light';
+  });
+  const body = document.getElementById('appBody'), toggle = document.getElementById('chatToggleBtn');
+  toggle.addEventListener('click', () => {
+    const collapsed = body.classList.toggle('collapsed');
+    toggle.setAttribute('aria-pressed', String(!collapsed));
+    toggle.setAttribute('aria-label', collapsed ? 'Show chat' : 'Hide chat');
+  });
+</script>
+</body>
+</html>
