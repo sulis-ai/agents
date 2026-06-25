@@ -138,6 +138,7 @@ from _session_manager.adapter import (
     ProviderAdapter,
     SessionSpec,
 )
+from _session_manager.adapters.agy_pty import InteractiveAgyPtyAdapter
 from _session_manager.adapters.claude import ClaudeAdapter
 from _session_manager.classifier import RecoveryClass, classify
 from _session_manager.event_log import (
@@ -226,6 +227,7 @@ __all__ = [
     "Capabilities",
     "SessionSpec",
     "ClaudeAdapter",
+    "InteractiveAgyPtyAdapter",
     # manager core surface (§2.2) — WP-004
     "SessionManager",
     "Session",
