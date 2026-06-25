@@ -75,11 +75,10 @@ real-pty round-trip is **observed-done** in WP-007.
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 import _change_session
-import _terminal_launcher
 from _session_manager.adapter import Capabilities, SessionSpec
+from _session_manager.adapters._pre_prompt import read_pre_prompt_sidecar
 from _session_manager.classifier import RecoveryClass
 from _session_manager.events import Event, EventError
 from _session_manager.recovery import ReauthTicket
@@ -176,7 +175,7 @@ class InteractiveClaudePtyAdapter:
         argv.extend(self._conversation_flags(spec))
         if _remote_control_enabled():
             argv.extend(self._remote_control_flags(spec))
-        pre_prompt = self._read_pre_prompt(spec)
+        pre_prompt = read_pre_prompt_sidecar(spec)
         if pre_prompt is not None:
             argv.append(pre_prompt)
         return argv
@@ -255,7 +254,8 @@ class InteractiveClaudePtyAdapter:
             return ["--session-id", _change_session.change_session_id(change_id)]
         except ValueError:
             # Malformed change id — degrade to a fresh, un-pinned session rather
-            # than crash the spawn (mirrors _read_pre_prompt's ignore-on-bad-id).
+            # than crash the spawn (mirrors the shared read_pre_prompt_sidecar's
+            # ignore-on-bad-id).
             return []
 
     # ── internal: Remote Control fragment (default-ON; named after change) ──
@@ -272,8 +272,8 @@ class InteractiveClaudePtyAdapter:
 
         Reuses the established ``(spec.brief_change_id or "").strip()`` +
         :func:`validate_change_ulid` guard that :meth:`_conversation_flags` /
-        :meth:`_read_pre_prompt` already use — the ULID validation is NOT
-        re-implemented here. The name is an ``execv`` literal token (the manager
+        the shared :func:`~_session_manager.adapters._pre_prompt.read_pre_prompt_sidecar`
+        already use — the ULID validation is NOT re-implemented here. The name is an ``execv`` literal token (the manager
         spawns this adapter's argv **directly**, no ``shell=True``, §2.12), so
         the handle's uppercase ``CH-`` prefix is safe — the launcher's
         ``^[a-z][a-z0-9 \\-]+$`` entry-command whitelist applies to the shelled
@@ -288,42 +288,7 @@ class InteractiveClaudePtyAdapter:
             return ["--remote-control"]
         return ["--remote-control", ulid_handle(change_id)]
 
-    # ── internal: pre-prompt sidecar resolution ───────────────────────────
-
-    def _read_pre_prompt(self, spec: SessionSpec) -> str | None:
-        """Return the change's pre-prompt brief text iff ``spec.brief_change_id``
-        is a valid change ULID and the sidecar file exists; else ``None``.
-
-        Resolves the same sidecar the launcher writes
-        (``~/.sulis/changes/{change_id}/{_PRE_PROMPT_SIDECAR}``, reusing the
-        launcher's constant — imported, not duplicated, EP-03) and reads its
-        bytes. The brief is returned as text to be passed as a single argv
-        element by :meth:`spawn_argv` (the manager spawns argv directly, no
-        shell — see that method's note).
-
-        The change id comes from ``spec.brief_change_id`` (this change's
-        ADR-001), NOT the ambient ``SULIS_CHANGE_ID`` — the env is constant
-        across every session the shared daemon spawns, so it cannot identify
-        *this* session's change. The spec carries the per-session change id the
-        consumer already uses as the ``open()`` key. The value is validated as a
-        real change ULID before it is joined into a filesystem path (the
-        ``SessionSpec.__post_init__`` guard already rejects a leading ``-`` /
-        control chars; this ULID check is the additional defence-in-depth before
-        the path join) — a malformed value is ignored rather than turned into a
-        path."""
-        change_id = (spec.brief_change_id or "").strip()
-        if not change_id:
-            return None
-        ok, _reason = validate_change_ulid(change_id)
-        if not ok:
-            return None
-        sidecar = (
-            Path.home()
-            / ".sulis"
-            / "changes"
-            / change_id
-            / _terminal_launcher._PRE_PROMPT_SIDECAR
-        )
-        if not sidecar.is_file():
-            return None
-        return sidecar.read_text(encoding="utf-8")
+    # The pre-prompt sidecar read is the shared
+    # :func:`_session_manager.adapters._pre_prompt.read_pre_prompt_sidecar`
+    # primitive (EP-02 — extracted at the 2-consumer threshold; the agy pty
+    # adapter is the other consumer). ``spawn_argv`` calls it directly.

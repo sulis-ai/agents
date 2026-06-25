@@ -1,0 +1,64 @@
+{
+  "review": {
+    "wp": "WP-001",
+    "project": "antigravity-agy-adapter",
+    "timestamp": "2026-06-25T171333Z",
+    "branch": "wp/create-antigravity-agy-adapter/wp-001-agy-pty-adapter-and-registration",
+    "base": "change/create-antigravity-agy-adapter",
+    "verdict": "PASS",
+    "outcome_plain": "Ready to merge"
+  },
+  "build_verification": {
+    "pr_introduced_errors": 0,
+    "ruff_check": "passed",
+    "ruff_format": "all formatted",
+    "test_suite": "42 passed"
+  },
+  "pr_hygiene": {
+    "scope": {"commit_type_spread": ["feat"], "module_fan_out": 1, "severity": "none"},
+    "size": {"lines_added": 816, "lines_removed": 46, "files_changed": 9, "severity": "low"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+    "completeness": {"new_source_without_test": 0, "api_change_without_schema": false, "severity": "none"}
+  },
+  "findings": {
+    "in_changes": [
+      {
+        "id": "F-01",
+        "severity": "medium",
+        "lens": "quality",
+        "file": "_session_manager/adapters/claude_pty.py",
+        "lines": [257, 274],
+        "summary": "Stale comment references to removed _read_pre_prompt method after Blue extraction of shared read_pre_prompt_sidecar helper",
+        "resolution": "fixed-inline",
+        "path": "A"
+      }
+    ],
+    "in_neighbours": [
+      {
+        "id": "F-02",
+        "severity": "low",
+        "lens": "quality",
+        "files": [
+          "manager.py:1272",
+          "manager.py:1361",
+          "tests/unit/test_pty_remote_control.py:127",
+          "tests/integration/test_live_resume_injection.py:39",
+          "tests/integration/test_cold_memory_live_resume.py:48"
+        ],
+        "summary": "Explanatory comments name old claude_pty._read_pre_prompt symbol path; behaviour preserved in shared helper, only symbol path stale",
+        "resolution": "watch-list",
+        "reason_not_fixed": "out-of-scope: files outside WP-001 Contract; comment-only semantic-preserving drift (EP-07 scope guard)"
+      }
+    ]
+  },
+  "lenses": {
+    "architecture": {"findings": 0, "note": "dependency-inward respected; shared-helper extraction improves structure"},
+    "security": {"findings": 0, "note": "no hardcoded secrets; no subprocess/shell in adapter; integration test read-only with timeout; ADR-003 default --sandbox posture"},
+    "quality": {"findings_in_changes": 1, "findings_in_neighbours": 1, "cr10_perf": "no anti-pattern matches", "new_file_coverage": "100%"}
+  },
+  "self_attestation": {
+    "CR-01": true, "CR-02": true, "CR-03": true, "CR-04": true,
+    "CR-05": true, "CR-06": true, "CR-07": true, "CR-09": true
+  },
+  "draft_deltas": 0
+}

@@ -1,0 +1,21 @@
+id: ARCH-CH-M7WSQ4
+project: antigravity-agy-adapter
+change: CH-M7WSQ4
+status: decomposed
+tier: S
+sourced-from: .changes/create-antigravity-agy-adapter.SPEC.md
+recon: .changes/create-antigravity-agy-adapter.RECON.md
+artifacts:
+  tdd: TDD.md
+  sizing: SIZING.md
+  platform-contracts:
+    - platform-contracts/PC-001-google-antigravity-agy.md
+  adrs:
+    - adrs/ADR-001-additive-provider-registration.md
+    - adrs/ADR-002-do-not-mirror-claude-only-behaviours.md
+    - adrs/ADR-003-agy-permission-posture.md
+  work-packages:
+    - work-packages/WP-001-agy-pty-adapter-and-registration.md
+verification:
+  index-lint: pass
+  pending-wps: 1
