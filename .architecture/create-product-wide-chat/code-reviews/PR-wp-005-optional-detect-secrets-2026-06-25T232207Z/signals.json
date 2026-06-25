@@ -1,0 +1,43 @@
+{
+  "pr": "wp-005-optional-detect-secrets",
+  "base": "change/create-product-wide-chat",
+  "head": "wp/create-product-wide-chat/wp-005-optional-detect-secrets",
+  "scope": {
+    "commit_type_spread": ["fix"],
+    "module_fan_out": 1,
+    "severity": "clean"
+  },
+  "size": {
+    "lines_added": 146,
+    "lines_removed": 5,
+    "total": 151,
+    "files_changed": 2,
+    "generated_ratio": 0.0,
+    "lock_file_ratio": 0.0,
+    "severity": "clean"
+  },
+  "safety": {
+    "migration_count": 0,
+    "schema_idl_count": 0,
+    "infra_files": 0,
+    "secret_pattern_hits": 0,
+    "severity": "clean"
+  },
+  "completeness": {
+    "new_source_without_test": 0,
+    "api_change_without_schema": false,
+    "tests_added": 4,
+    "severity": "clean"
+  },
+  "build_verification": {
+    "py_compile": "clean",
+    "ruff_check": "clean",
+    "errors_introduced": 0
+  },
+  "lenses": {
+    "architecture": {"in_changes": 0, "in_neighbours": 0},
+    "security": {"in_changes": 0, "in_neighbours": 1},
+    "quality": {"in_changes": 0, "in_neighbours": 0}
+  },
+  "verdict": "PASS"
+}
