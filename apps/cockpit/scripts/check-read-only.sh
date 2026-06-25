@@ -322,8 +322,14 @@ for f in "${SOURCE_FILES[@]}"; do
     server/adapters/SulisChangeStarter.ts | \
     server/lib/ensureDaemon.ts | \
     "$SETTINGS_ADAPTER_REL" | \
-    "$TURN_SUMMARIES_REL")
+    "$TURN_SUMMARIES_REL" | \
+    "$CHAT_SCOPE_ADAPTER_REL")
       ;; # sanctioned process-start site — skip
+      #   - LocalChatScopeStore.ts (WP-004, ADR-002 / DAT-PERSIST-01) — execFiles
+      #     the vendored `sulis-chat-append` to persist each per-product chat turn
+      #     through the REDACTING Python store path (keeping the secret catalogue
+      #     single-source; the cockpit never re-implements redaction in TS). A
+      #     sanctioned WRITE seam (the durable thread), not a read view.
       #   - SpineSettingsAdapter.ts (WP-005, ADR-019) — the Settings write
       #     surface's sanctioned writer; execFiles the validated python helpers.
       #     The only new process-start site in the settings change.

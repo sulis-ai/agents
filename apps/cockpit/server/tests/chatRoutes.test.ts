@@ -42,18 +42,32 @@ const ALL_SCOPE = "product:__all__";
 function fakeStore(): ChatScopeStore & {
   remembered: Map<string, ChatProvider>;
   messages: Map<string, TranscriptMessage[]>;
+  /** Every appendTurn the route made, in call order (the persistence assertion). */
+  appended: { scope: string; role: "user" | "assistant"; content: string }[];
 } {
   const remembered = new Map<string, ChatProvider>();
   const messages = new Map<string, TranscriptMessage[]>();
+  const appended: {
+    scope: string;
+    role: "user" | "assistant";
+    content: string;
+  }[] = [];
   return {
     remembered,
     messages,
+    appended,
     async getThread(scope) {
       return {
         messages: messages.get(scope) ?? [],
         provider: remembered.get(scope) ?? "pty",
         productId: scope === ALL_SCOPE ? null : scope.slice("product:".length),
       };
+    },
+    async appendTurn(scope, role, content) {
+      appended.push({ scope, role, content });
+    },
+    async groundCwd(scope) {
+      return `/fake/chat/${scope.replace(/:/g, "_")}`;
     },
     async rememberProvider(scope, provider) {
       remembered.set(scope, provider);
@@ -73,10 +87,16 @@ function fakeStore(): ChatScopeStore & {
  *  path, not this Claude text relay), so the fake asserts on relays, not on a
  *  provider channel. `relays` lets the AI-03 no-re-home test prove a switch does
  *  not touch an already-completed run. */
-function fakeBridge(): SessionBridge & { relays: string[] } {
+function fakeBridge(): SessionBridge & {
+  relays: string[];
+  /** Override the chunk(s) a relay emits — lets a test inject the reply text the
+   *  route must persist as the assistant turn. Defaults to a single "hi". */
+  replyChunks: string[];
+} {
   const relays: string[] = [];
-  return {
+  const self = {
     relays,
+    replyChunks: ["hi"],
     async resolveSession(changeId: string): Promise<SessionResolution> {
       return { kind: "fresh", session: { changeId, cwd: "/tmp/x" } };
     },
@@ -87,11 +107,12 @@ function fakeBridge(): SessionBridge & { relays: string[] } {
     ): Promise<RelayOutcome> {
       relays.push(prompt);
       sink.emit({ type: "state", state: "ready" });
-      sink.emit({ type: "chunk", text: "hi" });
+      for (const text of self.replyChunks) sink.emit({ type: "chunk", text });
       sink.emit({ type: "complete", resumed: false });
       return { kind: "completed", resumed: false };
     },
   };
+  return self;
 }
 
 function appWith(
@@ -264,3 +285,55 @@ describe("POST /api/chat/:scope/message", () => {
     expect(res.status).toBe(400);
   });
 });
+
+// ─── WP-004 seam-close: the persistence round-trip (folded DAT-PERSIST-01) ───
+// The message route must PERSIST each turn to the scope's durable thread via the
+// store's REDACTING append path: the user prompt before the relay, the assistant
+// reply after the relay completes. Without this, getThread is always empty and
+// per-product history is not real (Scenario 1 depends on it).
+
+describe("POST /api/chat/:scope/message — persists the turn (DAT-PERSIST-01)", () => {
+  it("appends the user prompt then the assistant reply to the scope thread", async () => {
+    const store = fakeStore();
+    const bridge = fakeBridge();
+    bridge.replyChunks = ["three ", "changes ", "shipped"];
+    await request(appWith(store, bridge))
+      .post(`/api/chat/${encodeURIComponent(REAL_SCOPE)}/message`)
+      .send({ prompt: "what changed today?" });
+
+    // User turn persisted BEFORE the assistant turn, both to THIS scope.
+    expect(store.appended).toEqual([
+      { scope: REAL_SCOPE, role: "user", content: "what changed today?" },
+      { scope: REAL_SCOPE, role: "assistant", content: "three changes shipped" },
+    ]);
+  });
+
+  it("persists per scope — a turn never lands on another scope's thread", async () => {
+    const store = fakeStore();
+    await request(appWith(store, fakeBridge()))
+      .post(`/api/chat/${encodeURIComponent(REAL_SCOPE)}/message`)
+      .send({ prompt: "only A" });
+    expect(store.appended.every((t) => t.scope === REAL_SCOPE)).toBe(true);
+    expect(store.appended.some((t) => t.role === "user")).toBe(true);
+  });
+
+  it("does not persist an assistant turn when the session was unreachable (no reply)", async () => {
+    const store = fakeStore();
+    const bridge: SessionBridge = {
+      async resolveSession(changeId) {
+        return { kind: "fresh", session: { changeId, cwd: "/tmp/x" } };
+      },
+      async relay(): Promise<RelayOutcome> {
+        // Nothing streamed — the session could not be started.
+        return { kind: "unreachable", detail: "relay threw before streaming" };
+      },
+    };
+    await request(appWith(store, bridge))
+      .post(`/api/chat/${encodeURIComponent(REAL_SCOPE)}/message`)
+      .send({ prompt: "hello" });
+    // The user turn is still recorded (the founder said it), but no empty/absent
+    // assistant turn is fabricated (FR-N5 parity — never synthesise a reply).
+    expect(store.appended.map((t) => t.role)).toEqual(["user"]);
+  });
+});
+

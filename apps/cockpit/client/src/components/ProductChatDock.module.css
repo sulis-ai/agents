@@ -55,7 +55,9 @@
 .status.idle {
   background: var(--muted);
   border: 1px solid var(--border);
-  color: var(--muted-foreground);
+  /* WP-004 a11y (Scenario 5) — --text-secondary clears WCAG AA (4.5:1) on
+   * --muted in both themes; --muted-foreground failed at 4.34:1 (11px text). */
+  color: var(--text-secondary);
 }
 
 .sdot {
@@ -271,14 +273,19 @@
   margin-top: 8px;
 }
 
+/* WP-004 a11y (Scenario 5) — the slash hint uses --text-secondary (the darker
+ * neutral) so its 10px text clears WCAG AA (4.5:1) on the card in BOTH themes.
+ * --muted-foreground (#737373 light) failed at 4.34:1; --text-secondary is
+ * #525252 light (~8:1) and the dark neutral on the dark card both pass. */
 .slashhint {
   font-size: 10px;
-  color: var(--muted-foreground);
+  color: var(--text-secondary);
 }
 
 .slashhint kbd {
   font-family: var(--font-mono);
   font-size: 10px;
+  color: var(--text-secondary);
   background: var(--muted);
   border: 1px solid var(--border);
   border-radius: 3px;

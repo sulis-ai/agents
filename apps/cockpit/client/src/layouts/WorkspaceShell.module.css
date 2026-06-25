@@ -248,6 +248,17 @@
   height: 12px;
 }
 
+/* WP-004 — the body row: board central, the per-product chat docked right
+ * (ADR-001). A horizontal flex row beneath the top bar; the main region grows,
+ * the dock takes its own intrinsic width on the right. */
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+
 .main {
   flex: 1 1 auto;
   min-width: 0;
