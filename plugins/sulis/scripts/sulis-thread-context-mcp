@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+"""sulis-thread-context-mcp — thin launcher for the thread_context MCP server
+(CH-GJ9KQR WP-005 server, wired live by WP-007).
+
+Resolves this ``scripts/`` directory onto ``sys.path`` so the server's imports
+(``_thread_context_mcp`` → ``_session_manager.thread_contract`` / the durable
+``LocalThreadStore``) resolve, then runs the server over stdio. It carries NO
+logic of its own — it is the ``command`` entry ``plugins/sulis/.mcp.json``
+invokes (ADR-002 launcher posture: a Python stdio server run via
+``uv run python <launcher>`` on the plugin's own project env; NOT npx),
+mirroring ``sulis-safe-tools-mcp`` verbatim.
+
+The server reads its scope (``SULIS_CHANGE_ID``) from the launch environment the
+agent session sets, never from agent call args (ADR-005 — change-scoped
+server-side). It is read-only and a denyable identity: the matching permission
+name ``mcp__sulis-thread-context__*`` is allow-listed by default (mirroring
+``sulis-safe-tools``), and the founder withholds it by moving that name to the
+settings ``deny`` list.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+
+from _thread_context_mcp import main  # noqa: E402
+
+if __name__ == "__main__":
+    main()

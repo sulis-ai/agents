@@ -1,0 +1,40 @@
+{
+  "wp": "CH-GJ9KQR-WP-002",
+  "branch": "wp/create-portable-agent-context/wp-002-threadstore-local-adapter",
+  "base": "change/create-portable-agent-context",
+  "timestamp": "2026-06-24T172842Z",
+  "verdict": "PASS",
+  "verdict_after": "inline-fix-loop",
+  "build_verification": {
+    "ruff": "clean",
+    "py_compile": "ok",
+    "mypy_changed_source_errors": 0,
+    "pr_introduced_errors": 0
+  },
+  "pr_hygiene": {
+    "scope": "low",
+    "size": {"severity": "low", "lines": 675, "files": 5},
+    "safety": {"severity": "low", "migrations": 0, "schema_files": 0, "secret_pattern_hits": 0, "infra_files": 0},
+    "completeness": {"severity": "clean", "new_source": 1, "new_tests": 2}
+  },
+  "findings": [
+    {"id": "F-1", "lens": "security", "severity": "high", "primitive": "DAT-03", "title": "Thread.topic/activity_summary persisted un-scrubbed", "status": "addressed", "resolution": "inline-fix", "evidence": "_scrub_thread() wired into put_thread; test_redaction_scrubs_thread_topic_and_summary"},
+    {"id": "F-2", "lens": "security", "severity": "high", "primitive": "DAT-03", "title": "participant_context + journal metadata persisted un-scrubbed", "status": "addressed", "resolution": "inline-fix", "evidence": "_scrub_value() recursive (keys+values) applied to participant_context + metadata; test_redaction_scrubs_participant_context_values + test_redaction_scrubs_journal_metadata"},
+    {"id": "F-3", "lens": "security", "severity": "medium", "primitive": "DAT-03", "title": "_scrub trusted advisory detect-secrets offsets", "status": "addressed", "resolution": "inline-fix", "evidence": "exact-value sweep pass added to _scrub; test_scrub_redacts_all_occurrences_when_offset_is_advisory"},
+    {"id": "F-4", "lens": "security", "severity": "low", "primitive": "DAT-03", "title": "dict keys un-scrubbed (defense-in-depth)", "status": "addressed", "resolution": "inline-fix", "evidence": "_scrub_value scrubs keys; test_scrub_value_scrubs_dict_keys"},
+    {"id": "F-5", "lens": "security", "severity": "informational", "title": "no dedicated integration test for journal metadata secret", "status": "addressed", "resolution": "inline-fix", "evidence": "test_redaction_scrubs_journal_metadata"}
+  ],
+  "watch_list": [
+    {"severity": "low", "title": "O(N^2) append (re-read log per append)", "disposition": "benign-by-design, single-founder bounded threads"},
+    {"severity": "low", "title": "corrupt-record resilience (JSONDecodeError outside 3 categories)", "disposition": "deferred; atomic temp-then-rename mitigates for all but torn message-log append"},
+    {"severity": "low", "title": "per-op structured observability", "disposition": "follow-on with session pump WP (ADR-002 scope)"},
+    {"severity": "low", "title": "file perms at default umask", "disposition": "accepted per ADR-002 single-founder loopback trust boundary"}
+  ],
+  "self_attestation": {
+    "CR-01": true, "CR-02": true, "CR-03": true, "CR-04": true,
+    "CR-05": true, "CR-06": true, "CR-07": true, "CR-09": true
+  },
+  "inline_fix_iterations": 2,
+  "final_tests_passed": 78,
+  "new_file_coverage_pct": 100
+}

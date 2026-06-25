@@ -43,6 +43,11 @@ Catalogue categories (the supplementary layer):
   - ``slack``       — Slack token (``xox[abprs]-`` + ≥3 numeric blocks + tail).
   - ``long-token``  — long opaque provider token (``sk_live_``/``ghp_``/
                       ``AKIA``/``AIza``/``npm_``/… + ≥20 alnum, no hyphens).
+  - ``openai-key``  — OpenAI API key: the modern project-scoped ``sk-proj-…``
+                      (hyphenated) form and the legacy ``sk-`` + ≥40-alnum form.
+                      Distinct from ``long-token`` because the OpenAI shapes are
+                      hyphenated and so escape the underscore-anchored,
+                      hyphen-excluding ``long-token`` pattern (#WP-010, GAP 3).
   - ``private-ip``  — private / loopback / link-local IP (RFC 1918/4193/3927/
                       4291 + loopback), classified via the ``ipaddress`` stdlib;
                       globally-routable IPs are NOT secrets and are not returned.
@@ -76,7 +81,7 @@ class SecretHit:
     ``value`` is the exact matched substring; ``start``/``end`` are character
     offsets into the scanned ``text`` such that ``text[start:end] == value``.
     """
-    category: str   # "env-secret" | "jwt" | "slack" | "long-token" | "private-ip"
+    category: str   # "env-secret" | "jwt" | "slack" | "long-token" | "openai-key" | "private-ip"
     value: str
     start: int
     end: int
@@ -132,6 +137,32 @@ _LONG_TOKEN = re.compile(
     re.VERBOSE,
 )
 
+# OpenAI API keys (#WP-010 — verified blind spot GAP 3). The modern project-
+# scoped form is hyphenated (``sk-proj-…``) and the legacy form is ``sk-`` + a
+# long alphanumeric tail; BOTH use a hyphen after the ``sk`` token, so the
+# underscore-anchored ``_LONG_TOKEN`` above (``sk_live_``/``sk_test_`` + a
+# hyphen-excluding suffix) never matches them. A dedicated pattern is needed.
+#
+# Two alternatives, each ``\b``-anchored and length-floored to keep ordinary
+# ``sk-``-prefixed prose (``sk-arund``, ``ask-me``, ``sk-1``, ``risk-averse``)
+# and SHA/ULID/UUID shapes clean:
+#   - project-scoped: the ``sk-proj-`` infix is the discriminator; the tail is
+#     base62 plus ``-``/``_`` (the chars OpenAI uses), ≥20 long.
+#   - legacy: ``sk-`` + ≥40 alphanumeric (real legacy keys are ``sk-`` + 48);
+#     the high length floor + the leading ``sk-`` anchor exclude prose and bare
+#     hex/Crockford identifiers, which are never ``sk-``-prefixed.
+_OPENAI_KEY = re.compile(
+    r"""
+    \b
+    (?:
+        sk-proj-[A-Za-z0-9_-]{20,}      # modern project-scoped key (hyphenated)
+      | sk-[A-Za-z0-9]{40,}             # legacy key (sk- + long alnum tail)
+    )
+    \b
+    """,
+    re.VERBOSE,
+)
+
 # IP addresses (v4 dotted-quad + v6 compact/full). The regex over-matches on
 # purpose (catches version-string-shaped quads); ``ipaddress`` stdlib decides
 # whether a candidate is a *private/loopback/link-local* secret (#40).
@@ -152,6 +183,7 @@ _REGEX_CATALOGUE: list[tuple[str, re.Pattern[str]]] = [
     ("jwt", _JWT),
     ("slack", _SLACK_TOKEN),
     ("long-token", _LONG_TOKEN),
+    ("openai-key", _OPENAI_KEY),
 ]
 
 

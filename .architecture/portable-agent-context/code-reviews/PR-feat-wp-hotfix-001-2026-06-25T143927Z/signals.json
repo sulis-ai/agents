@@ -1,0 +1,25 @@
+{
+  "target": "change/create-portable-agent-context (local hotfix diff)",
+  "timestamp": "2026-06-25T143927Z",
+  "build_verification": {
+    "ruff": "clean",
+    "ruff_format": "clean",
+    "mypy_head_errors": 32,
+    "mypy_base_errors": 31,
+    "mypy_pr_introduced": 1,
+    "mypy_pr_introduced_note": "float(self._tuning.get('durable_attach_timeout', ...)) — byte-identical to 3 pre-existing accepted _tuning.get->float casts in the same constructor (turn_timeout/idle_timeout/scrollback); not a new error CLASS, consistent with the module convention (CP-01)."
+  },
+  "hygiene": {
+    "scope": {"commit_type_spread": ["fix"], "module_fan_out": 2, "severity": "low"},
+    "size": {"lines_added": 369, "lines_removed": 20, "files_changed": 3, "prod_code_lines": 157, "test_lines": 199, "severity": "low"},
+    "safety": {"migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none"},
+    "completeness": {"new_source_without_test": 0, "tests_added": 4, "api_change_without_schema": false, "severity": "none"}
+  },
+  "lenses": {
+    "architecture": {"in_changes": 1, "in_neighbours": 0, "top": "abandoned worker-thread ceiling under sustained ~/.sulis FS hangs (low/awareness)"},
+    "security": {"in_changes": 0, "in_neighbours": 0, "top": "none — path traversal already guarded by validate_store_id (unchanged)"},
+    "quality": {"in_changes": 0, "in_neighbours": 0, "top": "none — 4 regression tests cover raise+hang+degraded+respawn"}
+  },
+  "verdict": "PASS",
+  "findings_total": {"critical": 0, "high": 0, "medium": 0, "low": 1}
+}

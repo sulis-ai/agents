@@ -1,0 +1,21 @@
+train_id: "train-2026-06-24T184148Z"
+started_at: "2026-06-24T18:41:48Z"
+completed_at: "2026-06-24T18:50:35Z"
+outcome: "success"
+batch_size: 2
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-24T18:47:00Z"
+bundle:
+  - wp: WP-006
+    branch: wp/create-portable-agent-context/wp-006-cockpit-raw-view-repoint
+    pre_train_sha: 11a4c9e2e5f4963fd708789e5e879bd154a90aec
+    rebased_to_sha: 11a4c9e2e5f4963fd708789e5e879bd154a90aec
+    merge_sha_on_dev: 54f612d542ecab94d3242d9068a6e2c71575fb9e
+  - wp: WP-007
+    branch: wp/create-portable-agent-context/wp-007-integration-seam-close-and-resume-drive
+    pre_train_sha: 3695fc50796c2729d9fecebe41d3300d26be3da7
+    rebased_to_sha: 3695fc50796c2729d9fecebe41d3300d26be3da7
+    merge_sha_on_dev: 14313f8b28c6f286071d36fe64e022434cac1b39

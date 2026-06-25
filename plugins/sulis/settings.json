@@ -7,7 +7,8 @@
       "Bash(wget:*)"
     ],
     "allow": [
-      "mcp__sulis-safe-tools__*"
+      "mcp__sulis-safe-tools__*",
+      "mcp__sulis-thread-context__*"
     ]
   }
 }

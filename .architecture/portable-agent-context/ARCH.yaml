@@ -1,0 +1,24 @@
+id: portable-agent-context
+change_id: "01KVX26BDXGJ9KQRJ11HACHMZV"
+handle: CH-GJ9KQR
+status: decomposed
+sourced_from: .changes/create-portable-agent-context.SPEC.md
+tier: M
+artifacts:
+  tdd: TDD.md
+  sizing: SIZING.md
+  adrs:
+    - adrs/ADR-001-adopt-platform-thread-model.md
+    - adrs/ADR-002-reuse-vs-reimplement-hybrid-local-contract-compatible.md
+    - adrs/ADR-003-brain-thread-entity-aligns-mint-later.md
+    - adrs/ADR-004-thread-vs-cockpit-session-relationship.md
+    - adrs/ADR-005-discovery-seam-mcp-tool-rich-by-default-raw-on-demand.md
+  work_packages: work-packages/INDEX.md
+references:
+  platform_model: ~/dev/repos/platform/features/thread-sdk/ONTOLOGY.jsonld
+  reused_seams:
+    - plugins/sulis/scripts/_session_manager/events.py
+    - plugins/sulis/scripts/_session_manager/event_log.py
+    - plugins/sulis/scripts/_session_manager/adapter.py
+    - plugins/sulis/scripts/_session_manager/spawn_env.py
+    - plugins/sulis/scripts/_safe_tools_mcp.py

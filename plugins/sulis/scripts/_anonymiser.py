@@ -55,6 +55,7 @@ from _secret_patterns import (
     _IP_ADDRESS,
     _JWT,
     _LONG_TOKEN,
+    _OPENAI_KEY,
     _SLACK_TOKEN,
 )
 
@@ -157,7 +158,8 @@ _EMAIL = re.compile(
 )
 
 # Secret patterns (``_ENV_SECRET_ASSIGNMENT``, ``_JWT``, ``_SLACK_TOKEN``,
-# ``_LONG_TOKEN``) and the IP regex (``_IP_ADDRESS``) are imported from the
+# ``_LONG_TOKEN``, ``_OPENAI_KEY``) and the IP regex (``_IP_ADDRESS``) are
+# imported from the
 # shared ``_secret_patterns`` catalogue at the top of this module — one source
 # of truth (ADR-002). ``_anonymiser`` applies the *redact* policy below; the L1
 # proxy applies the *refuse* policy over the same catalogue.
@@ -438,7 +440,8 @@ def _replace_ip(match: re.Match, keep: set[str]) -> str:
     return s  # globally routable — preserve
 
 
-# Pass order: code → URLs → secrets (env + JWT + long-token) → emails →
+# Pass order: code → URLs → secrets (env + JWT + long-token + openai-key) →
+# emails →
 # other-repo → IPs → paths (absolute then relative) → domains. Precision
 # decreases left-to-right; URLs run early so the path/domain passes
 # never get a chance to gobble the host out of an http(s):// URL. IPs
@@ -451,6 +454,7 @@ _PASSES: list[tuple[str, re.Pattern, callable]] = [
     ("secret", _JWT, _replace_jwt),
     ("secret", _SLACK_TOKEN, _replace_long_token),
     ("secret", _LONG_TOKEN, _replace_long_token),
+    ("secret", _OPENAI_KEY, _replace_long_token),
     ("email", _EMAIL, _replace_email),
     ("other-repo", _OTHER_REPO_REF, _replace_other_repo),
     ("ip", _IP_ADDRESS, _replace_ip),

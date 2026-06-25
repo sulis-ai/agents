@@ -1,0 +1,21 @@
+train_id: "train-2026-06-24T212521Z"
+started_at: "2026-06-24T21:25:21Z"
+completed_at: "2026-06-24T21:49:06Z"
+outcome: "success"
+batch_size: 2
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-24T21:30:36Z"
+bundle:
+  - wp: WP-009
+    branch: wp/create-portable-agent-context/wp-009-live-assemble-inject-resume-wiring
+    pre_train_sha: d465bd89e27a8a745d39b7ff6e955f10eeebb9d1
+    rebased_to_sha: d465bd89e27a8a745d39b7ff6e955f10eeebb9d1
+    merge_sha_on_dev: 077b9f91bd375883aecd270627e4550714dcdc80
+  - wp: WP-010
+    branch: wp/create-portable-agent-context/wp-010-openai-key-detector-pattern
+    pre_train_sha: 8184c080cf674aa3de68495eba00852111d4bd16
+    rebased_to_sha: 9452af40a9aac20d1a01cbd469d977a1658aac1f
+    merge_sha_on_dev: 60f065f128a9d0ef61f68423c824fcb63ff68c29

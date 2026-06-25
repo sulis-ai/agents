@@ -1,0 +1,16 @@
+train_id: "train-2026-06-24T165411Z"
+started_at: "2026-06-24T16:54:11Z"
+completed_at: "2026-06-24T17:03:33Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-24T16:55:02Z"
+bundle:
+  - wp: WP-001
+    branch: wp/create-portable-agent-context/wp-001-thread-context-contract
+    pre_train_sha: ec7c32c485ef87b7d08736b6d1e400358308bead
+    rebased_to_sha: ec7c32c485ef87b7d08736b6d1e400358308bead
+    merge_sha_on_dev: 57da24e166de5b636d048fce01a5ddd595e9032d

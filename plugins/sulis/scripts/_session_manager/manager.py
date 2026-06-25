@@ -36,12 +36,14 @@ stayed lean.
 
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import threading
 import time
 from collections.abc import Callable
-from typing import Iterator
+from pathlib import Path
+from typing import Iterator, TypeVar
 
 from _session_manager.adapter import ProviderAdapter, SessionSpec
 from _session_manager.classifier import RecoveryClass, classify
@@ -78,8 +80,26 @@ from _session_manager.recovery import (
     ReauthTicket,
     RecoveryDriver,
 )
+from _session_manager.context_payload import ContextPayloadAssembler
+from _session_manager.durable_sink import (
+    BRIEF_FRAGMENT_HEADER,
+    DurableAppendSink,
+    now_iso,
+    render_payload_brief,
+    seed_payload_for_resume,
+)
+from _session_manager.resume_readers import (
+    make_brain_reader,
+    make_working_set_reader,
+)
 from _session_manager.session import Session
 from _session_manager.spawn_env import PROXY_ENDPOINT_ENV, child_spawn_env
+from _session_manager.thread_contract import (
+    THREAD_NOT_FOUND,
+    Thread,
+    ThreadMemory,
+    ThreadStore,
+)
 from _session_manager.state import Health, SessionState, SessionStatus
 from _session_manager.viewer import Viewer, ViewerRegistry
 
@@ -93,11 +113,29 @@ from _session_manager.viewer import Viewer, ViewerRegistry
 # as the single sanctioned egress.
 DEFAULT_SAFE_FETCH_PROXY_ENDPOINT = "http://127.0.0.1:8080"
 
+_log = logging.getLogger("sulis.session_manager.manager")
+
+# Result type for the bounded-isolation runner — so a caller's work callable
+# flows its own return type through (no ``object`` cast at the call site).
+_T = TypeVar("_T")
+
 # Default per-session scrollback ceiling for a pty session (contract §2.11.3,
 # the Armor ceiling — bounded memory is a MUST): 1 MiB is generous for a terminal
 # screen + deep scrollback; appending past it drops oldest bytes. Overridable via
 # the ``scrollback_capacity_bytes`` tuning kwarg.
 DEFAULT_SCROLLBACK_CAPACITY_BYTES = 1024 * 1024
+
+# CH-GJ9KQR hotfix — default bound (seconds) on the durable-sink attach-time
+# store I/O (build store + ensure thread record + reseed) on the open/restart
+# path. The durable store writes the real ``~/.sulis`` filesystem; on a
+# restricted/slow/contended runner that can block. The live session must never
+# wait on the durable side-channel, so the attach is bounded: past this budget
+# (or on any error) it degrades to "no durable sink for this session" and the
+# live open proceeds (WP-004 ADV-1 isolation, extended to cover hangs). 5s is
+# generous for a healthy local append (sub-millisecond) while keeping a wedged
+# store from ever stalling a live terminal open. Overridable via the
+# ``durable_attach_timeout`` tuning kwarg.
+DEFAULT_DURABLE_ATTACH_TIMEOUT = 5.0
 
 
 def _default_recovery_driver_factory(**kwargs: object) -> RecoveryDriver:
@@ -110,6 +148,23 @@ def _default_recovery_driver_factory(**kwargs: object) -> RecoveryDriver:
     single wiring line. The keyword capabilities are the ones
     :meth:`SessionManager._make_recovery_driver` binds per session."""
     return RecoveryDriver(**kwargs)  # type: ignore[arg-type]
+
+
+def _default_thread_store_factory(change_id: str) -> ThreadStore:
+    """Build the durable local :class:`ThreadStore` for ``change_id`` (ADR-002 /
+    ADR-004) — the default binding the durable sink writes into.
+
+    The default the manager uses when no ``thread_store_factory`` tuning kwarg is
+    injected, mirroring ``_default_recovery_driver_factory``. The
+    :class:`~_session_manager.thread_store_local.LocalThreadStore` import is
+    deferred to call time so the manager module carries no filesystem dependency
+    at import time and codes against the ``ThreadStore`` Protocol, not the
+    concrete adapter (the binding swaps to the hosted transport later behind the
+    same port, ADR-002). A test injects an in-memory contract store instead —
+    still a real ``ThreadStore`` (MEA-09)."""
+    from _session_manager.thread_store_local import LocalThreadStore
+
+    return LocalThreadStore(change_id)
 
 
 class SessionManager:
@@ -191,6 +246,33 @@ class SessionManager:
             "recovery_driver_factory", _default_recovery_driver_factory
         )
         self._recovery_drivers: dict[str, RecoveryDriver] = {}
+        # CH-GJ9KQR WP-007 durable second sink (ADR-004). The session pump's
+        # in-memory ``EventLog`` stays the live-tail log; this adds a SECOND
+        # sink that appends each content-bearing Event to the durable thread
+        # store (the authoritative persisted record). The store binding is an
+        # injectable factory — the ``recovery_driver_factory`` precedent — so a
+        # test drives the real sink against an in-memory contract store without
+        # touching the founder's filesystem. The default builds the durable
+        # local adapter (WP-002) for the session's bound change. One sink per
+        # open key; built at ``open``, reseeded on ``_respawn`` (resume,
+        # WP-004 ADV-2), torn down at ``close``.
+        self._thread_store_factory: Callable[[str], ThreadStore] = self._tuning.get(  # type: ignore[assignment]
+            "thread_store_factory", _default_thread_store_factory
+        )
+        self._durable_sinks: dict[str, DurableAppendSink] = {}
+        # CH-GJ9KQR hotfix — the bound (seconds) the durable-sink attach-time
+        # store I/O (build store + ensure the thread record + reseed) is allowed
+        # before the OPEN/RESTART path abandons it and degrades to "no durable
+        # sink for this session" (WP-004 ADV-1 isolation, extended from
+        # exceptions to also cover HANGS/blocking). The durable store touches the
+        # real ``~/.sulis`` filesystem, which on a restricted/slow/contended
+        # runner can block — and this work runs synchronously on the open path,
+        # under the registry lock, before the open result is returned. The live
+        # session must NEVER wait on it. A generous boring default (a healthy
+        # local FS append is sub-millisecond); overridable for tests.
+        self._durable_attach_timeout: float = float(
+            self._tuning.get("durable_attach_timeout", DEFAULT_DURABLE_ATTACH_TIMEOUT)
+        )
         # The last command submitted per key — captured by ``send`` so the
         # recovery driver's ``send`` capability can re-submit *the stopped turn*
         # (not an empty turn) on a transient-blip retry. Additive read-only
@@ -313,6 +395,11 @@ class SessionManager:
             # (ADR-001 error-event seam). Done here, beside the guard attach, so
             # the very first turn is recoverable.
             self._attach_recovery(session)
+            # CH-GJ9KQR WP-007: register the durable second sink on the same
+            # ``on_event`` seam BEFORE the pumps run, so the very first decoded
+            # Event is tracked durably (ADR-004). Additive over the guard +
+            # recovery fan-out (the live-tail path is byte-for-byte unchanged).
+            self._attach_durable_sink(session)
             session.start_pumps()
             # The spawn succeeded: INITIALIZING → READY (§2.7 normal entry).
             session.to_state(SessionState.READY)
@@ -432,7 +519,16 @@ class SessionManager:
 
         SIGTERM then SIGKILL, join the pumps, close the log. Closing an
         already-closed or unknown key is a no-op.
+
+        CH-GJ9KQR WP-011 — keep the memory fresh at the session-close boundary:
+        regenerate + persist the thread's checkpoint BEFORE the sink is dropped
+        (line below), so the NEXT resume reads a current, pre-built memory rather
+        than rebuilding it from scratch. Off the live event hot path (a close is
+        a lifecycle boundary, never the ``on_event`` fan-out) and fully isolated
+        (:meth:`_checkpoint_at_boundary`) — a checkpoint failure must NEVER stall
+        a close.
         """
+        self._checkpoint_at_boundary(key)
         with self._registry_lock:
             session = self._sessions.pop(key, None)
             # WP-004: drop + close the pty session's viewer registry so every
@@ -446,6 +542,10 @@ class SessionManager:
             # with no recovery state — ``pop`` is a no-op.
             self._recovery_drivers.pop(key, None)
             self._last_command.pop(key, None)
+            # CH-GJ9KQR WP-007: drop the per-session durable sink so a long-lived
+            # manager accumulates no stale sink state (mirrors the recovery
+            # driver above). A key with no sink — ``pop`` is a no-op.
+            self._durable_sinks.pop(key, None)
         if registry is not None:
             registry.close()
         if session is None:
@@ -539,14 +639,272 @@ class SessionManager:
         if driver is None:
             driver = self._make_recovery_driver(session)
             self._recovery_drivers[session.key] = driver
-        guard_observer = session.on_event
+        self._chain_on_event(session, self._on_error_event)
+
+    @staticmethod
+    def _chain_on_event(
+        session: Session, observer: Callable[[object, Event], None]
+    ) -> None:
+        """Chain ``observer`` onto ``session.on_event`` ADDITIVELY — the one
+        definition of "add a second observer to the event seam".
+
+        Captures the existing observer (if any) and installs a fan-out that
+        calls the **prior** observer first, then ``observer``. Order matters:
+        the prior fan-out (guard watchdog / recovery) must keep working
+        byte-unchanged before the new observer runs. The two wave-4 attach sites
+        — recovery (:meth:`_attach_recovery`) and the durable sink
+        (:meth:`_attach_durable_sink`) — share this exact chaining shape; it is
+        extracted here at the 2-consumer threshold (EP-03 / Blue) so the
+        prior-first ordering invariant lives in exactly one place.
+
+        The ``observer`` param is typed with a ``object`` first arg (the widest
+        of the two call sites: the recovery hook is ``(Session, Event)``, the
+        durable sink's :meth:`DurableAppendSink.as_event_observer` is
+        ``(object, Event)`` — it ignores the session). ``object`` admits both
+        under a strict type-checker, so the seam type does not disagree with
+        either caller.
+        """
+        prior = session.on_event
 
         def _fan_out(s: Session, event: Event) -> None:
-            if guard_observer is not None:
-                guard_observer(s, event)
-            self._on_error_event(s, event)
+            if prior is not None:
+                prior(s, event)
+            observer(s, event)
 
         session.on_event = _fan_out
+
+    # ── CH-GJ9KQR WP-007 durable second sink + resume reseed (ADR-004) ──────
+
+    def _attach_durable_sink(self, session: Session) -> None:
+        """Register the durable second sink on ``session``'s ``on_event`` seam
+        (ADR-004) — additive, beside the guard + recovery fan-out.
+
+        One thread per change (ADR-004): the thread id is the session key (the
+        same change-keyed identity the manager already uses). Ensures the
+        thread record exists in the store, builds (or reuses, on a restart) a
+        :class:`DurableAppendSink` bound to it, **reseeds its ``_next_order``
+        from the store high-water mark** (WP-004 ADV-2 — so a restart that
+        rebinds to a non-empty log continues the order rather than degrading
+        OUT_OF_ORDER_WRITE), and chains the sink observer onto ``on_event``
+        ADDITIVELY: the existing observer fires first (the live-tail path is
+        byte-for-byte unchanged), then the durable append runs as an isolated
+        side-effect (it never raises into the pump, ADR-004 / WP-004 ADV-1).
+
+        Idempotent on a restart: ``replace_process`` keeps the same Session, so
+        a re-attach reuses the per-key sink and re-chains over the (still
+        guard/recovery-owned) ``on_event``. The reseed is what makes resume
+        correct — it is run on every attach, so first-open is a no-op (empty
+        log → next_order stays 0) and a restart picks up where the log left off.
+
+        **CH-GJ9KQR hotfix — the attach NEVER stalls or breaks the live open
+        (WP-004 ADV-1 isolation, extended from exceptions to HANGS).** The
+        store-touching work (build the store binding, ensure the thread record,
+        build + reseed the sink) is real ``~/.sulis`` filesystem I/O running
+        synchronously on the open path, under the registry lock, BEFORE the
+        pumps run and before the open result is returned. On a restricted, slow,
+        or contended runner that I/O can RAISE (read-only FS) or BLOCK
+        indefinitely — either of which previously stalled the live WS
+        open/attach/feed round-trip. So the store-touching work is run under
+        :meth:`_isolated_durable_attach`: a bounded, exception-isolated wrapper.
+        If it raises OR exceeds the attach budget, the session opens WITHOUT a
+        durable sink (the capability degrades; the live-tail path is unchanged)
+        and the spawn proceeds. The durable observer is chained ONLY when the
+        sink was built successfully — so a degraded attach adds no observer at
+        all (no failing side-channel on the seam either).
+        """
+        sink = self._isolated_durable_attach(session.key)
+        if sink is None:
+            return  # durable attach degraded — the live session opens unchanged
+
+        # Chain the durable observer additively — the prior fan-out (guard +
+        # recovery) fires first, then the durable append runs as an isolated
+        # side-effect (``append_event`` never raises into the pump, ADR-004 /
+        # WP-004 ADV-1). Same chaining shape the recovery attach uses.
+        self._chain_on_event(session, sink.as_event_observer())
+
+    def _isolated_durable_attach(self, key: str) -> DurableAppendSink | None:
+        """Build + reseed the per-key durable sink under a bound, fully isolated.
+
+        Returns the ready :class:`DurableAppendSink`, or ``None`` if the
+        store-touching attach work raised or exceeded
+        :attr:`_durable_attach_timeout`. This is the one place the durable
+        side-channel's open-path I/O is allowed to fail without touching the
+        live session — see :meth:`_attach_durable_sink` for why (the store hits
+        the real ``~/.sulis`` filesystem, which can raise or block on a
+        restricted/slow runner, and this runs synchronously on the open path).
+
+        The work runs via :meth:`_run_isolated_bounded`, which executes it on a
+        short-lived worker thread and abandons it (degrading to ``None``) if it
+        outlives the budget — so a HANG cannot stall the caller. A persisted sink
+        from a prior attach over the same key is reused (restart idempotency); a
+        successful build is cached for the key.
+        """
+
+        def _build() -> DurableAppendSink:
+            thread_id = key
+            store = self._durable_store_for(key)
+            self._ensure_thread_record(store, thread_id)
+            sink = self._durable_sinks.get(key)
+            if sink is None:
+                sink = DurableAppendSink(store, thread_id=thread_id)
+            # Resume reseed (WP-004 ADV-2): align the next order with the durable
+            # log's high-water mark on every attach (no-op on an empty thread).
+            sink.seed_next_order_from_store()
+            return sink
+
+        sink = self._run_isolated_bounded(
+            _build,
+            timeout=self._durable_attach_timeout,
+            what=f"durable sink attach for key {key}",
+        )
+        if sink is None:
+            return None
+        # Cache only on a successful build — a degraded attach leaves no stale
+        # half-built sink for the key (a later attach over the same key retries
+        # cleanly).
+        self._durable_sinks[key] = sink
+        return sink
+
+    def _run_isolated_bounded(
+        self,
+        work: Callable[[], _T],
+        *,
+        timeout: float,
+        what: str,
+    ) -> _T | None:
+        """Run ``work`` on a worker thread, bounded by ``timeout`` and fully
+        isolated — return its result, or ``None`` if it raised or timed out.
+
+        The isolation primitive the durable side-channel uses on the open /
+        restart path (WP-004 ADV-1, extended to cover hangs): a store call that
+        RAISES is caught (logged, ``None``); a store call that BLOCKS past
+        ``timeout`` is abandoned (the daemon worker thread is left to die on its
+        own — it cannot block process exit and holds no manager lock — and we
+        degrade to ``None``). ``signal.alarm`` is deliberately NOT used: it is
+        main-thread-only, and the daemon serves requests on worker threads, so a
+        signal-based timeout would not fire here.
+
+        ``work`` MUST NOT mutate manager state that the caller then reads
+        racily — it returns a value the caller installs after the bound clears.
+        (The durable build only touches the injected store + a local sink, both
+        safe to abandon.)
+        """
+        result: _T | None = None
+        failed = False
+
+        def _runner() -> None:
+            nonlocal result, failed
+            try:
+                result = work()
+            except Exception:  # noqa: BLE001 — isolation: any fault degrades to None
+                failed = True
+                _log.warning("%s failed (degrading)", what, exc_info=True)
+
+        worker = threading.Thread(target=_runner, name="durable-attach", daemon=True)
+        worker.start()
+        worker.join(timeout)
+        if worker.is_alive():
+            # Blocked past the budget — abandon the worker (daemon thread; it
+            # holds no manager lock) and degrade. The live session opens now.
+            _log.warning(
+                "%s exceeded the %.1fs attach budget (degrading; the live "
+                "session opens without the durable side-channel)",
+                what,
+                timeout,
+            )
+            return None
+        if failed:
+            return None
+        return result
+
+    def _durable_store_for(self, key: str) -> ThreadStore:
+        """The durable :class:`ThreadStore` binding for ``key``'s bound change,
+        from the injectable factory (the default builds the local adapter)."""
+        return self._thread_store_factory(key)
+
+    def _ensure_thread_record(self, store: ThreadStore, thread_id: str) -> None:
+        """Create the thread record if it does not exist yet (idempotent).
+
+        The durable log + memory are keyed by the thread record; the append-only
+        store needs the Thread to exist before checkpoint/read ops are meaningful.
+        A ``get_thread`` that raises the contract's ``THREAD_NOT_FOUND`` means
+        "not created yet" → put a minimal local-binding Thread (ADR-002:
+        ``platform_id='local'``); any already-present record is left untouched.
+
+        Only ``THREAD_NOT_FOUND`` is treated as "absent → create" — a genuine
+        store/IO fault (any other category) is propagated, NOT silently masked
+        by a ``put_thread`` (so a real read fault surfaces honestly rather than
+        being papered over with a fresh record, consistent with the contract's
+        three-category error model).
+        """
+        try:
+            store.get_thread(thread_id)
+            return
+        except ExpectedError as exc:
+            if exc.code != THREAD_NOT_FOUND:
+                raise
+            # absent thread → fall through and create it (see docstring)
+        now = now_iso()
+        store.put_thread(
+            Thread(
+                id=thread_id,
+                platform_id="local",
+                topic=None,
+                activity_summary=None,
+                created_at=now,
+                updated_at=now,
+                participant_count=1,
+                resumed_from=None,
+            )
+        )
+
+    def checkpoint(self, key: str) -> ThreadMemory | None:
+        """Regenerate the bound thread's ``ThreadMemory`` from the durable log —
+        the Working-Set-crystallisation-boundary hook (WP-004 ADV-1).
+
+        Called OFF the live event hot path (at a crystallisation boundary, NOT
+        inside the ``on_event`` fan-out) so a checkpoint error can never stall
+        the live pump. Delegates to the per-key sink's
+        :meth:`DurableAppendSink.checkpoint`, which reuses the WP-003
+        ``summarise_memory`` (one definition of the structured summary) and
+        bumps the monotonic memory version.
+
+        Returns the regenerated :class:`ThreadMemory`, or ``None`` if no session
+        (and so no sink) is open for ``key`` — a no-op rather than an error, so a
+        crystallisation tick over a key whose session has since closed is safe.
+        """
+        sink = self._durable_sinks.get(key)
+        if sink is None:
+            return None
+        return sink.checkpoint()
+
+    def _checkpoint_at_boundary(self, key: str) -> None:
+        """Take a memory checkpoint at a live lifecycle boundary, fully isolated
+        (CH-GJ9KQR WP-011 — the freshness move).
+
+        Wraps :meth:`checkpoint` so a regeneration/persist failure can NEVER
+        propagate into the boundary that called it (a session close or a
+        respawn): the checkpoint is a best-effort freshness optimisation, not a
+        correctness requirement (the on-demand regeneration in
+        ``ContextPayloadAssembler.assemble`` is the correctness floor — the next
+        resume rebuilds the summary from messages even if no checkpoint was
+        persisted). A no-session key is already a no-op in ``checkpoint``; this
+        additionally isolates any store fault during the regenerate/put.
+
+        Runs OFF the live event hot path by construction — its only callers are
+        the close + respawn lifecycle boundaries, never the ``on_event`` observer
+        fan-out (WP-004 ADV-1: move 2 is off the hot path)."""
+        try:
+            self.checkpoint(key)
+        except Exception:  # noqa: BLE001 — isolation: a boundary checkpoint must
+            # never stall close/respawn (freshness is best-effort; the on-demand
+            # build is the correctness floor).
+            _log.warning(
+                "boundary checkpoint failed for key %s (resume will regenerate "
+                "the summary on demand instead)",
+                key,
+                exc_info=True,
+            )
 
     def _make_recovery_driver(self, session: Session) -> RecoveryDriver:
         """Build the recovery driver for ``session`` via the injected factory,
@@ -747,9 +1105,41 @@ class SessionManager:
         For a pty session the fresh spawn re-creates the PTY (a new
         ``os.openpty`` master, §2.12.3); the new master fd is handed to
         ``replace_process``, which closes the old master and keeps the scrollback
-        across the restart (restart-is-not-a-new-key applied to scrollback)."""
+        across the restart (restart-is-not-a-new-key applied to scrollback).
+
+        CH-GJ9KQR WP-011 — keep the memory fresh at the respawn boundary: take a
+        checkpoint over the durable log accumulated up to the death point BEFORE
+        the fresh spawn, so the resume compose ``_spawn_process`` runs (which
+        reads the thread's memory) sees a current, pre-built checkpoint rather
+        than regenerating from messages every restart. Isolated
+        (:meth:`_checkpoint_at_boundary`) and off the hot path — a checkpoint
+        failure must never block the restart (the on-demand build remains the
+        correctness floor)."""
+        self._checkpoint_at_boundary(session.key)
         process, master_fd = self._spawn_process(session.adapter, session.spec)
         session.replace_process(process, master_fd)
+        # CH-GJ9KQR WP-007 resume reseed (WP-004 ADV-2): the durable observer
+        # survives ``replace_process`` (it lives on the same Session's
+        # ``on_event``), but its ``_next_order`` must be realigned to the durable
+        # log's high-water mark so post-restart appends continue the order rather
+        # than colliding (silent OUT_OF_ORDER_WRITE degradation). Reseed off the
+        # hot path here, on the restart seam — the resume is from OUR store.
+        #
+        # CH-GJ9KQR hotfix — bound + isolate the reseed exactly as the open-path
+        # attach is (WP-004 ADV-1, extended to hangs). ``seed_next_order_from_store``
+        # already isolates a store *raise* internally, but a store that BLOCKS on
+        # a restricted/slow runner would stall the restart synchronously. Run it
+        # under the same bounded, abandon-on-hang wrapper so a wedged store can
+        # never stall a live respawn; on timeout/error the reseed is skipped (the
+        # sink keeps its prior ``_next_order`` — at worst a post-restart append
+        # degrades to a counted OUT_OF_ORDER_WRITE, never a stalled restart).
+        sink = self._durable_sinks.get(session.key)
+        if sink is not None:
+            self._run_isolated_bounded(
+                sink.seed_next_order_from_store,
+                timeout=self._durable_attach_timeout,
+                what=f"durable reseed on respawn for key {session.key}",
+            )
 
     def _maintenance_tick(self) -> None:
         """One pass of the periodic maintenance loop (§2.7), filled by WP-006.
@@ -845,6 +1235,169 @@ class SessionManager:
         behind the hook (Blue: WP-004 core flow untouched)."""
         return None
 
+    # ── CH-GJ9KQR WP-009 live assemble→inject resume wiring (TDD §3.2) ──────
+
+    def _compose_resume_brief(self, spec: SessionSpec) -> None:
+        """Assemble the rich resume payload over OUR durable store and compose it
+        into the change's brief sidecar — the live realisation of the TDD §3.2
+        ``◀── assembled payload ──`` arrow (WP-009, ADR-004/005).
+
+        The composition root (WPB-07): builds a :class:`ContextPayloadAssembler`
+        bound to the change's :class:`ThreadStore` (via the same injectable
+        :meth:`_durable_store_for` the durable sink uses) with the **real**
+        Working Set + brain readers injected (WP-009 GAP-2 — the readers are pure
+        functions of the change worktree, so the assembler still touches no
+        filesystem itself, MEA-01 / WPB-01), assembles the standard-tier payload
+        from OUR store (``seed_payload_for_resume``, NEVER the provider
+        transcript), renders it to a vendor-neutral fragment, and composes it
+        **additively** beneath the change's default brief in
+        ``~/.sulis/changes/{change_id}/pre_prompt.txt`` — the EXACT sidecar the
+        adapter's ``spawn_argv`` resolves at spawn.
+
+        **Off the live event hot path + fully isolated (WP-004 ADV-1).** This
+        runs at the spawn/resume seam (inside :meth:`_spawn_process`), never
+        inside the ``on_event`` observer fan-out — so a payload-assembly error
+        cannot stall the live pump. EVERY failure mode (no brief target, no
+        checkpoint memory yet → ``MEMORY_NOT_FOUND``, a store/reader fault, a
+        sidecar write error) is caught and degrades to the existing default
+        brief: the rich fragment is simply absent, and the spawn proceeds
+        unchanged. It NEVER raises into the spawn.
+        """
+        change_id = (spec.brief_change_id or "").strip()
+        if not change_id:
+            return  # no brief target — nothing to compose (frozen callers)
+        # Defence-in-depth (path traversal): validate ``change_id`` as a real
+        # change ULID BEFORE it is joined into the sidecar filesystem path — at
+        # parity with the pty adapter's READ path
+        # (``claude_pty._read_pre_prompt``), which gates the identical join
+        # behind the same check. ``SessionSpec.__post_init__`` only rejects a
+        # leading ``-`` / control chars, so ``..`` / ``/`` segments would
+        # otherwise survive to a ``mkdir`` + ``write_text`` outside
+        # ``~/.sulis/changes/``. A malformed id degrades (no compose) rather than
+        # turning into a path — fail closed, the same isolation posture. Reuses
+        # ``_wpxlib.validate_change_ulid`` (EP-03), deferred to call time so the
+        # manager carries no import-time dependency on it.
+        try:
+            from _wpxlib import validate_change_ulid
+
+            ok, _reason = validate_change_ulid(change_id)
+        except Exception:  # noqa: BLE001 — validator unavailable → fail closed
+            ok = False
+        if not ok:
+            _log.warning(
+                "resume brief skipped: brief_change_id is not a valid change "
+                "ULID (degrading to the default brief; spawn proceeds)"
+            )
+            return
+        try:
+            store = self._durable_store_for(change_id)
+            assembler = ContextPayloadAssembler(
+                store,
+                working_set_reader=make_working_set_reader(spec.cwd, change_id),
+                brain_reader=make_brain_reader(spec.cwd),
+            )
+            payload = seed_payload_for_resume(assembler, thread_id=change_id)
+            fragment = render_payload_brief(payload)
+        except Exception:  # noqa: BLE001 — isolation: degrade to the default brief
+            _log.warning(
+                "resume payload assembly failed for change %s (degrading to the "
+                "default brief; spawn proceeds)",
+                change_id,
+                exc_info=True,
+            )
+            return
+        self._compose_into_sidecar(change_id, fragment)
+
+    def _compose_into_sidecar(self, change_id: str, fragment: str) -> None:
+        """Compose ``fragment`` ADDITIVELY but IDEMPOTENTLY into the change's
+        brief sidecar.
+
+        The rich payload AUGMENTS the change's default brief; it never clobbers
+        the change-binding / recon pointer the default carries (WP Contract:
+        additive over ``_default_change_pre_prompt``). When the sidecar does not
+        exist, the launcher's default brief is seeded first (reused, EP-03) and
+        the fragment appended — so the spawn is never left with ONLY the rich
+        fragment and no change binding.
+
+        **Idempotent across re-spawns (load-bearing).** ``_spawn_process`` —
+        and so this compose — runs on EVERY spawn, including ``_respawn``
+        (restart-on-death + login-expiry resume, the very paths this WP serves).
+        A naive append would stack a fresh fragment beneath the prior one on each
+        resume, growing the brief without bound and defeating the assembler's
+        token budget (the per-fragment cap does not bound the SUM). So before
+        appending, any previously-composed fragment is stripped: the base is
+        truncated at :data:`BRIEF_FRAGMENT_HEADER` (the one delimiter the
+        renderer and this stripper share, EP-03), keeping only the content above
+        it (the default brief / launcher binding). The result is exactly ONE
+        resumed-context block, no matter how many times the session respawns.
+
+        Isolated: a sidecar resolve/read/write fault is caught and logged — the
+        spawn proceeds with whatever brief already exists (or none)."""
+        try:
+            sidecar = self._brief_sidecar_path(change_id)
+            sidecar.parent.mkdir(parents=True, exist_ok=True)
+            existing = (
+                sidecar.read_text(encoding="utf-8")
+                if sidecar.is_file()
+                else self._default_brief(change_id)
+            )
+            # Idempotency: drop any prior resumed-context fragment (split at the
+            # shared header) before appending the fresh one — a re-spawn replaces
+            # rather than stacks.
+            base = existing.split(BRIEF_FRAGMENT_HEADER, 1)[0]
+            composed = base.rstrip() + "\n\n" + fragment + "\n"
+            sidecar.write_text(composed, encoding="utf-8")
+        except Exception:  # noqa: BLE001 — isolation: spawn proceeds regardless
+            _log.warning(
+                "composing resume brief into the sidecar failed for change %s "
+                "(spawn proceeds with the existing brief)",
+                change_id,
+                exc_info=True,
+            )
+
+    @staticmethod
+    def _brief_sidecar_path(change_id: str) -> Path:
+        """The change's brief sidecar — the EXACT path the launcher writes and
+        the pty adapter (``claude_pty._read_pre_prompt``) reads
+        (``~/.sulis/changes/{change_id}/{_PRE_PROMPT_SIDECAR}``).
+
+        Reuses the launcher's :data:`~_terminal_launcher._PRE_PROMPT_SIDECAR`
+        filename constant (imported, not duplicated, EP-03) so the manager
+        composes into the SAME file the adapter resolves at spawn — a re-point of
+        the constant follows here for free, exactly as it does in the adapter. A
+        launcher import failure degrades to the conventional filename rather than
+        crashing the compose (isolation)."""
+        try:
+            import _terminal_launcher
+
+            name = _terminal_launcher._PRE_PROMPT_SIDECAR
+        except (ImportError, AttributeError):
+            # The launcher module/constant is unavailable — degrade to the
+            # conventional filename rather than crash the compose. Narrow to the
+            # two failures an intra-package import can actually raise.
+            name = "pre_prompt.txt"
+        return Path.home() / ".sulis" / "changes" / change_id / name
+
+    @staticmethod
+    def _default_brief(change_id: str) -> str:
+        """The change's default opening brief — reused from the launcher
+        (``_terminal_launcher._default_change_pre_prompt``, EP-03) so a sidecar
+        seeded here carries the SAME change-binding / recon pointer the launcher
+        writes. Import is deferred to call time so the manager carries no
+        launcher dependency at import time; a launcher import failure degrades to
+        a minimal binding line rather than crashing the compose."""
+        try:
+            import _terminal_launcher
+
+            return _terminal_launcher._default_change_pre_prompt(change_id)
+        except (ImportError, AttributeError):
+            # The launcher module/function is unavailable — degrade to a minimal
+            # change-binding line rather than crash the compose.
+            return (
+                f"You are Sulis, focused on the change bound to this session "
+                f"(id: {change_id})."
+            )
+
     # ── internal helpers ────────────────────────────────────────────────────
 
     def _child_env(self, spec: SessionSpec) -> dict[str, str]:
@@ -899,6 +1452,14 @@ class SessionManager:
 
         Errors: Protocol ``SPAWN_FAILED`` (the pipe spawn failed); Internal
         ``PTY_OPEN_FAILED`` (``os.openpty`` / the pty spawn failed, §2.15)."""
+        # CH-GJ9KQR WP-009: ASSEMBLE the rich resume payload from OUR durable
+        # store and COMPOSE it into the change's brief sidecar BEFORE the adapter
+        # resolves the brief (``spawn_argv`` reads ``pre_prompt.txt``, ADR-004/
+        # 005). This is the live realisation of the TDD §3.2 brief-injection
+        # arrow. Fully isolated: any failure degrades to the existing default
+        # brief — it never raises into the spawn (WP-004 ADV-1, applied at the
+        # spawn/resume seam, OFF the live event hot path).
+        self._compose_resume_brief(spec)
         argv = adapter.spawn_argv(spec)
         if spec.io_mode == "pty":
             return self._spawn_pty_process(argv, spec)
