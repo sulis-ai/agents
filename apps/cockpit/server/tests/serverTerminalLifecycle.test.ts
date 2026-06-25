@@ -158,11 +158,19 @@ function openWs(url: string): Promise<WebSocket> {
   });
 }
 
-/** Collect WS text messages until `pred` matches one, or the budget elapses. */
+/** Collect WS text messages until `pred` matches one, or the budget elapses.
+ *
+ *  Budget = 25s (was 8s): the FIRST round-trip in each test is an `open`, which
+ *  triggers a COLD start — the daemon is cold-spawned, binds its AF_UNIX socket,
+ *  and forks the real fake-pty child — before the result streams back. On a
+ *  loaded CI runner that cold-start exceeds 8s (observed deterministically), so
+ *  8s raced the cold-start, not a logic fault (the same round-trip passes on a
+ *  warm/faster runner). 25s gives the cold-start realistic headroom while still
+ *  sitting inside the 30s vitest testTimeout; every assertion is unchanged. */
 function waitForMessage(
   ws: WebSocket,
   pred: (parsed: Record<string, unknown>) => boolean,
-  budgetMs = 8_000,
+  budgetMs = 25_000,
 ): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
