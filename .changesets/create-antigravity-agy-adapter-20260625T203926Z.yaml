@@ -1,7 +1,0 @@
-change_id: 01KVZRVMC1M7WSQ4RSSKH7TCQ6
-primitive: create
-tier: minor
-touches_plugin: true
-summary: |
-  Antigravity (agy) provider adapter: run a change agent session on Google Antigravity, seeded by the portable context; default-sandboxed, resume via --conversation. Additive to the Claude path. Phase 1 of Claude-agy failover.
-created_at: 2026-06-25T20:39:26Z
