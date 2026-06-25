@@ -70,3 +70,8 @@ root; real `start-from-intent`):
 > - ADV-CWD-01: the relay cwd resolves to '' for a chat scope (resolveChange(scope)
 >   returns null → cwd:''), so the chat session would run in the server's dir. WP-004
 >   must ground the relay cwd to a real directory for the scope.
+
+## Acceptance Evidence
+
+- Branch: wp/create-product-wide-chat/wp-004-integration-seam-close (deleted post-merge)
+- Completed: `2026-06-25T23:43:21Z` (Step 12 by calling session)

@@ -1,0 +1,21 @@
+train_id: "train-2026-06-25T220620Z"
+started_at: "2026-06-25T22:06:20Z"
+completed_at: "2026-06-25T22:16:58Z"
+outcome: "success"
+batch_size: 2
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-25T22:11:34Z"
+bundle:
+  - wp: WP-002
+    branch: wp/create-product-wide-chat/wp-002-backend-thread-provider-card
+    pre_train_sha: 1e48aca3bb901be864ec3fa134459bbec380a93e
+    rebased_to_sha: 1e48aca3bb901be864ec3fa134459bbec380a93e
+    merge_sha_on_dev: 88e6b5fb5a1a1b3f042f665583b6f3fbcfb1fdf6
+  - wp: WP-003
+    branch: wp/create-product-wide-chat/wp-003-frontend-chat-dock
+    pre_train_sha: ff230994ca23c9a115941e4e9ccc648d40e28103
+    rebased_to_sha: bc4c1ee2069c3d85ad1233cd526e01412d020ad6
+    merge_sha_on_dev: 26bd8de3e18db4a09748a39048996c21d6427bdd

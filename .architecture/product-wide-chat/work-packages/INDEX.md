@@ -10,8 +10,8 @@
 | WP-001 | Per-product chat-scope seam contract (API + contract test) | Create | done | — | WP-002, WP-003, WP-004 |
 | WP-002 | Backend — thread keying, provider-on-open, chat→card | Create | done | WP-001 | WP-004 |
 | WP-003 | Frontend — chat dock, agent picker, switcher tie-in, chat→card, three states | Create | done | WP-001 | WP-004 |
-| WP-004 | Integration — close the seam; drive the Scenarios green | Create | step-7-complete | WP-002, WP-003 | — |
-| WP-005 | Make detect_secrets optional in the shared scrub (degrade to the catalogue) | reinforce-harden | step-7-complete | — | — |
+| WP-004 | Integration — close the seam; drive the Scenarios green | Create | done | WP-002, WP-003 | — |
+| WP-005 | Make detect_secrets optional in the shared scrub (degrade to the catalogue) | reinforce-harden | done | — | — |
 
 ## Detail (kind, verification artifact, source)
 

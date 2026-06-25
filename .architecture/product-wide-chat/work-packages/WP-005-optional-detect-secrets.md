@@ -50,3 +50,8 @@ Red (4 tests, missing-dep simulated) → Green (optional import + flag-gated deg
 > Note (record): for stronger runtime redaction the cockpit could invoke the
 > chat-append under the uv env so detect_secrets is present — but graceful
 > degradation to the catalogue is the correct robustness posture regardless.
+
+## Acceptance Evidence
+
+- Branch: wp/create-product-wide-chat/wp-005-optional-detect-secrets (deleted post-merge)
+- Completed: `2026-06-25T23:43:21Z` (Step 12 by calling session)
