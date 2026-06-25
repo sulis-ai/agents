@@ -1,3 +1,9 @@
+## v0.169.0 — 2026-06-25
+
+**Minor — release-train batch.**
+
+- Antigravity (agy) provider adapter: run a change agent session on Google Antigravity, seeded by the portable context; default-sandboxed, resume via --conversation. Additive to the Claude path. Phase 1 of Claude-agy failover.
+
 ## v0.168.0 — 2026-06-25
 
 **Minor — release-train batch.**

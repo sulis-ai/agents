@@ -74,6 +74,9 @@ import fcntl  # noqa: E402
 
 from _session_manager import daemon_client  # noqa: E402
 from _session_manager.adapter import ProviderAdapter  # noqa: E402
+from _session_manager.adapters.agy_pty import (  # noqa: E402
+    InteractiveAgyPtyAdapter,
+)
 from _session_manager.adapters.claude_pty import (  # noqa: E402
     InteractiveClaudePtyAdapter,
 )
@@ -624,8 +627,18 @@ def _build_server(socket_path: str) -> tuple[SocketServer, SessionManager]:
     the two share one binding resolver (EP-03) — the host's standalone ``main``
     is gone; this is the single composition root for the engine over the socket.
     """
+    # agy provider registration (ADR-001, additive). A single
+    # InteractiveAgyPtyAdapter instance is registered under both "agy" and its
+    # "antigravity" alias; the Claude "pty" key is byte-for-byte UNCHANGED. agy
+    # has no test-seam branch (unlike the Claude _build_pty_adapter), so the
+    # instance is inlined here — boring beats a manufactured factory (ADR-001).
+    agy_adapter = InteractiveAgyPtyAdapter()
     manager = SessionManager(
-        {"pty": _build_pty_adapter()},
+        {
+            "pty": _build_pty_adapter(),  # UNCHANGED — Claude
+            "agy": agy_adapter,  # NEW
+            "antigravity": agy_adapter,  # NEW alias
+        },
         start_maintenance=True,  # engine's per-session idle eviction ON
     )
     registry = ConnectionBindingRegistry()

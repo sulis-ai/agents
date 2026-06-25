@@ -1,0 +1,16 @@
+train_id: "train-2026-06-25T171647Z"
+started_at: "2026-06-25T17:16:47Z"
+completed_at: "2026-06-25T17:25:57Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-25T17:21:58Z"
+bundle:
+  - wp: WP-001
+    branch: wp/create-antigravity-agy-adapter/wp-001-agy-pty-adapter-and-registration
+    pre_train_sha: f032b57916994e9427cf888191783e8153d8a14f
+    rebased_to_sha: f032b57916994e9427cf888191783e8153d8a14f
+    merge_sha_on_dev: 85cef271fa7e0dacaad591c80b3f480aeda93d16
