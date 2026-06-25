@@ -57,3 +57,16 @@ root; real `start-from-intent`):
       *actually running* provider, not the picked-but-unapplied one.
 - [ ] Post-build visual check vs `product-wide-chat.html` re-run on the integrated surface,
       light + dark.
+
+> Notes folded from WP-002/003 security review (the integration WP MUST close these):
+> - CONCERN DAT-PERSIST-01: chat turns are NOT yet persisted to the per-product
+>   scope thread at runtime — `getThread` reads `~/.sulis/chat/{scope}/threads/{scope}.messages.jsonl`
+>   but nothing appends to it (the relay transcript lands only in claude's own
+>   ~/.claude/projects). WP-004 MUST close the round-trip: append each chat turn to
+>   the scope thread via the REDACTING store path (the Python LocalThreadStore
+>   scrub / chat_scope_store), so per-product history actually persists AND
+>   redaction-on-write applies to chat content. Scenario 1 (switch product → see
+>   that product's history) depends on this being real.
+> - ADV-CWD-01: the relay cwd resolves to '' for a chat scope (resolveChange(scope)
+>   returns null → cwd:''), so the chat session would run in the server's dir. WP-004
+>   must ground the relay cwd to a real directory for the scope.
