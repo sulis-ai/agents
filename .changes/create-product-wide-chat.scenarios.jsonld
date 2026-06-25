@@ -1,0 +1,465 @@
+{
+ "scenarios": [
+  {
+   "exercises": "dna:design:00000000000000000000000000",
+   "id": "dna:scenario:0GHKDC0NMRASHXTGJSCMJYRBXS",
+   "journey": "dna:workflow:REH9AHFG4A9EFTQ3K8PBD7MEC6",
+   "name": "The chat dock is keyboard-navigable and legible without colour in both themes",
+   "state": "draft",
+   "surface": "ui",
+   "sys_status": "active",
+   "verifies": [
+    "dna:requirement:WQGCY5P4YA6JEZ5W3Q6KBDN5ZZ"
+   ]
+  },
+  {
+   "exercises": "dna:design:00000000000000000000000000",
+   "id": "dna:scenario:7PEMXS2PB6S902DJ0SG7Y1XFJR",
+   "journey": "dna:workflow:H4S8P8A9H1CAZZ6DB45DVN6HBT",
+   "name": "The All-products overview chat asks which product before filing a card",
+   "state": "draft",
+   "surface": "ui",
+   "sys_status": "active",
+   "verifies": [
+    "dna:requirement:146FVGVMKE1FSQG22MAFN7JXPD"
+   ]
+  },
+  {
+   "exercises": "dna:design:00000000000000000000000000",
+   "id": "dna:scenario:JD7VKBQC1KKR77WY9BRHR1Z40M",
+   "journey": "dna:workflow:WDJK3TAH04MQ01EF3M7HMEDHBJ",
+   "name": "Picking and switching the agent drives the real provider with a guard",
+   "state": "draft",
+   "surface": "ui",
+   "sys_status": "active",
+   "verifies": [
+    "dna:requirement:FYW52QX0BT123CR1GASFBCVBEG"
+   ]
+  },
+  {
+   "exercises": "dna:design:00000000000000000000000000",
+   "id": "dna:scenario:RGH45T2XPS7WVNQWN25EJWN19T",
+   "journey": "dna:workflow:37X7ATNC2H3VX0XN9XVH8G1ESK",
+   "name": "Switching the product swaps the board and the chat together",
+   "state": "draft",
+   "surface": "ui",
+   "sys_status": "active",
+   "verifies": [
+    "dna:requirement:E48MA6FYHE4B84KRX2QV95C76H"
+   ]
+  },
+  {
+   "exercises": "dna:design:00000000000000000000000000",
+   "id": "dna:scenario:CR5EGEPGATPQ5RSME0ZC6WVAK1",
+   "journey": "dna:workflow:6Q41S2Z63MXVG6GKR7TDSMBW2R",
+   "name": "Asking the chat to start work creates a card on that product's board",
+   "state": "draft",
+   "surface": "ui",
+   "sys_status": "active",
+   "verifies": [
+    "dna:requirement:EDQQQX021ENCJM0FV3CM3WTFGK"
+   ]
+  }
+ ],
+ "steps": [
+  {
+   "agent_instructions": "Using only the keyboard, open and operate the product switcher and the agent picker",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:QX5PS94YQ9BPB8DXDG9S8SEC0Q",
+   "input_artifacts": [
+    "test-target"
+   ],
+   "mechanism": "human",
+   "name": "hhysvx59-using-only-the-keyboard-open-and-operate-1",
+   "output_artifacts": [
+    "hhysvx59-using-only-the-keyboard-open-and-operate-1-result"
+   ],
+   "postconditions": [
+    "both are reachable and operable by keyboard with a visible focus ring",
+    "both expose real menu semantics (a radio-style checked item)"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "Drive the chat into its loading, empty, and error states in both light and dark themes",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:9G4C95ZHD8RQ7STVGQ7JBBKS4G",
+   "input_artifacts": [
+    "hhysvx59-using-only-the-keyboard-open-and-operate-1-result"
+   ],
+   "mechanism": "human",
+   "name": "hhysvx59-drive-the-chat-into-its-loading-empty-an-2",
+   "output_artifacts": [
+    "hhysvx59-drive-the-chat-into-its-loading-empty-an-2-result"
+   ],
+   "postconditions": [
+    "each state is legible without relying on colour (glyph plus word)",
+    "all text pairings meet WCAG AA in both themes",
+    "the streaming caret and skeleton honour reduced-motion"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "Select 'All products' in the switcher",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:S62D2ME69Z07A6KZHWEPFXWRDV",
+   "input_artifacts": [
+    "test-target"
+   ],
+   "mechanism": "human",
+   "name": "4xd9z2e6-select-all-products-in-the-switcher-1",
+   "output_artifacts": [
+    "4xd9z2e6-select-all-products-in-the-switcher-1-result"
+   ],
+   "postconditions": [
+    "the cross-product overview chat is shown",
+    "it does not blend any single product's history into the stream"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "Ask the overview chat to start a piece of work",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:VVFD7NCNGFWSVBVXF1XFCTF005",
+   "input_artifacts": [
+    "4xd9z2e6-select-all-products-in-the-switcher-1-result"
+   ],
+   "mechanism": "human",
+   "name": "4xd9z2e6-ask-the-overview-chat-to-start-a-piece-o-2",
+   "output_artifacts": [
+    "4xd9z2e6-ask-the-overview-chat-to-start-a-piece-o-2-result"
+   ],
+   "postconditions": [
+    "the chat asks which product the new work belongs to before creating anything"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "Choose a product and confirm",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:N9ZXBRNJSYHZC8HSCW4KFQYTAS",
+   "input_artifacts": [
+    "4xd9z2e6-ask-the-overview-chat-to-start-a-piece-o-2-result"
+   ],
+   "mechanism": "human",
+   "name": "4xd9z2e6-choose-a-product-and-confirm-3",
+   "output_artifacts": [
+    "4xd9z2e6-choose-a-product-and-confirm-3-result"
+   ],
+   "postconditions": [
+    "the card lands on the chosen product's board"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "Set a product's chat agent to Antigravity at the composer foot",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:C6EB8ZY43B4D56HRZZ5R1X1D66",
+   "input_artifacts": [
+    "test-target"
+   ],
+   "mechanism": "human",
+   "name": "6az2wdjm-set-a-product-s-chat-agent-to-antigravit-1",
+   "output_artifacts": [
+    "6az2wdjm-set-a-product-s-chat-agent-to-antigravit-1-result"
+   ],
+   "postconditions": [
+    "the composer foot names Antigravity as the active agent"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "Send a message so a session is running, then switch the agent to Claude",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:CTSH1ASX3DE2M34JP6NGH06ECJ",
+   "input_artifacts": [
+    "6az2wdjm-set-a-product-s-chat-agent-to-antigravit-1-result"
+   ],
+   "mechanism": "human",
+   "name": "6az2wdjm-send-a-message-so-a-session-is-running-t-2",
+   "output_artifacts": [
+    "6az2wdjm-send-a-message-so-a-session-is-running-t-2-result"
+   ],
+   "postconditions": [
+    "a confirm appears before the switch takes effect",
+    "the confirm explains the switch applies to new work, not the running session"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "Confirm the switch and start new work",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:QR5HCHTD0CV32D3YZGQ4T9A34D",
+   "input_artifacts": [
+    "6az2wdjm-send-a-message-so-a-session-is-running-t-2-result"
+   ],
+   "mechanism": "human",
+   "name": "6az2wdjm-confirm-the-switch-and-start-new-work-3",
+   "output_artifacts": [
+    "6az2wdjm-confirm-the-switch-and-start-new-work-3-result"
+   ],
+   "postconditions": [
+    "the new session runs on the chosen provider",
+    "the composer foot names the agent that is actually running, not the picked-but-unapplied one"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "Open the cockpit and pick 'Clinics' in the product switcher",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:891823R8KWYKSD2MP3S8A41XWB",
+   "input_artifacts": [
+    "test-target"
+   ],
+   "mechanism": "human",
+   "name": "vpg7hfps-open-the-cockpit-and-pick-clinics-in-the-1",
+   "output_artifacts": [
+    "vpg7hfps-open-the-cockpit-and-pick-clinics-in-the-1-result"
+   ],
+   "postconditions": [
+    "the board shows the Clinics changes",
+    "the chat dock header shows the Clinics tile",
+    "the chat dock shows the Clinics conversation"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "Pick a different product in the switcher",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:6DRT0ZD4AF684T7BK88JHXXGHS",
+   "input_artifacts": [
+    "vpg7hfps-open-the-cockpit-and-pick-clinics-in-the-1-result"
+   ],
+   "mechanism": "human",
+   "name": "vpg7hfps-pick-a-different-product-in-the-switcher-2",
+   "output_artifacts": [
+    "vpg7hfps-pick-a-different-product-in-the-switcher-2-result"
+   ],
+   "postconditions": [
+    "the board re-scopes to the new product",
+    "the chat dock swaps to the new product's conversation",
+    "the new conversation does not contain any Clinics messages"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "Switch back to Clinics",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:VKP2RQ5TSGTD7XCZ3YW81Z4S4D",
+   "input_artifacts": [
+    "vpg7hfps-pick-a-different-product-in-the-switcher-2-result"
+   ],
+   "mechanism": "human",
+   "name": "vpg7hfps-switch-back-to-clinics-3",
+   "output_artifacts": [
+    "vpg7hfps-switch-back-to-clinics-3-result"
+   ],
+   "postconditions": [
+    "the same Clinics conversation returns unchanged",
+    "the two products' histories never appear blended in one stream"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "In a product's chat, ask to start a piece of work",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:3Z45A3K87CXKXGPB3PSEW2RPGP",
+   "input_artifacts": [
+    "test-target"
+   ],
+   "mechanism": "human",
+   "name": "jrgx42ne-in-a-product-s-chat-ask-to-start-a-piece-1",
+   "output_artifacts": [
+    "jrgx42ne-in-a-product-s-chat-ask-to-start-a-piece-1-result"
+   ],
+   "postconditions": [
+    "the chat shows a confirm step before anything is created",
+    "nothing is on the board yet"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "Confirm the proposed work",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:56NKXPD1257HC49J9TDCGC0SWE",
+   "input_artifacts": [
+    "jrgx42ne-in-a-product-s-chat-ask-to-start-a-piece-1-result"
+   ],
+   "mechanism": "human",
+   "name": "jrgx42ne-confirm-the-proposed-work-2",
+   "output_artifacts": [
+    "jrgx42ne-confirm-the-proposed-work-2-result"
+   ],
+   "postconditions": [
+    "a change card appears on that product's board",
+    "the chat shows a plain-language line saying the work is on that product's board"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  },
+  {
+   "agent_instructions": "Click the new card",
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:step:JR8TBBPZ037KDV5BJDPBSEGMRD",
+   "input_artifacts": [
+    "jrgx42ne-confirm-the-proposed-work-2-result"
+   ],
+   "mechanism": "human",
+   "name": "jrgx42ne-click-the-new-card-3",
+   "output_artifacts": [
+    "jrgx42ne-click-the-new-card-3-result"
+   ],
+   "postconditions": [
+    "the view focuses that change"
+   ],
+   "state": "draft",
+   "sys_status": "active"
+  }
+ ],
+ "workflows": [
+  {
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:workflow:REH9AHFG4A9EFTQ3K8PBD7MEC6",
+   "initial_steps": [
+    "hhysvx59-using-only-the-keyboard-open-and-operate-1"
+   ],
+   "name": "The chat dock is keyboard-navigable and legible without colour in both themes",
+   "state": "draft",
+   "steps": [
+    "hhysvx59-using-only-the-keyboard-open-and-operate-1",
+    "hhysvx59-drive-the-chat-into-its-loading-empty-an-2"
+   ],
+   "sys_status": "active",
+   "terminal_steps": [
+    "hhysvx59-drive-the-chat-into-its-loading-empty-an-2"
+   ],
+   "transitions": [
+    "hhysvx59-using-only-the-keyboard-open-and-operate-1 -> hhysvx59-drive-the-chat-into-its-loading-empty-an-2"
+   ],
+   "type": "review"
+  },
+  {
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:workflow:H4S8P8A9H1CAZZ6DB45DVN6HBT",
+   "initial_steps": [
+    "4xd9z2e6-select-all-products-in-the-switcher-1"
+   ],
+   "name": "The All-products overview chat asks which product before filing a card",
+   "state": "draft",
+   "steps": [
+    "4xd9z2e6-select-all-products-in-the-switcher-1",
+    "4xd9z2e6-ask-the-overview-chat-to-start-a-piece-o-2",
+    "4xd9z2e6-choose-a-product-and-confirm-3"
+   ],
+   "sys_status": "active",
+   "terminal_steps": [
+    "4xd9z2e6-choose-a-product-and-confirm-3"
+   ],
+   "transitions": [
+    "4xd9z2e6-select-all-products-in-the-switcher-1 -> 4xd9z2e6-ask-the-overview-chat-to-start-a-piece-o-2",
+    "4xd9z2e6-ask-the-overview-chat-to-start-a-piece-o-2 -> 4xd9z2e6-choose-a-product-and-confirm-3"
+   ],
+   "type": "review"
+  },
+  {
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:workflow:WDJK3TAH04MQ01EF3M7HMEDHBJ",
+   "initial_steps": [
+    "6az2wdjm-set-a-product-s-chat-agent-to-antigravit-1"
+   ],
+   "name": "Picking and switching the agent drives the real provider with a guard",
+   "state": "draft",
+   "steps": [
+    "6az2wdjm-set-a-product-s-chat-agent-to-antigravit-1",
+    "6az2wdjm-send-a-message-so-a-session-is-running-t-2",
+    "6az2wdjm-confirm-the-switch-and-start-new-work-3"
+   ],
+   "sys_status": "active",
+   "terminal_steps": [
+    "6az2wdjm-confirm-the-switch-and-start-new-work-3"
+   ],
+   "transitions": [
+    "6az2wdjm-set-a-product-s-chat-agent-to-antigravit-1 -> 6az2wdjm-send-a-message-so-a-session-is-running-t-2",
+    "6az2wdjm-send-a-message-so-a-session-is-running-t-2 -> 6az2wdjm-confirm-the-switch-and-start-new-work-3"
+   ],
+   "type": "review"
+  },
+  {
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:workflow:37X7ATNC2H3VX0XN9XVH8G1ESK",
+   "initial_steps": [
+    "vpg7hfps-open-the-cockpit-and-pick-clinics-in-the-1"
+   ],
+   "name": "Switching the product swaps the board and the chat together",
+   "state": "draft",
+   "steps": [
+    "vpg7hfps-open-the-cockpit-and-pick-clinics-in-the-1",
+    "vpg7hfps-pick-a-different-product-in-the-switcher-2",
+    "vpg7hfps-switch-back-to-clinics-3"
+   ],
+   "sys_status": "active",
+   "terminal_steps": [
+    "vpg7hfps-switch-back-to-clinics-3"
+   ],
+   "transitions": [
+    "vpg7hfps-open-the-cockpit-and-pick-clinics-in-the-1 -> vpg7hfps-pick-a-different-product-in-the-switcher-2",
+    "vpg7hfps-pick-a-different-product-in-the-switcher-2 -> vpg7hfps-switch-back-to-clinics-3"
+   ],
+   "type": "review"
+  },
+  {
+   "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+   "for_process": "verification",
+   "id": "dna:workflow:6Q41S2Z63MXVG6GKR7TDSMBW2R",
+   "initial_steps": [
+    "jrgx42ne-in-a-product-s-chat-ask-to-start-a-piece-1"
+   ],
+   "name": "Asking the chat to start work creates a card on that product's board",
+   "state": "draft",
+   "steps": [
+    "jrgx42ne-in-a-product-s-chat-ask-to-start-a-piece-1",
+    "jrgx42ne-confirm-the-proposed-work-2",
+    "jrgx42ne-click-the-new-card-3"
+   ],
+   "sys_status": "active",
+   "terminal_steps": [
+    "jrgx42ne-click-the-new-card-3"
+   ],
+   "transitions": [
+    "jrgx42ne-in-a-product-s-chat-ask-to-start-a-piece-1 -> jrgx42ne-confirm-the-proposed-work-2",
+    "jrgx42ne-confirm-the-proposed-work-2 -> jrgx42ne-click-the-new-card-3"
+   ],
+   "type": "review"
+  }
+ ]
+}
