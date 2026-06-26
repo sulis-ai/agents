@@ -81,6 +81,9 @@ export function AgentPicker({
           // open UPWARD or it falls off the bottom of the viewport. The shared
           // primitive's default ("down") stays for the top-of-page placements.
           placement="up"
+          // chat-ux: this picker reuses ProductControl, so its search input
+          // would otherwise read "Find a product" — it's choosing an AGENT.
+          searchLabel="Find an agent…"
         />
       </div>
 

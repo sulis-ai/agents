@@ -79,6 +79,12 @@ export interface ProductControlProps {
    * downward menu would fall off-screen (chat-ux Fix 1).
    */
   placement?: "down" | "up";
+  /**
+   * Placeholder + aria-label for the popover's search input. Defaults to the
+   * product wording; the agent picker overrides it ("Find an agent…") since it
+   * reuses this primitive (chat-ux: the agent picker showed "Find a product").
+   */
+  searchLabel?: string;
 }
 
 // ─── glyph tiles ────────────────────────────────────────────────────────────
@@ -206,6 +212,7 @@ export function ProductControl({
   triggerLabel,
   testIdPrefix = "product-control",
   placement = "down",
+  searchLabel = "Find a product…",
 }: ProductControlProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -390,8 +397,8 @@ export function ProductControl({
             <input
               ref={searchRef}
               type="text"
-              placeholder="Find a product…"
-              aria-label="Find a product"
+              placeholder={searchLabel}
+              aria-label={searchLabel.replace(/…$/, "")}
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);

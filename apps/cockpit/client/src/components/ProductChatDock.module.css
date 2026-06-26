@@ -8,11 +8,12 @@
   /* chat-ux Fix 3 — the dock is a FIXED-width panel on the right; it does not
    * flex-grow and does not let the board squeeze it. Opening the chat must not
    * shrink the board (the board area scrolls horizontally instead — see
-   * WorkspaceShell .main). 380px is the signed-contract chat width. */
-  flex: 0 0 380px;
-  width: 380px;
-  min-width: 380px;
-  max-width: 380px;
+   * WorkspaceShell .main). chat-ux follow-up: the founder wanted the expanded
+   * chat ~half again bigger (380 → 560) so the conversation has real room. */
+  flex: 0 0 560px;
+  width: 560px;
+  min-width: 560px;
+  max-width: 560px;
   height: 100%;
   background: var(--card);
   border-left: 1px solid var(--border);

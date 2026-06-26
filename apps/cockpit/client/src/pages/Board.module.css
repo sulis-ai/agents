@@ -54,7 +54,12 @@
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(6, minmax(180px, 1fr));
+  /* chat-ux follow-up — lanes hold a COMFORTABLE min width (280px) and never
+   * shrink below it; when the docked chat narrows the board area the row
+   * overflows + scrolls horizontally (WorkspaceShell .main overflow-x:auto)
+   * instead of compressing the cards. The founder wanted cards at their correct
+   * size + scroll sideways, not squeezed. (Was minmax(180px,1fr).) */
+  grid-template-columns: repeat(6, minmax(280px, 1fr));
   gap: 16px;
 }
 
