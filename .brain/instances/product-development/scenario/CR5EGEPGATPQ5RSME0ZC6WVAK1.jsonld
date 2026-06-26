@@ -1,0 +1,12 @@
+{
+  "exercises": "dna:design:00000000000000000000000000",
+  "id": "dna:scenario:CR5EGEPGATPQ5RSME0ZC6WVAK1",
+  "journey": "dna:workflow:6Q41S2Z63MXVG6GKR7TDSMBW2R",
+  "name": "Asking the chat to start work creates a card on that product's board",
+  "state": "draft",
+  "surface": "ui",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:EDQQQX021ENCJM0FV3CM3WTFGK"
+  ]
+}

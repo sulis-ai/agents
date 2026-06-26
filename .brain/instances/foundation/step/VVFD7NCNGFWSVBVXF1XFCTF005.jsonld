@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Ask the overview chat to start a piece of work",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:VVFD7NCNGFWSVBVXF1XFCTF005",
+  "input_artifacts": [
+    "4xd9z2e6-select-all-products-in-the-switcher-1-result"
+  ],
+  "mechanism": "human",
+  "name": "4xd9z2e6-ask-the-overview-chat-to-start-a-piece-o-2",
+  "output_artifacts": [
+    "4xd9z2e6-ask-the-overview-chat-to-start-a-piece-o-2-result"
+  ],
+  "postconditions": [
+    "the chat asks which product the new work belongs to before creating anything"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

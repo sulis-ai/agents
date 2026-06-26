@@ -1,0 +1,12 @@
+{
+  "exercises": "dna:design:00000000000000000000000000",
+  "id": "dna:scenario:7PEMXS2PB6S902DJ0SG7Y1XFJR",
+  "journey": "dna:workflow:H4S8P8A9H1CAZZ6DB45DVN6HBT",
+  "name": "The All-products overview chat asks which product before filing a card",
+  "state": "draft",
+  "surface": "ui",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:146FVGVMKE1FSQG22MAFN7JXPD"
+  ]
+}

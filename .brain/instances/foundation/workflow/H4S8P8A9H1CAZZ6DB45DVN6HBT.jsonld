@@ -1,0 +1,24 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:workflow:H4S8P8A9H1CAZZ6DB45DVN6HBT",
+  "initial_steps": [
+    "4xd9z2e6-select-all-products-in-the-switcher-1"
+  ],
+  "name": "The All-products overview chat asks which product before filing a card",
+  "state": "draft",
+  "steps": [
+    "4xd9z2e6-select-all-products-in-the-switcher-1",
+    "4xd9z2e6-ask-the-overview-chat-to-start-a-piece-o-2",
+    "4xd9z2e6-choose-a-product-and-confirm-3"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "4xd9z2e6-choose-a-product-and-confirm-3"
+  ],
+  "transitions": [
+    "4xd9z2e6-select-all-products-in-the-switcher-1 -> 4xd9z2e6-ask-the-overview-chat-to-start-a-piece-o-2",
+    "4xd9z2e6-ask-the-overview-chat-to-start-a-piece-o-2 -> 4xd9z2e6-choose-a-product-and-confirm-3"
+  ],
+  "type": "review"
+}

@@ -1,0 +1,12 @@
+{
+  "evidence": "human-attested:concierge: live Playwright e2e 5/5 (product-wide-chat.spec.ts) against standing cockpit; observed=['both are reachable and operable by keyboard with a visible focus ring', 'both expose real menu semantics (a radio-style checked item)', 'each state is legible without relying on colour (glyph plus word)', 'all text pairings meet WCAG AA in both themes', 'the streaming caret and skeleton honour reduced-motion']; not-observed=[]",
+  "id": "dna:testresult:DRHM633XNP4TGNNXFYW9G50NR1",
+  "of_run": "dna:testrun:JQ070EKM2EYZT0SEM9EFQG53CY",
+  "outcome": "pass",
+  "scenario": "dna:scenario:0GHKDC0NMRASHXTGJSCMJYRBXS",
+  "sys_status": "active",
+  "type": "e2e",
+  "verifies": [
+    "dna:requirement:WQGCY5P4YA6JEZ5W3Q6KBDN5ZZ"
+  ]
+}

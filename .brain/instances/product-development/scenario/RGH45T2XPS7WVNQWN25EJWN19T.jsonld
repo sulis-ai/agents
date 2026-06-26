@@ -1,0 +1,12 @@
+{
+  "exercises": "dna:design:00000000000000000000000000",
+  "id": "dna:scenario:RGH45T2XPS7WVNQWN25EJWN19T",
+  "journey": "dna:workflow:37X7ATNC2H3VX0XN9XVH8G1ESK",
+  "name": "Switching the product swaps the board and the chat together",
+  "state": "draft",
+  "surface": "ui",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:E48MA6FYHE4B84KRX2QV95C76H"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "agent_instructions": "Open the cockpit and pick 'Clinics' in the product switcher",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:891823R8KWYKSD2MP3S8A41XWB",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "vpg7hfps-open-the-cockpit-and-pick-clinics-in-the-1",
+  "output_artifacts": [
+    "vpg7hfps-open-the-cockpit-and-pick-clinics-in-the-1-result"
+  ],
+  "postconditions": [
+    "the board shows the Clinics changes",
+    "the chat dock header shows the Clinics tile",
+    "the chat dock shows the Clinics conversation"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

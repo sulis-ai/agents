@@ -1,0 +1,22 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:workflow:REH9AHFG4A9EFTQ3K8PBD7MEC6",
+  "initial_steps": [
+    "hhysvx59-using-only-the-keyboard-open-and-operate-1"
+  ],
+  "name": "The chat dock is keyboard-navigable and legible without colour in both themes",
+  "state": "draft",
+  "steps": [
+    "hhysvx59-using-only-the-keyboard-open-and-operate-1",
+    "hhysvx59-drive-the-chat-into-its-loading-empty-an-2"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "hhysvx59-drive-the-chat-into-its-loading-empty-an-2"
+  ],
+  "transitions": [
+    "hhysvx59-using-only-the-keyboard-open-and-operate-1 -> hhysvx59-drive-the-chat-into-its-loading-empty-an-2"
+  ],
+  "type": "review"
+}

@@ -1,0 +1,24 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:workflow:6Q41S2Z63MXVG6GKR7TDSMBW2R",
+  "initial_steps": [
+    "jrgx42ne-in-a-product-s-chat-ask-to-start-a-piece-1"
+  ],
+  "name": "Asking the chat to start work creates a card on that product's board",
+  "state": "draft",
+  "steps": [
+    "jrgx42ne-in-a-product-s-chat-ask-to-start-a-piece-1",
+    "jrgx42ne-confirm-the-proposed-work-2",
+    "jrgx42ne-click-the-new-card-3"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "jrgx42ne-click-the-new-card-3"
+  ],
+  "transitions": [
+    "jrgx42ne-in-a-product-s-chat-ask-to-start-a-piece-1 -> jrgx42ne-confirm-the-proposed-work-2",
+    "jrgx42ne-confirm-the-proposed-work-2 -> jrgx42ne-click-the-new-card-3"
+  ],
+  "type": "review"
+}

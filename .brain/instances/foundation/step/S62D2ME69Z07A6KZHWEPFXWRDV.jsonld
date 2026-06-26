@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Select 'All products' in the switcher",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:S62D2ME69Z07A6KZHWEPFXWRDV",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "4xd9z2e6-select-all-products-in-the-switcher-1",
+  "output_artifacts": [
+    "4xd9z2e6-select-all-products-in-the-switcher-1-result"
+  ],
+  "postconditions": [
+    "the cross-product overview chat is shown",
+    "it does not blend any single product's history into the stream"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

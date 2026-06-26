@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "In a product's chat, ask to start a piece of work",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:3Z45A3K87CXKXGPB3PSEW2RPGP",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "jrgx42ne-in-a-product-s-chat-ask-to-start-a-piece-1",
+  "output_artifacts": [
+    "jrgx42ne-in-a-product-s-chat-ask-to-start-a-piece-1-result"
+  ],
+  "postconditions": [
+    "the chat shows a confirm step before anything is created",
+    "nothing is on the board yet"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

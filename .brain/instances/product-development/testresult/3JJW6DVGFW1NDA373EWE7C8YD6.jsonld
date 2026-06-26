@@ -1,0 +1,12 @@
+{
+  "evidence": "human-attested:concierge: live Playwright e2e 5/5 (product-wide-chat.spec.ts) against standing cockpit; observed=['the composer foot names Antigravity as the active agent', 'a confirm appears before the switch takes effect', 'the confirm explains the switch applies to new work, not the running session', 'the new session runs on the chosen provider', 'the composer foot names the agent that is actually running, not the picked-but-unapplied one']; not-observed=[]",
+  "id": "dna:testresult:3JJW6DVGFW1NDA373EWE7C8YD6",
+  "of_run": "dna:testrun:KKRMXCM8FBFSHK4Y9K184V9XC1",
+  "outcome": "pass",
+  "scenario": "dna:scenario:JD7VKBQC1KKR77WY9BRHR1Z40M",
+  "sys_status": "active",
+  "type": "e2e",
+  "verifies": [
+    "dna:requirement:FYW52QX0BT123CR1GASFBCVBEG"
+  ]
+}

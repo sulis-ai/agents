@@ -1,0 +1,24 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:workflow:WDJK3TAH04MQ01EF3M7HMEDHBJ",
+  "initial_steps": [
+    "6az2wdjm-set-a-product-s-chat-agent-to-antigravit-1"
+  ],
+  "name": "Picking and switching the agent drives the real provider with a guard",
+  "state": "draft",
+  "steps": [
+    "6az2wdjm-set-a-product-s-chat-agent-to-antigravit-1",
+    "6az2wdjm-send-a-message-so-a-session-is-running-t-2",
+    "6az2wdjm-confirm-the-switch-and-start-new-work-3"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "6az2wdjm-confirm-the-switch-and-start-new-work-3"
+  ],
+  "transitions": [
+    "6az2wdjm-set-a-product-s-chat-agent-to-antigravit-1 -> 6az2wdjm-send-a-message-so-a-session-is-running-t-2",
+    "6az2wdjm-send-a-message-so-a-session-is-running-t-2 -> 6az2wdjm-confirm-the-switch-and-start-new-work-3"
+  ],
+  "type": "review"
+}

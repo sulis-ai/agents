@@ -1,0 +1,12 @@
+{
+  "evidence": "human-attested:concierge: live Playwright e2e 5/5 (product-wide-chat.spec.ts) against standing cockpit; observed=['the chat shows a confirm step before anything is created', 'nothing is on the board yet', \"a change card appears on that product's board\", \"the chat shows a plain-language line saying the work is on that product's board\", 'the view focuses that change']; not-observed=[]",
+  "id": "dna:testresult:JMQ8PWH9EWZWR27VZX4H4VTVRQ",
+  "of_run": "dna:testrun:AMWXBP1BMXPNE4878BTAN7DM6R",
+  "outcome": "pass",
+  "scenario": "dna:scenario:CR5EGEPGATPQ5RSME0ZC6WVAK1",
+  "sys_status": "active",
+  "type": "e2e",
+  "verifies": [
+    "dna:requirement:EDQQQX021ENCJM0FV3CM3WTFGK"
+  ]
+}
