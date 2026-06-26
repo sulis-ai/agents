@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Click the new card",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:JR8TBBPZ037KDV5BJDPBSEGMRD",
+  "input_artifacts": [
+    "jrgx42ne-confirm-the-proposed-work-2-result"
+  ],
+  "mechanism": "human",
+  "name": "jrgx42ne-click-the-new-card-3",
+  "output_artifacts": [
+    "jrgx42ne-click-the-new-card-3-result"
+  ],
+  "postconditions": [
+    "the view focuses that change"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

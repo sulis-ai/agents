@@ -25,16 +25,17 @@
 import type { Change, Product } from "../../../shared/api-types";
 import { ProductControl, type ProductRow } from "./ProductControl";
 import {
+  ALL_SCOPE,
   UNASSIGNED_SCOPE,
   countForScope,
   type ProductScope,
 } from "../lib/productCounts";
 import styles from "./ProductSwitcher.module.css";
 
-// The All-products row id. A client sentinel that maps to the `null` scope
-// (every change); kept distinct from a product id and from UNASSIGNED_SCOPE so
-// the synthetic + real rows never collide.
-const ALL_SCOPE_ROW_ID = "__all__";
+// The All-products row id — the shared `ALL_SCOPE` sentinel (one vocabulary,
+// WP-001). Maps to the `null` scope (every change); kept distinct from a product
+// id and from UNASSIGNED_SCOPE so the synthetic + real rows never collide.
+const ALL_SCOPE_ROW_ID = ALL_SCOPE;
 
 export interface ProductSwitcherProps {
   products: Product[];

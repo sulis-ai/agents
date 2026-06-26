@@ -1,0 +1,12 @@
+{
+  "exercises": "dna:design:00000000000000000000000000",
+  "id": "dna:scenario:0GHKDC0NMRASHXTGJSCMJYRBXS",
+  "journey": "dna:workflow:REH9AHFG4A9EFTQ3K8PBD7MEC6",
+  "name": "The chat dock is keyboard-navigable and legible without colour in both themes",
+  "state": "draft",
+  "surface": "ui",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:WQGCY5P4YA6JEZ5W3Q6KBDN5ZZ"
+  ]
+}

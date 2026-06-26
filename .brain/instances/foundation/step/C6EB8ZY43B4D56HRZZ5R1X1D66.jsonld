@@ -1,0 +1,19 @@
+{
+  "agent_instructions": "Set a product's chat agent to Antigravity at the composer foot",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:C6EB8ZY43B4D56HRZZ5R1X1D66",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "6az2wdjm-set-a-product-s-chat-agent-to-antigravit-1",
+  "output_artifacts": [
+    "6az2wdjm-set-a-product-s-chat-agent-to-antigravit-1-result"
+  ],
+  "postconditions": [
+    "the composer foot names Antigravity as the active agent"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

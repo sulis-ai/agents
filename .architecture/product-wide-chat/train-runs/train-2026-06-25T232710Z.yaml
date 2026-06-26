@@ -1,0 +1,15 @@
+train_id: "train-2026-06-25T232710Z"
+started_at: "2026-06-25T23:27:10Z"
+outcome: "paused"
+outcome_reason: "bundled-tip CI failed on wp/create-product-wide-chat/wp-004-integration-seam-close"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: null
+smoke_verdict: null
+bundle:
+  - wp: WP-004
+    branch: wp/create-product-wide-chat/wp-004-integration-seam-close
+    pre_train_sha: c494381423d75b9589152b6fc012a840704984dd
+    rebased_to_sha: 2b633f0e8fa5edb101b790dad42d209efde51204
+    merge_sha_on_dev: null

@@ -20,7 +20,12 @@ exposes ``SecretHit`` + three named functions so the two consumers can pick
     a secret (not). ADR-006 supersedes ADR-002's entropy-rejection for THIS
     policy only — detect-secrets' entropy plugins use a quote/assignment
     heuristic, so commit SHAs / ULIDs / UUIDs in prose stay clean while
-    quoted/assigned high-entropy provider tokens are caught.
+    quoted/assigned high-entropy provider tokens are caught. ``detect-secrets``
+    is an OPTIONAL dependency: when it is unavailable (e.g. the cockpit chat-turn
+    scrub spawns a plain ``python3`` with no uv env), the union DEGRADES to the
+    in-house catalogue alone — ``find_secrets`` still redacts the real provider
+    key shapes and NEVER crashes on the missing enhancer (CH-G3Y4RM). When
+    detect-secrets IS present, behaviour is byte-for-byte unchanged.
 
   - ``_anonymiser`` does NOT call either function above — it imports the raw
     compiled catalogue patterns directly and applies its own **redact policy**.
@@ -68,8 +73,27 @@ from dataclasses import dataclass
 # ``default_settings`` populates the plugin registry with Yelp's default plugin
 # set; ``get_plugins`` returns the configured plugin instances we run per line.
 # In-process plugin API — no shell-out (the WP constraint), portable.
-from detect_secrets.core.scan import get_plugins
-from detect_secrets.settings import default_settings
+#
+# OPTIONAL dependency (CH-G3Y4RM robustness fix). ``detect_secrets`` is a uv-
+# locked dependency, present under the project's pytest/uv environment but NOT
+# guaranteed in every interpreter that reaches this module — notably the cockpit
+# server spawns a PLAIN ``python3`` (no uv env) to run the chat-turn scrub, where
+# the package is absent. A module-level import would make that import fatal and
+# crash the append ("chat turn append failed"). So the import is optional: when
+# ``detect_secrets`` is unavailable, the outbound-scrub union DEGRADES to the
+# in-house catalogue ALONE (``find_secrets`` == ``find_catalogue_secrets``),
+# which still redacts the real provider key shapes. The scrub must never crash on
+# the missing optional enhancer. When ``detect_secrets`` IS present, behaviour is
+# byte-for-byte unchanged (no regression to the shipped portable-context union).
+try:
+    from detect_secrets.core.scan import get_plugins
+    from detect_secrets.settings import default_settings
+
+    _DETECT_SECRETS_AVAILABLE = True
+except ImportError:  # pragma: no cover — exercised via a meta-path block in tests
+    get_plugins = None  # type: ignore[assignment]
+    default_settings = None  # type: ignore[assignment]
+    _DETECT_SECRETS_AVAILABLE = False
 
 # ─── Public type ──────────────────────────────────────────────────────────────
 
@@ -259,7 +283,13 @@ _DETECT_SECRETS_PLUGINS: tuple = ()
 
 
 def _detect_secrets_plugins() -> tuple:
-    """Return the cached detect-secrets plugin instances, building them once."""
+    """Return the cached detect-secrets plugin instances, building them once.
+
+    Returns an empty tuple when ``detect_secrets`` is unavailable (the optional
+    dependency is absent — e.g. the cockpit plain-python3 env), so the
+    outbound-scrub union degrades gracefully to the in-house catalogue alone."""
+    if not _DETECT_SECRETS_AVAILABLE:
+        return ()
     global _DETECT_SECRETS_PLUGINS
     if not _DETECT_SECRETS_PLUGINS:
         with default_settings():
@@ -288,7 +318,10 @@ def _find_detect_secrets(text: str) -> list[SecretHit]:
     advisory offsets are sufficient. Categories are prefixed ``ds:`` to record
     detect-secrets provenance in the refusal message.
     """
-    if not text:
+    if not text or not _DETECT_SECRETS_AVAILABLE:
+        # No text, or the optional detect-secrets enhancer is absent — the union
+        # degrades to the catalogue alone, so this primary layer contributes
+        # nothing rather than crashing on the missing dependency.
         return []
 
     # detect-secrets scans line-by-line; a request part may contain newlines

@@ -38,6 +38,9 @@ import {
   type StartChangeLogLine,
 } from "./routes/chat";
 import { LocalTranscriptConversationIdentity } from "./adapters/LocalTranscriptConversationIdentity";
+import { createChatScopeRouter } from "./routes/chatScope";
+import type { ChatScopeStore } from "./ports/ChatScopeStore";
+import { LocalChatScopeStore } from "./adapters/LocalChatScopeStore";
 import type { SpineMinter } from "./ports/SpineMinter";
 import {
   SpineEmitterMinter,
@@ -92,6 +95,15 @@ export interface CreateAppDeps {
    * recorded/programmable bridge.
    */
   sessionBridge?: SessionBridge;
+  /**
+   * WP-002 — the durable per-product chat store (ADR-002). Backs the three
+   * per-product chat routes (`/api/chat/:scope/*`). Optional: production
+   * defaults to the real `LocalChatScopeStore` (the on-disk binding the Python
+   * `_session_manager.chat_scope_store` resolver writes); tests inject a fake.
+   * The chat-scope routes are bridge-gated (they relay through the SessionBridge)
+   * — mounted only when a bridge is wired, the same rollback shape as the relay.
+   */
+  chatScopeStore?: ChatScopeStore;
   /**
    * WP-005 — where the relay's one-structured-line-per-send log goes
    * (NFR-SEC-03: never the body or reply). Defaults to a no-op; tests capture
@@ -210,6 +222,20 @@ export function createApp(deps: CreateAppDeps): Application {
         conversationIdentity: new LocalTranscriptConversationIdentity(),
         claudeProjectsDir: deps.claudeProjectsDir,
         chatLogSink: deps.chatLogSink,
+      }),
+    );
+
+    // WP-002 — the per-product chat routes (ADR-002/003/004). The three-route
+    // seam built against the WP-001 contract: GET /:scope/thread, POST
+    // /:scope/message (SSE), PUT /:scope/provider. Bridge-gated like the relay
+    // (the message route relays through the SAME SessionBridge, opening on the
+    // scope's resolved provider — provider-on-open). The durable store defaults
+    // to the real on-disk `LocalChatScopeStore` (the Python store's binding).
+    app.use(
+      "/api/chat",
+      createChatScopeRouter({
+        store: deps.chatScopeStore ?? new LocalChatScopeStore(),
+        sessionBridge: deps.sessionBridge,
       }),
     );
 

@@ -55,10 +55,13 @@ import {
   createTerminalSidecar,
   type TerminalSidecar,
 } from "./adapters/TerminalSidecar";
+import { LocalChatScopeStore } from "./adapters/LocalChatScopeStore";
 import { resolveSessionFor } from "./lib/resolveSession";
 import { ensureDaemon, resolveDefaultSocket } from "./lib/ensureDaemon";
 import type { ChangeStoreReader } from "./ports/ChangeStoreReader";
 import type { SessionResolution } from "./ports/SessionBridge";
+// eslint-disable-next-line no-restricted-imports -- intra-package import to apps/cockpit/shared/ (TDD §9 permits; the rule blocks escapes OUT of apps/cockpit/)
+import type { ChatScope } from "../shared/api-types";
 import { CONFIG } from "./config";
 import { createApp } from "./app";
 
@@ -100,6 +103,12 @@ export function buildProductionApp() {
     timeoutMs: CONFIG.changeListTimeoutMs,
   });
 
+  // WP-004 — the per-product chat store, reused here so the bridge can GROUND a
+  // chat scope's cwd to its real chat-store dir (folded ADV-CWD-01). A chat
+  // scope (`product:…`) is NOT a change id; without this it would resolve to
+  // `cwd:""` and the chat session would run in the server's own dir.
+  const chatScopeStore = new LocalChatScopeStore();
+
   // WP-005 — the production SessionBridge (ADR-002). Its `resolve` looks up the
   // change's worktree (the cwd the session runs in + the binding identity) via
   // the change store, then composes the side-effect-free liveness + transcript
@@ -108,6 +117,14 @@ export function buildProductionApp() {
   // site (ADR-003). The real round-trip is the founder-machine observation.
   const sessionBridge = new StreamJsonSessionBridge({
     resolve: async (changeId): Promise<SessionResolution> => {
+      // A per-product chat scope is keyed `product:…` (never a change id). Its
+      // session runs GROUNDED in the scope's real chat-store dir (ADV-CWD-01),
+      // not the server's cwd — and always `fresh` (the chat relay has no
+      // resumable change transcript; ADR-003).
+      if (changeId.startsWith("product:")) {
+        const cwd = await chatScopeStore.groundCwd(changeId as ChatScope);
+        return { kind: "fresh", session: { changeId, cwd } };
+      }
       const record = await changeStore.readChangeRecord(changeId);
       if (record === null) {
         // Unknown change → fresh with no usable worktree; the relay's
@@ -131,6 +148,10 @@ export function buildProductionApp() {
   return createApp({
     changeStore,
     sessionBridge,
+    // WP-004 — the SAME chat store the bridge grounds cwds through, so the
+    // per-product chat routes persist turns to (and ground cwd against) one
+    // store instance (DAT-PERSIST-01 / ADV-CWD-01).
+    chatScopeStore,
     // The relay's one-structured-line-per-send log (NFR-SEC-03: never the body
     // or reply). Routed through the dev-runner heartbeat console; no bodies.
     chatLogSink: (line) => {
@@ -195,6 +216,17 @@ export interface StartProductionServerOptions {
    *  SAME socket the running server bridges to. Mirrors the existing `python`
    *  test-injection option. */
   socketPath?: string;
+  /**
+   * WP-002 (ADR-003) — resolve the provider a session is opened on, REPLACING
+   * the prior hardcoded `{provider:"pty"}` literal. Given the resolved change
+   * id, returns the provider key to open on (the picker's choice → the scope's
+   * remembered choice → the safe default `pty`). Defaults to a resolver that
+   * yields `pty` for every change — byte-identical to today's behaviour — so the
+   * change is additive: a caller that wires a per-scope resolver gets the
+   * Claude/Antigravity choice; one that does not keeps Claude. The resolver only
+   * ever yields a registered key; the daemon's `UNKNOWN_PROVIDER` stays the
+   * last-resort backstop. */
+  resolveProvider?: (changeId: string) => Promise<string> | string;
 }
 
 /**
@@ -209,9 +241,10 @@ export interface StartProductionServerOptions {
  * Either way both views land on the SAME daemon — the load-bearing invariant.
  *
  * The sidecar's `resolveChange` is bound to the change-store reader
- * (`readChangeRecord(id).worktreePath` → `{provider:"pty", cwd:worktreePath}`)
- * — REUSE-FIRST (EP-03), the same lookup the chat path uses, no second
- * resolution path. The origin allow-list is `CONFIG.clientOrigin`; the caps are
+ * (`readChangeRecord(id).worktreePath` → `{provider, cwd:worktreePath}`, the
+ * provider RESOLVED per ADR-003 — picker → remembered → `pty` default, no longer
+ * a hardcoded literal) — REUSE-FIRST (EP-03), the same lookup the chat path
+ * uses, no second resolution path. The origin allow-list is `CONFIG.clientOrigin`; the caps are
  * the frozen `CONFIG.terminal*` ceilings; the log sink routes one structured
  * line per refuse through the dev-runner console (NFR-SEC-03: outcome/code/
  * change-id only, never a terminal byte).
@@ -226,6 +259,10 @@ export async function startProductionServer(
   const port = opts.port ?? CONFIG.serverPort;
   const originAllowList = opts.originAllowList ?? [CONFIG.clientOrigin];
   const socketPath = opts.socketPath ?? resolveDefaultSocket();
+  // WP-002 (ADR-003) — the provider-on-open resolver. Defaults to the safe `pty`
+  // (Claude) backstop for every change, so the literal that lived at the
+  // `resolveChange` return is gone but today's behaviour is preserved.
+  const resolveProvider = opts.resolveProvider ?? (() => "pty");
   const changeStore =
     opts.changeStore ??
     new SulisChangeStoreReader({
@@ -272,7 +309,10 @@ export async function startProductionServer(
     resolveChange: async (changeId: string) => {
       const record = await changeStore.readChangeRecord(changeId);
       if (record === null) return null;
-      return { provider: "pty", cwd: record.worktreePath };
+      // ADR-003: the provider is RESOLVED (picker → remembered → pty), not the
+      // old `{provider:"pty"}` literal. The resolver's default preserves `pty`.
+      const provider = await resolveProvider(changeId);
+      return { provider, cwd: record.worktreePath };
     },
     originAllowList,
     caps: {

@@ -1,0 +1,24 @@
+{
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:workflow:37X7ATNC2H3VX0XN9XVH8G1ESK",
+  "initial_steps": [
+    "vpg7hfps-open-the-cockpit-and-pick-clinics-in-the-1"
+  ],
+  "name": "Switching the product swaps the board and the chat together",
+  "state": "draft",
+  "steps": [
+    "vpg7hfps-open-the-cockpit-and-pick-clinics-in-the-1",
+    "vpg7hfps-pick-a-different-product-in-the-switcher-2",
+    "vpg7hfps-switch-back-to-clinics-3"
+  ],
+  "sys_status": "active",
+  "terminal_steps": [
+    "vpg7hfps-switch-back-to-clinics-3"
+  ],
+  "transitions": [
+    "vpg7hfps-open-the-cockpit-and-pick-clinics-in-the-1 -> vpg7hfps-pick-a-different-product-in-the-switcher-2",
+    "vpg7hfps-pick-a-different-product-in-the-switcher-2 -> vpg7hfps-switch-back-to-clinics-3"
+  ],
+  "type": "review"
+}

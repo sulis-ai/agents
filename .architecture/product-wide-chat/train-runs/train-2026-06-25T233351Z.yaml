@@ -1,0 +1,21 @@
+train_id: "train-2026-06-25T233351Z"
+started_at: "2026-06-25T23:33:51Z"
+completed_at: "2026-06-25T23:43:21Z"
+outcome: "success"
+batch_size: 2
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-25T23:39:06Z"
+bundle:
+  - wp: WP-004
+    branch: wp/create-product-wide-chat/wp-004-integration-seam-close
+    pre_train_sha: 2b633f0e8fa5edb101b790dad42d209efde51204
+    rebased_to_sha: dc52701ef5ef47011b37127d856da58fa6f0f5da
+    merge_sha_on_dev: 8c51b95c657b18a4efb47a2fcefabce7efc7fa88
+  - wp: WP-005
+    branch: wp/create-product-wide-chat/wp-005-optional-detect-secrets
+    pre_train_sha: 8aa0a657df60797155772dda84ab554db5bbf281
+    rebased_to_sha: 837347cca7eb8abc58a8321cb483304f2d1c441c
+    merge_sha_on_dev: d303601a3d41a2b3e7078d3ad9d98987d1360480

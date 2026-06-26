@@ -16,6 +16,12 @@
 // predicate (forProduct == null) on the client.
 
 import type { Change } from "../../../shared/api-types";
+// The scope sentinels live ONCE in `shared/chatScope.ts` (the single vocabulary
+// home — the per-product chat scope and these board sentinels share one token,
+// WP-001 / CL-05). Re-exported here so existing client importers keep working.
+import { ALL_SCOPE, UNASSIGNED_SCOPE } from "../../../shared/chatScope";
+
+export { ALL_SCOPE, UNASSIGNED_SCOPE };
 
 /**
  * The active board scope: `null` = All products (every change), a product id =
@@ -23,13 +29,6 @@ import type { Change } from "../../../shared/api-types";
  * changes with no product (filtered client-side).
  */
 export type ProductScope = string | null;
-
-/**
- * The "Unassigned" scope sentinel. A client-only marker — it is NEVER sent to
- * the server (which has no "unassigned" `?product=` value). Shaped so it can't
- * collide with a real product id (`dna:product:<ulid>`).
- */
-export const UNASSIGNED_SCOPE = "__unassigned__" as const;
 
 /** True when the change has no product (null or undefined `forProduct`). */
 function isUnassigned(change: Change): boolean {

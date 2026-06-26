@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Confirm the proposed work",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:56NKXPD1257HC49J9TDCGC0SWE",
+  "input_artifacts": [
+    "jrgx42ne-in-a-product-s-chat-ask-to-start-a-piece-1-result"
+  ],
+  "mechanism": "human",
+  "name": "jrgx42ne-confirm-the-proposed-work-2",
+  "output_artifacts": [
+    "jrgx42ne-confirm-the-proposed-work-2-result"
+  ],
+  "postconditions": [
+    "a change card appears on that product's board",
+    "the chat shows a plain-language line saying the work is on that product's board"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

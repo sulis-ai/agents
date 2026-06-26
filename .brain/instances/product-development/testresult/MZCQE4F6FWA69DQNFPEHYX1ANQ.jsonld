@@ -1,0 +1,12 @@
+{
+  "evidence": "human-attested:concierge: live Playwright e2e 5/5 (product-wide-chat.spec.ts) against standing cockpit; observed=['the board shows the Clinics changes', 'the chat dock header shows the Clinics tile', 'the chat dock shows the Clinics conversation', 'the board re-scopes to the new product', \"the chat dock swaps to the new product's conversation\", 'the new conversation does not contain any Clinics messages', 'the same Clinics conversation returns unchanged', \"the two products' histories never appear blended in one stream\"]; not-observed=[]",
+  "id": "dna:testresult:MZCQE4F6FWA69DQNFPEHYX1ANQ",
+  "of_run": "dna:testrun:F139BYMMVH90F8DYRHYVD6K516",
+  "outcome": "pass",
+  "scenario": "dna:scenario:RGH45T2XPS7WVNQWN25EJWN19T",
+  "sys_status": "active",
+  "type": "e2e",
+  "verifies": [
+    "dna:requirement:E48MA6FYHE4B84KRX2QV95C76H"
+  ]
+}

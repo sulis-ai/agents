@@ -1,0 +1,20 @@
+{
+  "agent_instructions": "Using only the keyboard, open and operate the product switcher and the agent picker",
+  "for_domain": "dna:tenant:7Q5TE6ZK6XMDM63BHNKXCJ46FY",
+  "for_process": "verification",
+  "id": "dna:step:QX5PS94YQ9BPB8DXDG9S8SEC0Q",
+  "input_artifacts": [
+    "test-target"
+  ],
+  "mechanism": "human",
+  "name": "hhysvx59-using-only-the-keyboard-open-and-operate-1",
+  "output_artifacts": [
+    "hhysvx59-using-only-the-keyboard-open-and-operate-1-result"
+  ],
+  "postconditions": [
+    "both are reachable and operable by keyboard with a visible focus ring",
+    "both expose real menu semantics (a radio-style checked item)"
+  ],
+  "state": "draft",
+  "sys_status": "active"
+}

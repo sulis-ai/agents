@@ -1,0 +1,355 @@
+/* WP-003 — <ProductChatDock> styles. Token-only (tokens.css), light + dark.
+ * Built to the SIGNED visual contract (product-wide-chat.html .chat / .chatHead
+ * / .agentStatus / .composerWrap / state cards). Zero invented hex. */
+
+.dock {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  background: var(--card);
+  border-left: 1px solid var(--border);
+}
+
+.dock.collapsed {
+  /* Collapsed: only the header chrome remains, still keyboard-reachable. */
+  height: auto;
+}
+
+/* ── header — echoes the active product tile + honest status ──────────────── */
+.head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-muted);
+}
+
+.switcher {
+  min-width: 0;
+}
+
+.right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--radius-badge);
+  font-weight: var(--weight-label);
+}
+
+.status.working {
+  background: var(--bg-warning);
+  border: 1px solid var(--bg-warning-border);
+  color: var(--warning);
+}
+
+.status.idle {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  /* WP-004 a11y (Scenario 5) — --text-secondary clears WCAG AA (4.5:1) on
+   * --muted in both themes; --muted-foreground failed at 4.34:1 (11px text). */
+  color: var(--text-secondary);
+}
+
+.sdot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.toggle {
+  font-size: 11px;
+  padding: 4px 10px;
+  min-height: 28px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-secondary);
+  border-radius: var(--radius-button);
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* ── three honest states ──────────────────────────────────────────────────── */
+.skel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 16px 14px;
+}
+
+.skelLine {
+  height: 12px;
+  border-radius: var(--radius-interactive);
+  background: linear-gradient(
+    90deg,
+    var(--muted),
+    var(--border-muted),
+    var(--muted)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.3s linear infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.skelLine.short {
+  width: 60%;
+}
+
+.skelLine.med {
+  width: 80%;
+}
+
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 18px 14px;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: var(--weight-label);
+}
+
+.empty p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  max-width: 240px;
+}
+
+.errBox {
+  margin: 14px;
+  background: var(--bg-destructive);
+  border: 1px solid var(--bg-destructive-border);
+  border-radius: var(--radius-container);
+  padding: 12px;
+  font-size: 12px;
+  color: var(--foreground);
+}
+
+.errTitle {
+  font-weight: var(--weight-label);
+  color: var(--foreground);
+}
+
+.errBox p {
+  margin: 7px 0 10px;
+  color: var(--text-secondary);
+}
+
+/* ── chat→card gate + activity + which-product ────────────────────────────── */
+.gate,
+.which {
+  margin: 0 14px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--muted);
+  padding: 11px 12px;
+  font-size: 12px;
+}
+
+.gate p,
+.which p {
+  margin: 0 0 9px;
+  color: var(--text-secondary);
+}
+
+.gateActs {
+  display: flex;
+  gap: 8px;
+}
+
+.activity {
+  margin: 0 14px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-container);
+  background: var(--bg-positive);
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--foreground);
+}
+
+/* ── composer ─────────────────────────────────────────────────────────────── */
+.composer {
+  border-top: 1px solid var(--border-muted);
+  padding: 10px 12px 12px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.chip {
+  font-size: 11px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-secondary);
+  border-radius: var(--radius-button);
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+.chip:hover {
+  border-color: var(--primary);
+  color: var(--foreground);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* A relay error surfaced under the transcript — said plainly (role=alert). */
+.relayError {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--foreground);
+  background: var(--bg-destructive);
+  border: 1px solid var(--bg-destructive-border);
+  border-radius: var(--radius-container);
+}
+
+.field {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--card);
+  padding: 8px 10px;
+}
+
+.field textarea {
+  width: 100%;
+  border: none;
+  resize: none;
+  background: transparent;
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  outline: none;
+  min-height: 38px;
+}
+
+.field textarea::placeholder {
+  color: var(--muted-foreground);
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* WP-004 a11y (Scenario 5) — the slash hint uses --text-secondary (the darker
+ * neutral) so its 10px text clears WCAG AA (4.5:1) on the card in BOTH themes.
+ * --muted-foreground (#737373 light) failed at 4.34:1; --text-secondary is
+ * #525252 light (~8:1) and the dark neutral on the dark card both pass. */
+.slashhint {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.slashhint kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+.grow {
+  flex: 1;
+}
+
+.send {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: none;
+  border-radius: var(--radius-button);
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: var(--weight-label);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  min-height: 34px;
+}
+
+.send:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.btnPrimary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: none;
+  border-radius: var(--radius-button);
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: var(--weight-label);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  min-height: 32px;
+}
+
+.btnGhost {
+  background: var(--card);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-button);
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: var(--weight-label);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  min-height: 32px;
+}
+
+.btnPrimary:focus-visible,
+.btnGhost:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* ── reduced-motion: the skeleton shimmer holds still (end state) ─────────── */
+@media (prefers-reduced-motion: reduce) {
+  .skelLine {
+    animation: none;
+    background: var(--muted);
+  }
+}

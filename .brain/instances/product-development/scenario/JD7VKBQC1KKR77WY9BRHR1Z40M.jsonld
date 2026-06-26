@@ -1,0 +1,12 @@
+{
+  "exercises": "dna:design:00000000000000000000000000",
+  "id": "dna:scenario:JD7VKBQC1KKR77WY9BRHR1Z40M",
+  "journey": "dna:workflow:WDJK3TAH04MQ01EF3M7HMEDHBJ",
+  "name": "Picking and switching the agent drives the real provider with a guard",
+  "state": "draft",
+  "surface": "ui",
+  "sys_status": "active",
+  "verifies": [
+    "dna:requirement:FYW52QX0BT123CR1GASFBCVBEG"
+  ]
+}

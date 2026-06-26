@@ -58,7 +58,14 @@
 .bubbleTime {
   margin-top: 6px;
   font-size: 11px;
-  color: var(--muted-foreground);
+  /* WP-004 a11y — inherit the BUBBLE's own foreground, at FULL opacity. The
+   * bubble's foreground (--primary-foreground on the user bubble, --foreground
+   * on the assistant bubble) is the contrast-safe pairing for that background;
+   * the timestamp reads quiet from its small size, NOT from a dimmed contrast.
+   * (A fixed --muted-foreground was 1.09:1 on the blue bubble; dimming via
+   * opacity hovered just under AA at 4.48:1 — reducing contrast for "quiet" is
+   * the very anti-pattern the gate catches, so size carries the quiet instead.) */
+  color: inherit;
 }
 
 .userText {

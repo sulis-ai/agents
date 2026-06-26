@@ -1,0 +1,16 @@
+train_id: "train-2026-06-25T211559Z"
+started_at: "2026-06-25T21:15:59Z"
+completed_at: "2026-06-25T21:24:45Z"
+outcome: "success"
+batch_size: 1
+deploy_url: null
+deploy_workflow_run: null
+health_status: "skipped (no --staging-url)"
+smoke_verdict: "skipped (no --smoke-cmd)"
+awaiting_gates_at: "2026-06-25T21:21:09Z"
+bundle:
+  - wp: WP-001
+    branch: wp/create-product-wide-chat/wp-001-chat-scope-seam-contract
+    pre_train_sha: 3a3f69e06227e99b05275c17d0d423a4370fcaef
+    rebased_to_sha: 3a3f69e06227e99b05275c17d0d423a4370fcaef
+    merge_sha_on_dev: b2ce406a36cc27d0c178cfb95882b3a4643aa174

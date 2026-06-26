@@ -1,0 +1,16 @@
+id: ARCH-product-wide-chat
+change: CH-G3Y4RM
+slug: product-wide-chat
+status: decomposed          # draft → designed → decomposed → implemented → verified
+sourced_from:
+  spec: .changes/create-product-wide-chat.SPEC.md
+  recon: .changes/create-product-wide-chat.RECON.md
+  visual_contract: .architecture/product-wide-chat/contracts/visual/product-wide-chat.contract.md
+tier: M
+adrs:
+  - ADR-001-chat-dock-layout
+  - ADR-002-per-product-thread-keying
+  - ADR-003-provider-on-open-wiring
+  - ADR-004-chat-to-card-path
+work_packages: 4
+scenarios: .changes/create-product-wide-chat.scenarios.jsonld
