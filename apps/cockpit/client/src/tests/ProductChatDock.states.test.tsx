@@ -41,6 +41,30 @@ afterEach(() => {
   delete document.documentElement.dataset.theme;
 });
 
+describe("<ProductChatDock> collapsed is a slim right rail (chat-ux Fix 2)", () => {
+  it("collapsing the dock renders a rail with the expand affordance + agent identity, not empty space", async () => {
+    const { findByTestId, getByTestId, queryByTestId } = renderDock(async () => ({
+      messages: [],
+      provider: "pty",
+      productId: CLINICS,
+    }));
+    // Wait for the dock to settle, then collapse it.
+    await findByTestId("chat-empty");
+    fireEvent.click(getByTestId("chat-toggle"));
+
+    // Collapsed = a rail, not the full dock body. The composer is gone…
+    expect(queryByTestId("chat-intent-input")).toBeNull();
+    // …but the rail is present, carries the expand affordance, and names the
+    // agent identity (the active product) so "whose chat" stays legible.
+    const rail = getByTestId("chat-rail");
+    expect(rail).toBeTruthy();
+    const expand = getByTestId("chat-toggle");
+    expect(expand.getAttribute("aria-label")).toMatch(/show chat/i);
+    // The rail names the active product (agent identity) for legibility.
+    expect(rail.textContent ?? "").toMatch(/clinics/i);
+  });
+});
+
 describe("<ProductChatDock> three honest states", () => {
   it("loading — shows a skeleton while the thread loads", () => {
     // A never-resolving fetch keeps the dock in the loading state.

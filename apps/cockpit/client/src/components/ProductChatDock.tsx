@@ -216,9 +216,45 @@ export function ProductChatDock({
   const sessionRunning = chat.isStreaming;
   const statusWord = sessionRunning ? "Working…" : "Idle";
 
+  // chat-ux Fix 2 — collapsed is a slim vertical RAIL on the right (not empty
+  // white space): a thin strip carrying the expand affordance + the active
+  // product's identity, so "whose chat" stays legible while it's tucked away.
+  if (collapsed) {
+    return (
+      <aside
+        className={`${styles.dock} ${styles.collapsed}`}
+        aria-label={`${headerName} chat`}
+        data-testid="product-chat-dock"
+      >
+        <div className={styles.rail} data-testid="chat-rail">
+          <button
+            type="button"
+            className={styles.railToggle}
+            data-testid="chat-toggle"
+            aria-pressed={true}
+            aria-label="Show chat"
+            onClick={() => setCollapsed(false)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <span
+            className={`${styles.railDot} ${sessionRunning ? styles.working : styles.idle}`}
+            data-testid="agent-status"
+            data-state={sessionRunning ? "working" : "idle"}
+            aria-hidden="true"
+          />
+          {/* The active product's identity, set sideways down the rail. */}
+          <span className={styles.railName}>{headerName}</span>
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <aside
-      className={`${styles.dock} ${collapsed ? styles.collapsed : ""}`}
+      className={styles.dock}
       aria-label={`${headerName} chat`}
       data-testid="product-chat-dock"
     >
@@ -248,11 +284,11 @@ export function ProductChatDock({
             type="button"
             className={styles.toggle}
             data-testid="chat-toggle"
-            aria-pressed={collapsed}
-            aria-label={collapsed ? "Show chat" : "Hide chat"}
-            onClick={() => setCollapsed((v) => !v)}
+            aria-pressed={false}
+            aria-label="Hide chat"
+            onClick={() => setCollapsed(true)}
           >
-            {collapsed ? "Show chat" : "Hide chat"}
+            Hide chat
           </button>
         </div>
       </header>

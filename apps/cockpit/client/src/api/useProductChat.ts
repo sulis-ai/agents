@@ -15,6 +15,7 @@ import type {
   ChatErrorCode,
   ChatProvider,
   ChatScope,
+  ChatThreadResponse,
   TranscriptMessage,
 } from "../../../shared/api-types";
 import {
@@ -63,6 +64,33 @@ export interface ProductChatState {
   retry: () => void;
 }
 
+/**
+ * chat-ux Fix 4 — append the founder's just-submitted turn to the scope's
+ * cached thread so it is visible IMMEDIATELY (during streaming), mirroring
+ * `useChatStream`'s instant-user-turn behaviour. This is the ONE optimistic
+ * cache-write shape (the Blue constraint: no duplicated cache logic) — `send`
+ * calls it on submit and the durable thread, refetched on `complete`, replaces
+ * the cache wholesale so the optimistic copy is reconciled, never duplicated.
+ */
+function appendOptimisticUserTurn(
+  prev: ChatThreadResponse | undefined,
+  text: string,
+): ChatThreadResponse {
+  const base: ChatThreadResponse = prev ?? {
+    messages: [],
+    provider: "pty",
+    productId: null,
+  };
+  const optimistic: TranscriptMessage = {
+    kind: "user",
+    // A transient id — the durable thread's own uuid takes over on refetch.
+    uuid: `optimistic-${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    text,
+  };
+  return { ...base, messages: [...base.messages, optimistic] };
+}
+
 export function useProductChat(
   scope: ChatScope,
   options: UseProductChatOptions = {},
@@ -105,6 +133,13 @@ export function useProductChat(
       setReplyText("");
       setErrorCode(null);
       setErrorMessage(null);
+      // chat-ux Fix 4 — show the founder's own message INSTANTLY (before any
+      // reply chunk) by appending it to the cached thread. The durable thread,
+      // refetched on `complete`, reconciles it (no duplicate).
+      queryClient.setQueryData<ChatThreadResponse>(
+        ["product-chat", scope],
+        (prev) => appendOptimisticUserTurn(prev, prompt),
+      );
       await streamChat(scope, prompt, (event) => {
         if (event.type === "state") {
           if (event.state === "complete") setState("ready");

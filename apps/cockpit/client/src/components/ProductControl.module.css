@@ -204,6 +204,14 @@
   padding: 6px;
   transition: opacity 120ms ease;
 }
+/* chat-ux Fix 1 — drop-up variant: the menu opens UPWARD from the trigger,
+ * anchored to its bottom edge. Used by the agent picker at the composer foot,
+ * where the default downward menu falls off the bottom of the viewport. The
+ * top-of-page placements keep the default (.pmenu opens down). */
+.pmenuUp {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
 .pmsearch {
   display: flex;
   align-items: center;

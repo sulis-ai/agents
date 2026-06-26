@@ -51,6 +51,106 @@ describe("useProductChat — load + send + switch", () => {
     expect(result.current.state).toBe("ready");
   });
 
+  it("send renders the user's submitted message IMMEDIATELY (before any reply chunk) — chat-ux Fix 4", async () => {
+    // The stream pauses after spawning so we can assert the user's own message
+    // is already visible DURING streaming, not only after complete.
+    let resolveStream: (() => void) | null = null;
+    const streamProductChat = vi.fn(
+      async (_scope: ChatScope, _prompt: string, onEvent: (e: ChatStreamEvent) => void) => {
+        onEvent({ type: "state", state: "spawning" });
+        // hold here — the reply has NOT arrived yet.
+        await new Promise<void>((res) => {
+          resolveStream = () => {
+            onEvent({ type: "chunk", text: "reply" });
+            onEvent({ type: "complete", resumed: false });
+            res();
+          };
+        });
+      },
+    );
+    const { result } = renderHook(
+      () =>
+        useProductChat(SCOPE, {
+          fetchChatThread: async () => ({ messages: [], provider: "pty", productId: null }),
+          streamProductChat,
+          putChatProvider: async () => ({ provider: "pty", applied: "new-work" }),
+        }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    // Fire the send but DON'T await — it parks inside the stream above.
+    let sendDone!: Promise<void>;
+    act(() => {
+      sendDone = result.current.send("hello there");
+    });
+
+    // BEFORE the reply: the user's own message is already in the transcript.
+    await waitFor(() => {
+      const texts = result.current.messages
+        .filter((m) => m.kind === "user")
+        .map((m) => (m as { text: string }).text);
+      expect(texts).toContain("hello there");
+    });
+
+    // Release the stream and let it complete.
+    await act(async () => {
+      resolveStream?.();
+      await sendDone;
+    });
+  });
+
+  it("reconciles the optimistic message with the durable thread on complete — no duplicate (chat-ux Fix 4)", async () => {
+    // The durable thread (after the send) contains the user's turn exactly once.
+    let loads = 0;
+    const fetchChatThread = vi.fn(async () => {
+      loads += 1;
+      // First load: empty. After complete (refetch): the durable single turn.
+      if (loads === 1) return { messages: [], provider: "pty" as const, productId: null };
+      return {
+        messages: [
+          { kind: "user" as const, uuid: "durable-u1", timestamp: "t", text: "hello there" },
+          {
+            kind: "assistant" as const,
+            uuid: "durable-a1",
+            timestamp: "t",
+            blocks: [{ kind: "text" as const, text: "reply" }],
+          },
+        ],
+        provider: "pty" as const,
+        productId: null,
+      };
+    });
+    const streamProductChat = vi.fn(
+      async (_scope: ChatScope, _prompt: string, onEvent: (e: ChatStreamEvent) => void) => {
+        onEvent({ type: "chunk", text: "reply" });
+        onEvent({ type: "complete", resumed: false });
+      },
+    );
+    const { result } = renderHook(
+      () =>
+        useProductChat(SCOPE, {
+          fetchChatThread,
+          streamProductChat,
+          putChatProvider: async () => ({ provider: "pty", applied: "new-work" }),
+        }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await act(async () => {
+      await result.current.send("hello there");
+    });
+
+    // After complete the durable thread is authoritative: the user's turn
+    // appears EXACTLY once (the optimistic copy is reconciled, not duplicated).
+    await waitFor(() => {
+      const userTurns = result.current.messages.filter(
+        (m) => m.kind === "user" && (m as { text: string }).text === "hello there",
+      );
+      expect(userTurns).toHaveLength(1);
+    });
+  });
+
   it("send surfaces a relay error as a single error projection", async () => {
     const streamProductChat = vi.fn(
       async (_scope: ChatScope, _prompt: string, onEvent: (e: ChatStreamEvent) => void) => {

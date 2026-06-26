@@ -5,15 +5,98 @@
 .dock {
   display: flex;
   flex-direction: column;
-  min-width: 0;
+  /* chat-ux Fix 3 — the dock is a FIXED-width panel on the right; it does not
+   * flex-grow and does not let the board squeeze it. Opening the chat must not
+   * shrink the board (the board area scrolls horizontally instead — see
+   * WorkspaceShell .main). 380px is the signed-contract chat width. */
+  flex: 0 0 380px;
+  width: 380px;
+  min-width: 380px;
+  max-width: 380px;
   height: 100%;
   background: var(--card);
   border-left: 1px solid var(--border);
 }
 
+/* chat-ux Fix 2 — collapsed is a slim vertical RAIL, not empty white space. */
 .dock.collapsed {
-  /* Collapsed: only the header chrome remains, still keyboard-reachable. */
-  height: auto;
+  flex: 0 0 var(--rail-w, 44px);
+  width: var(--rail-w, 44px);
+  min-width: var(--rail-w, 44px);
+  max-width: var(--rail-w, 44px);
+  height: 100%;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  padding: 10px 0;
+}
+
+.railToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-secondary);
+  border-radius: var(--radius-button);
+  cursor: pointer;
+}
+
+.railToggle:hover {
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.railToggle:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.railToggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* The honest status dot on the rail — colour reinforces the data-state word the
+ * expanded view carries; on its own it is never the sole cue (aria-hidden, and
+ * the expanded dock names "Working…"/"Idle" in words). */
+.railDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--text-muted);
+}
+
+.railDot.working {
+  background: var(--warning);
+}
+
+.railDot.idle {
+  background: var(--text-muted);
+}
+
+/* The active product's name, set vertically down the rail so "whose chat" stays
+ * legible while collapsed. */
+.railName {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 11px;
+  font-weight: var(--weight-label);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-height: 60%;
 }
 
 /* ── header — echoes the active product tile + honest status ──────────────── */
