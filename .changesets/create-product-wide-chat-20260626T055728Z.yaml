@@ -1,7 +1,0 @@
-change_id: 01KW064YHSG3Y4RMD4M9Y3M72S
-primitive: create
-tier: minor
-touches_plugin: true
-summary: |
-  Product-wide (per-product) chat in the cockpit: a chat per product switched by the board product switcher, each with its own durable secret-scrubbed conversation; the Claude/Antigravity agent choice in the composer driving the real provider; chat-to-card; an All-products overview chat.
-created_at: 2026-06-26T05:57:28Z

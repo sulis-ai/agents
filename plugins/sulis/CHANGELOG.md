@@ -1,3 +1,9 @@
+## v0.170.0 — 2026-06-26
+
+**Minor — release-train batch.**
+
+- Product-wide (per-product) chat in the cockpit: a chat per product switched by the board product switcher, each with its own durable secret-scrubbed conversation; the Claude/Antigravity agent choice in the composer driving the real provider; chat-to-card; an All-products overview chat.
+
 ## v0.169.0 — 2026-06-25
 
 **Minor — release-train batch.**
