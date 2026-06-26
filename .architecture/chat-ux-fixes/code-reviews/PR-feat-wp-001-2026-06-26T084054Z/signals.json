@@ -1,0 +1,22 @@
+{
+  "pr": "wp/fix-chat-ux-fixes/wp-001-chat-ux-fixes",
+  "timestamp": "2026-06-26T084054Z",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["fix"], "module_fan_out": 1, "severity": "none" },
+    "size": { "lines_added": 358, "lines_removed": 10, "files_changed": 11, "severity": "none" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "none" },
+    "completeness": { "new_source_without_test": 0, "api_change_without_schema": false, "severity": "none" }
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+    "in_neighbours": { "total": 0 }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "note": "nothing surfaced" },
+    "security": { "findings": 0, "note": "nothing surfaced" },
+    "quality": { "findings": 0, "note": "nothing surfaced" }
+  },
+  "draft_fixes": 0
+}

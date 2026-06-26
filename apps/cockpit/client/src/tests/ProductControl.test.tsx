@@ -66,6 +66,37 @@ function openMenu(getByTestId: (id: string) => HTMLElement) {
   return getByTestId("product-control-menu");
 }
 
+describe("<ProductControl> — menu placement (chat-ux Fix 1)", () => {
+  it("defaults to opening downward (data-placement='down') — the top-of-page usages keep dropping DOWN", () => {
+    const { getByTestId } = render(
+      <ProductControl
+        mode="scope"
+        rows={SCOPE_ROWS}
+        selectedId="all"
+        onSelect={() => {}}
+      />,
+    );
+    const menu = openMenu(getByTestId);
+    expect(menu.getAttribute("data-placement")).toBe("down");
+  });
+
+  it("placement='up' opens the menu upward (drop-up) — for the composer-foot agent picker", () => {
+    const { getByTestId } = render(
+      <ProductControl
+        mode="scope"
+        rows={SCOPE_ROWS}
+        selectedId="all"
+        onSelect={() => {}}
+        placement="up"
+      />,
+    );
+    const menu = openMenu(getByTestId);
+    expect(menu.getAttribute("data-placement")).toBe("up");
+    // The drop-up CSS variant is applied (hash-prefixed local name).
+    expect(menu.className).toMatch(/pmenuUp/);
+  });
+});
+
 describe("<ProductControl> — shared behaviour (ADR-002)", () => {
   describe("scope mode", () => {
     it("renders the trigger as a real button with aria-haspopup=menu and aria-expanded", () => {

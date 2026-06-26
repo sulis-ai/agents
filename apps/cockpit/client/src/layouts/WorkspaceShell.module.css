@@ -259,13 +259,21 @@
   overflow: hidden;
 }
 
+/* chat-ux Fix 3 — the board area keeps its natural width and scrolls
+ * HORIZONTALLY beside the fixed-width docked chat; opening the chat must NOT
+ * shrink the board. The dock is `flex: 0 0 380px` (ProductChatDock .dock), so
+ * .main takes the remaining width and scrolls its own content on overflow-x
+ * rather than compressing it. min-width:0 keeps .main itself inside the row
+ * (so the dock is never pushed off), and overflow-x:auto surfaces the board's
+ * natural width as a horizontal scroll instead of squeezing the lanes. */
 .main {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 /* ════════════════════════════════════════════════════════════════════

@@ -23,6 +23,15 @@ describe("<AgentPicker> names the running provider (AI-07)", () => {
     expect(getByTestId("agent-picker-trigger").textContent).toMatch(/antigravity/i);
   });
 
+  it("opens its menu UPWARD (drop-up) — at the composer foot a downward menu goes off-screen (chat-ux Fix 1)", () => {
+    const { getByTestId } = render(
+      <AgentPicker running="pty" selected="pty" sessionRunning={false} onSwitch={vi.fn()} />,
+    );
+    fireEvent.click(getByTestId("agent-picker-trigger"));
+    const menu = getByTestId("agent-picker-menu");
+    expect(menu.getAttribute("data-placement")).toBe("up");
+  });
+
   it("is a real menu with menuitemradio rows + aria-checked on the running one", () => {
     const { getByTestId } = render(
       <AgentPicker running="pty" selected="pty" sessionRunning={false} onSwitch={vi.fn()} />,

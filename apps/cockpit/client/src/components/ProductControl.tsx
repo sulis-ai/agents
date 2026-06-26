@@ -71,6 +71,14 @@ export interface ProductControlProps {
    * testids to "agent-picker-*"). Defaults to "product-control".
    */
   testIdPrefix?: string;
+  /**
+   * Which way the popover opens. `"down"` (default) keeps the historical
+   * top-of-page behaviour (the scope switcher / change-nav / which-product all
+   * open DOWNWARD). `"up"` is the drop-up variant for placements pinned to the
+   * bottom of the viewport — the agent picker at the composer foot, where a
+   * downward menu would fall off-screen (chat-ux Fix 1).
+   */
+  placement?: "down" | "up";
 }
 
 // ─── glyph tiles ────────────────────────────────────────────────────────────
@@ -197,6 +205,7 @@ export function ProductControl({
   onRemove,
   triggerLabel,
   testIdPrefix = "product-control",
+  placement = "down",
 }: ProductControlProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -358,8 +367,9 @@ export function ProductControl({
 
       {open && (
         <div
-          className={styles.pmenu}
+          className={`${styles.pmenu} ${placement === "up" ? styles.pmenuUp : ""}`}
           data-testid={`${testIdPrefix}-menu`}
+          data-placement={placement}
           onKeyDown={onMenuKeyDown}
         >
           {/* The typeahead sits in the popover header, OUTSIDE role="menu": a

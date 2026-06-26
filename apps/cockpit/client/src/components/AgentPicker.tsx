@@ -77,6 +77,10 @@ export function AgentPicker({
           onSelect={handleSelect}
           testIdPrefix="agent-picker"
           triggerLabel={`Powered by ${PROVIDER_NAME[running]}. Choose which AI powers this chat.`}
+          // chat-ux Fix 1 — the picker lives at the composer FOOT; its menu must
+          // open UPWARD or it falls off the bottom of the viewport. The shared
+          // primitive's default ("down") stays for the top-of-page placements.
+          placement="up"
         />
       </div>
 
