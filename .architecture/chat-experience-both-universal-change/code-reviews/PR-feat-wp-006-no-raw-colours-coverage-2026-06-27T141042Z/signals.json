@@ -1,0 +1,19 @@
+{
+  "pr": "feat/wp-006-no-raw-colours-coverage",
+  "base": "change/feat-chat-experience-both-universal-change",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["test"], "module_fan_out": 1, "severity": "clean" },
+    "size": { "lines_added": 82, "lines_removed": 55, "total": 137, "files_changed": 1, "severity": "clean" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "lock_files": 0, "severity": "clean" },
+    "completeness": { "new_source_without_test": 0, "api_change_without_schema": false, "severity": "clean", "note": "the diff IS test code" }
+  },
+  "lenses": {
+    "architecture": { "in_changes": 0, "in_neighbours": 0 },
+    "security": { "in_changes": 0, "in_neighbours": 0 },
+    "quality": { "in_changes": 0, "in_neighbours": 0 }
+  },
+  "findings": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+  "draft_deltas": 0
+}
