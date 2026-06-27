@@ -44,11 +44,11 @@ can run in parallel.
 | ID | Title | Primitive | Status | Depends On | Blocks |
 |---|---|---|---|---|---|
 | WP-001 | Chat parity + status-line visual contract (sign-off gate) | REINFORCE-Document | done | — | WP-002, WP-003, WP-004, WP-005, WP-006 |
-| WP-002 | Shared ChatStatusLine (working↔finished, derived) | EXPAND-Create | in_progress | WP-001 | WP-004, WP-005, WP-006 |
-| WP-003 | Universal chat TurnCard parity + markdown | SUBSTITUTE-Replace | in_progress | WP-001 | — |
-| WP-004 | Composer status line + de-collision fix | REORGANISE-Refactor | pending | WP-001, WP-002 | WP-006 |
-| WP-005 | Dock status line (universal) | EXPAND-Extend | pending | WP-001, WP-002 | WP-006 |
-| WP-006 | Extend no-raw-colours coverage to status-line surfaces | REINFORCE-Test | pending | WP-002, WP-004, WP-005 | — |
+| WP-002 | Shared ChatStatusLine (working↔finished, derived) | EXPAND-Create | done | WP-001 | WP-004, WP-005, WP-006 |
+| WP-003 | Universal chat TurnCard parity + markdown | SUBSTITUTE-Replace | done | WP-001 | — |
+| WP-004 | Composer status line + de-collision fix | REORGANISE-Refactor | done | WP-001, WP-002 | WP-006 |
+| WP-005 | Dock status line (universal) | EXPAND-Extend | done | WP-001, WP-002 | WP-006 |
+| WP-006 | Extend no-raw-colours coverage to status-line surfaces | REINFORCE-Test | in_progress | WP-002, WP-004, WP-005 | — |
 
 ---
 
