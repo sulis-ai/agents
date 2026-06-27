@@ -1,15 +1,26 @@
-// WP-003 — <ProductChat>: the per-scope transcript + streaming reply (ADR-001).
+// WP-003 — <ProductChat>: the per-scope durable transcript + streaming reply.
 //
-// EXTENDS the concierge composer family by REUSING <ChatMessage> for the
-// durable transcript (the same neutral user bubble / assistant blocks the rest
-// of the cockpit uses) and rendering the in-flight streamed reply with a caret.
-// It is a pure presentational piece — the dock owns the scope, the hook and the
-// composer; this renders what the hook produced. The three honest states
-// (loading skeleton / empty / error) live in the dock so the chrome is shared.
+// REUSES the in-change chat's summary-card primitive (ADR-001): the durable
+// transcript is grouped with the same pure `groupTurns()` `Chat.tsx` uses, and
+// each agent turn renders as one `<TurnCard>` — summary lead + "show the full
+// reply" + folded steps + safe markdown — instead of the old plain-text
+// `AssistantBlock` path. No new renderer, no markdown library (EP-03); the
+// universal chat inherits `TurnCard`'s safe-render invariant
+// (`renderMarkdown`/`renderInlineMarkdown`, escape-before-emit).
+//
+// Per ADR-003 the card is rendered with NO `summary` prop, so it shows its
+// built-in first-sentences fallback (the universal chat is product-scoped and
+// has no change-scoped summary endpoint). User messages stay verbatim (spec
+// non-goal). The in-flight streamed reply still renders here, plain + caret.
+// This is a pure presentational piece — the dock owns the scope, the hook and
+// the composer; the three honest states (loading / empty / error) live in the
+// dock so the chrome is shared.
 
 import type { ChatProvider, TranscriptMessage } from "../../../shared/api-types";
 import { PROVIDER_NAME } from "../lib/providerName";
-import { ChatMessage } from "./ChatMessage";
+import { groupTurns } from "../lib/groupTurns";
+import { TurnCard } from "./TurnCard";
+import { UserBubble } from "./UserBubble";
 import styles from "./ProductChat.module.css";
 
 export interface ProductChatProps {
@@ -27,11 +38,25 @@ export function ProductChat({
   replyText,
   isStreaming,
 }: ProductChatProps) {
+  // Group the flat transcript into the founder's message bubbles + one turn
+  // per run of agent messages — the SAME pure transform Chat.tsx uses, so the
+  // universal chat groups its product transcript exactly as the in-change chat
+  // groups a change transcript (ADR-001).
+  const items = groupTurns(messages);
+
   return (
     <div className={styles.thread} data-testid="product-chat-thread">
-      {messages.map((m) => (
-        <ChatMessage key={m.uuid} message={m} />
-      ))}
+      {items.map((item) =>
+        item.type === "user" ? (
+          // Verbatim user text — never markdown-rendered (spec non-goal). The
+          // bubble is the shared <UserBubble> both chats render (EP-03).
+          <UserBubble key={item.key} item={item} />
+        ) : (
+          // No `summary` prop → the card shows its first-sentences fallback
+          // (ADR-003); markdown flows through TurnCard's safe renderer.
+          <TurnCard key={item.key} turn={item} />
+        ),
+      )}
 
       {(isStreaming || replyText.length > 0) && (
         <div className={styles.reply} data-testid="product-chat-reply">

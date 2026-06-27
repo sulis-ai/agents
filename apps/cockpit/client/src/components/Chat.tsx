@@ -14,9 +14,8 @@ import { useTranscript } from "../api/useTranscript";
 import { useTurnSummaries } from "../api/useTurnSummaries";
 import { EmptyTranscript } from "./EmptyTranscript";
 import { TurnCard } from "./TurnCard";
+import { UserBubble } from "./UserBubble";
 import { groupTurns } from "../lib/groupTurns";
-import { formatRelativeTime } from "../utils/relativeTime";
-import convo from "../styles/Conversation.module.css";
 import styles from "../styles/Chat.module.css";
 
 interface Props {
@@ -74,13 +73,7 @@ export function Chat({ changeId }: Props) {
     <div className={styles.chat} data-testid="chat-list">
       {items.map((item) =>
         item.type === "user" ? (
-          <div key={item.key} className={convo.msgUser} data-testid="chat-message-user">
-            <div className={convo.who}>You</div>
-            <div className={convo.say}>{item.text}</div>
-            <div className={convo.userTime}>
-              {formatRelativeTime(item.timestamp)}
-            </div>
-          </div>
+          <UserBubble key={item.key} item={item} />
         ) : (
           <TurnCard
             key={item.key}

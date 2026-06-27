@@ -1,0 +1,358 @@
+diff --git a/apps/cockpit/client/src/components/Chat.tsx b/apps/cockpit/client/src/components/Chat.tsx
+index 4a4ff397..788b7455 100644
+--- a/apps/cockpit/client/src/components/Chat.tsx
++++ b/apps/cockpit/client/src/components/Chat.tsx
+@@ -14,9 +14,8 @@ import { useTranscript } from "../api/useTranscript";
+ import { useTurnSummaries } from "../api/useTurnSummaries";
+ import { EmptyTranscript } from "./EmptyTranscript";
+ import { TurnCard } from "./TurnCard";
++import { UserBubble } from "./UserBubble";
+ import { groupTurns } from "../lib/groupTurns";
+-import { formatRelativeTime } from "../utils/relativeTime";
+-import convo from "../styles/Conversation.module.css";
+ import styles from "../styles/Chat.module.css";
+ 
+ interface Props {
+@@ -74,13 +73,7 @@ export function Chat({ changeId }: Props) {
+     <div className={styles.chat} data-testid="chat-list">
+       {items.map((item) =>
+         item.type === "user" ? (
+-          <div key={item.key} className={convo.msgUser} data-testid="chat-message-user">
+-            <div className={convo.who}>You</div>
+-            <div className={convo.say}>{item.text}</div>
+-            <div className={convo.userTime}>
+-              {formatRelativeTime(item.timestamp)}
+-            </div>
+-          </div>
++          <UserBubble key={item.key} item={item} />
+         ) : (
+           <TurnCard
+             key={item.key}
+diff --git a/apps/cockpit/client/src/components/ProductChat.tsx b/apps/cockpit/client/src/components/ProductChat.tsx
+index 1a397674..6f5d6233 100644
+--- a/apps/cockpit/client/src/components/ProductChat.tsx
++++ b/apps/cockpit/client/src/components/ProductChat.tsx
+@@ -1,15 +1,26 @@
+-// WP-003 — <ProductChat>: the per-scope transcript + streaming reply (ADR-001).
++// WP-003 — <ProductChat>: the per-scope durable transcript + streaming reply.
+ //
+-// EXTENDS the concierge composer family by REUSING <ChatMessage> for the
+-// durable transcript (the same neutral user bubble / assistant blocks the rest
+-// of the cockpit uses) and rendering the in-flight streamed reply with a caret.
+-// It is a pure presentational piece — the dock owns the scope, the hook and the
+-// composer; this renders what the hook produced. The three honest states
+-// (loading skeleton / empty / error) live in the dock so the chrome is shared.
++// REUSES the in-change chat's summary-card primitive (ADR-001): the durable
++// transcript is grouped with the same pure `groupTurns()` `Chat.tsx` uses, and
++// each agent turn renders as one `<TurnCard>` — summary lead + "show the full
++// reply" + folded steps + safe markdown — instead of the old plain-text
++// `AssistantBlock` path. No new renderer, no markdown library (EP-03); the
++// universal chat inherits `TurnCard`'s safe-render invariant
++// (`renderMarkdown`/`renderInlineMarkdown`, escape-before-emit).
++//
++// Per ADR-003 the card is rendered with NO `summary` prop, so it shows its
++// built-in first-sentences fallback (the universal chat is product-scoped and
++// has no change-scoped summary endpoint). User messages stay verbatim (spec
++// non-goal). The in-flight streamed reply still renders here, plain + caret.
++// This is a pure presentational piece — the dock owns the scope, the hook and
++// the composer; the three honest states (loading / empty / error) live in the
++// dock so the chrome is shared.
+ 
+ import type { ChatProvider, TranscriptMessage } from "../../../shared/api-types";
+ import { PROVIDER_NAME } from "../lib/providerName";
+-import { ChatMessage } from "./ChatMessage";
++import { groupTurns } from "../lib/groupTurns";
++import { TurnCard } from "./TurnCard";
++import { UserBubble } from "./UserBubble";
+ import styles from "./ProductChat.module.css";
+ 
+ export interface ProductChatProps {
+@@ -27,11 +38,25 @@ export function ProductChat({
+   replyText,
+   isStreaming,
+ }: ProductChatProps) {
++  // Group the flat transcript into the founder's message bubbles + one turn
++  // per run of agent messages — the SAME pure transform Chat.tsx uses, so the
++  // universal chat groups its product transcript exactly as the in-change chat
++  // groups a change transcript (ADR-001).
++  const items = groupTurns(messages);
++
+   return (
+     <div className={styles.thread} data-testid="product-chat-thread">
+-      {messages.map((m) => (
+-        <ChatMessage key={m.uuid} message={m} />
+-      ))}
++      {items.map((item) =>
++        item.type === "user" ? (
++          // Verbatim user text — never markdown-rendered (spec non-goal). The
++          // bubble is the shared <UserBubble> both chats render (EP-03).
++          <UserBubble key={item.key} item={item} />
++        ) : (
++          // No `summary` prop → the card shows its first-sentences fallback
++          // (ADR-003); markdown flows through TurnCard's safe renderer.
++          <TurnCard key={item.key} turn={item} />
++        ),
++      )}
+ 
+       {(isStreaming || replyText.length > 0) && (
+         <div className={styles.reply} data-testid="product-chat-reply">
+diff --git a/apps/cockpit/client/src/components/UserBubble.tsx b/apps/cockpit/client/src/components/UserBubble.tsx
+new file mode 100644
+index 00000000..fd2915a8
+--- /dev/null
++++ b/apps/cockpit/client/src/components/UserBubble.tsx
+@@ -0,0 +1,32 @@
++// WP-003 — <UserBubble>: the founder's message bubble in a Turn-Cards thread.
++//
++// Extracted at the 2-consumer threshold (EP-03 / Non-Negotiable #2): the
++// in-change chat (`Chat.tsx`) and the universal chat (`ProductChat.tsx`) both
++// render the founder's grouped `UserItem` as the exact same neutral bubble.
++// Once WP-003 made the universal chat a second consumer of this byte-identical
++// markup, the shared primitive must be extracted — in the same change, not
++// later. The agent turn renderer is NOT shared here: the two chats differ on
++// the turn (the in-change card carries a generated summary; the universal card
++// uses the first-sentences fallback, ADR-003), so only the genuinely-identical
++// user bubble is lifted.
++//
++// User text is rendered VERBATIM — never markdown-parsed (spec non-goal: user
++// messages are shown exactly as typed).
++
++import type { UserItem } from "../lib/groupTurns";
++import { formatRelativeTime } from "../utils/relativeTime";
++import convo from "../styles/Conversation.module.css";
++
++interface Props {
++  item: UserItem;
++}
++
++export function UserBubble({ item }: Props) {
++  return (
++    <div className={convo.msgUser} data-testid="chat-message-user">
++      <div className={convo.who}>You</div>
++      <div className={convo.say}>{item.text}</div>
++      <div className={convo.userTime}>{formatRelativeTime(item.timestamp)}</div>
++    </div>
++  );
++}
+diff --git a/apps/cockpit/client/src/tests/ProductChat.characterisation.test.tsx b/apps/cockpit/client/src/tests/ProductChat.characterisation.test.tsx
+new file mode 100644
+index 00000000..86c204d2
+--- /dev/null
++++ b/apps/cockpit/client/src/tests/ProductChat.characterisation.test.tsx
+@@ -0,0 +1,55 @@
++// WP-003 — characterisation test (Fowler / EP-07), now SUPERSEDED.
++//
++// Before the WP-003 swap this file pinned today's behaviour: the universal
++// chat rendered each TranscriptMessage via <ChatMessage> → <AssistantBlock>,
++// and an assistant "text" block rendered as PLAIN TEXT (no summary card, no
++// markdown). That characterisation was confirmed green against the pre-swap
++// code (the Fowler discipline: prove behaviour before changing it).
++//
++// The swap is now in place — the durable transcript renders <TurnCard>s
++// (ADR-001) — so this file records the SUPERSESSION rather than re-asserting
++// the retired plain-text contract. The live behaviour is owned by
++// ProductChat.turncard.test.tsx. The single assertion below is the regression
++// guard that the old plain-text path is gone (the summary card replaced it).
++//
++// References: WP-003 Definition of Done > Red ("then it is updated/superseded
++// by the behaviour test"); ADR-001; TDD §2.1.
++
++import { describe, it, expect } from "vitest";
++import { render, screen } from "@testing-library/react";
++import { ProductChat } from "../components/ProductChat";
++import type { TranscriptMessage } from "../../../shared/api-types";
++
++const TRANSCRIPT: TranscriptMessage[] = [
++  {
++    kind: "user",
++    uuid: "u1",
++    timestamp: "2026-06-27T10:00:00Z",
++    text: "what did you change?",
++  },
++  {
++    kind: "assistant",
++    uuid: "a1",
++    timestamp: "2026-06-27T10:00:05Z",
++    blocks: [{ kind: "text", text: "I edited the login handler." }],
++  },
++];
++
++describe("<ProductChat> — characterisation superseded by the TurnCard swap (WP-003)", () => {
++  it("no longer renders the agent turn via the plain-text AssistantBlock path", () => {
++    render(
++      <ProductChat
++        messages={TRANSCRIPT}
++        provider="pty"
++        replyText=""
++        isStreaming={false}
++      />,
++    );
++
++    // The retired plain-text path is gone: the agent turn is a summary card,
++    // never a `chat-message-assistant` / `assistant-block-text` block.
++    expect(screen.queryByTestId("chat-message-assistant")).not.toBeInTheDocument();
++    expect(screen.queryByTestId("assistant-block-text")).not.toBeInTheDocument();
++    expect(screen.getByTestId("turn-card")).toBeInTheDocument();
++  });
++});
+diff --git a/apps/cockpit/client/src/tests/ProductChat.turncard.test.tsx b/apps/cockpit/client/src/tests/ProductChat.turncard.test.tsx
+new file mode 100644
+index 00000000..27885074
+--- /dev/null
++++ b/apps/cockpit/client/src/tests/ProductChat.turncard.test.tsx
+@@ -0,0 +1,155 @@
++// WP-003 — behaviour test: the UNIVERSAL chat renders agent turns as summary
++// cards with markdown (parity with the in-change chat), via groupTurns() +
++// <TurnCard> (ADR-001 reuse; ADR-003 first-sentences fallback summary).
++//
++// The founder-facing surface is the rendered DOM (TDD §4 — no testing internal
++// helpers in isolation). We feed a product transcript whose assistant turn
++// carries a heading, a bold word, a list, and a fenced code block, and assert:
++//   - the turn renders as `turn-card` (not a raw plain-text block);
++//   - a working "show the full reply" toggle reveals `turn-full-text`;
++//   - the markdown renders as HTML (<h_>, <li>, <pre><code>) with NO raw `**`
++//     or backticks leaking through;
++//   - a user message still renders verbatim (spec non-goal: user text unchanged).
++//
++// This FAILS against the pre-WP-003 plain-text path (it renders the markdown
++// literally inside `assistant-block-text`, with no `turn-card`).
++//
++// References: WP-003 Contract + Definition of Done; ADR-001/003; TDD §2.1/§4.
++
++import { describe, it, expect } from "vitest";
++import { fireEvent, render, screen, within } from "@testing-library/react";
++import { ProductChat } from "../components/ProductChat";
++import type { TranscriptMessage } from "../../../shared/api-types";
++
++// The agent's prose for the turn: a lead sentence (the summary fallback), then
++// more content than the first 3 sentences — so the "show the full reply" toggle
++// appears — including a heading, a bold word, a list, and a fenced code block.
++const SAID = [
++  "I added the cancel-subscription flow.",
++  "It validates the request first.",
++  "Then it refunds any remaining balance.",
++  "",
++  "## What changed",
++  "",
++  "I touched the **billing** module and added a guard.",
++  "",
++  "- validates the subscription id",
++  "- refunds the prorated balance",
++  "",
++  "```ts",
++  "export function cancel(id: string) {}",
++  "```",
++].join("\n");
++
++const TRANSCRIPT: TranscriptMessage[] = [
++  {
++    kind: "user",
++    uuid: "u1",
++    timestamp: "2026-06-27T10:00:00Z",
++    text: "add a cancel flow with **emphasis** please",
++  },
++  {
++    kind: "assistant",
++    uuid: "a1",
++    timestamp: "2026-06-27T10:00:05Z",
++    blocks: [{ kind: "text", text: SAID }],
++  },
++];
++
++describe("<ProductChat> — universal TurnCard parity + markdown (WP-003)", () => {
++  it("renders the agent turn as a summary card with a working 'show the full reply'", () => {
++    render(
++      <ProductChat
++        messages={TRANSCRIPT}
++        provider="pty"
++        replyText=""
++        isStreaming={false}
++      />,
++    );
++
++    // The agent turn is a summary card — not the old plain-text block.
++    const card = screen.getByTestId("turn-card");
++    expect(card).toBeInTheDocument();
++    expect(screen.queryByTestId("assistant-block-text")).not.toBeInTheDocument();
++
++    // The progressive-disclosure toggle is present and starts collapsed; the
++    // full reply is not in the DOM yet.
++    const toggle = screen.getByTestId("turn-full-toggle");
++    expect(toggle.getAttribute("aria-expanded")).toBe("false");
++    expect(screen.queryByTestId("turn-full-text")).not.toBeInTheDocument();
++
++    // Clicking reveals the full reply.
++    fireEvent.click(toggle);
++    expect(toggle.getAttribute("aria-expanded")).toBe("true");
++    const full = screen.getByTestId("turn-full-text");
++    expect(full).toBeInTheDocument();
++  });
++
++  it("renders the full reply's markdown as formatted HTML (heading, list, code) — no raw ** or backticks", () => {
++    render(
++      <ProductChat
++        messages={TRANSCRIPT}
++        provider="pty"
++        replyText=""
++        isStreaming={false}
++      />,
++    );
++
++    fireEvent.click(screen.getByTestId("turn-full-toggle"));
++    const full = screen.getByTestId("turn-full-text");
++
++    // Heading → an <h_> element.
++    const heading = within(full).getByText("What changed");
++    expect(heading.tagName.toLowerCase()).toMatch(/^h[1-6]$/);
++
++    // Bold → a <strong> element.
++    const bold = within(full).getByText("billing");
++    expect(bold.tagName.toLowerCase()).toBe("strong");
++
++    // List → <li> items.
++    const items = full.querySelectorAll("li");
++    expect(items.length).toBe(2);
++    expect(items[0]!.textContent).toContain("validates the subscription id");
++
++    // Fenced code → a <pre><code> with the verbatim code, no surrounding fence.
++    const pre = full.querySelector("pre code");
++    expect(pre).not.toBeNull();
++    expect(pre!.textContent).toContain("export function cancel(id: string) {}");
++
++    // No raw markdown leaks into the rendered text.
++    expect(full.textContent).not.toContain("**");
++    expect(full.textContent).not.toContain("```");
++    expect(full.textContent).not.toContain("## What changed");
++  });
++
++  it("keeps user messages verbatim (spec non-goal: user text unchanged)", () => {
++    render(
++      <ProductChat
++        messages={TRANSCRIPT}
++        provider="pty"
++        replyText=""
++        isStreaming={false}
++      />,
++    );
++
++    // The user's literal text — including the raw ** — is shown exactly as typed,
++    // never markdown-rendered.
++    const userBubble = screen.getByTestId("chat-message-user");
++    expect(userBubble.textContent).toContain("add a cancel flow with **emphasis** please");
++    expect(within(userBubble).queryByText("emphasis")?.tagName.toLowerCase()).not.toBe("strong");
++  });
++
++  it("still renders the in-flight streamed reply + caret while streaming", () => {
++    render(
++      <ProductChat
++        messages={TRANSCRIPT}
++        provider="pty"
++        replyText="thinking it through"
++        isStreaming={true}
++      />,
++    );
++    const reply = screen.getByTestId("product-chat-reply");
++    expect(reply.textContent).toContain("thinking it through");
++    expect(screen.getByTestId("stream-caret")).toBeInTheDocument();
++  });
++});
