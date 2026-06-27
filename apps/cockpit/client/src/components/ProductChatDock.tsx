@@ -20,7 +20,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { ChatProvider, Product } from "../../../shared/api-types";
 import { UNASSIGNED_SCOPE } from "../../../shared/chatScope";
 import type { ProductScope } from "../lib/productCounts";
-import { chatScopeForProduct, isOverviewScope } from "../lib/chatScopeForProduct";
+import {
+  chatScopeForProduct,
+  isOverviewScope,
+} from "../lib/chatScopeForProduct";
 import { useActiveProduct } from "../api/activeProduct";
 import {
   useProductChat,
@@ -31,6 +34,7 @@ import type { StreamStartFromIntentFn } from "../api/client";
 import { ProductControl, type ProductRow } from "./ProductControl";
 import { AgentPicker } from "./AgentPicker";
 import { ProductChat } from "./ProductChat";
+import { ChatStatusLine } from "./ChatStatusLine";
 import styles from "./ProductChatDock.module.css";
 
 // Sentinel row ids the scope switcher uses (ProductControl scope mode), matched
@@ -100,6 +104,20 @@ export function ProductChatDock({
   // front; the overview path resolves it when the founder picks one.
   const [queuedIntent, setQueuedIntent] = useState<string | null>(null);
 
+  // WP-005 — the "reply produced this session" signal that drives the shared
+  // status line's "finished" slot (ADR-002). It is a presentational latch, NOT
+  // chat lifecycle state: it flips true the moment a reply streams in and is
+  // cleared on a scope switch (a different product's chat starts clean) and when
+  // the founder reads the finished line. The hook's single source of truth
+  // (useProductChat) is untouched.
+  const [replyProduced, setReplyProduced] = useState(false);
+  useEffect(() => {
+    if (chat.replyText.length > 0) setReplyProduced(true);
+  }, [chat.replyText]);
+  useEffect(() => {
+    setReplyProduced(false);
+  }, [scope]);
+
   const start = useStartFromIntent({
     productId: cardProductId ?? "",
     streamStartFromIntent,
@@ -131,7 +149,11 @@ export function ProductChatDock({
   const switcherRows: ProductRow[] = useMemo(
     () => [
       { productId: ALL_ROW_ID, name: "All products", glyph: "all-grid" },
-      { productId: UNASSIGNED_ROW_ID, name: "Unassigned", glyph: "unassigned-dashed" },
+      {
+        productId: UNASSIGNED_ROW_ID,
+        name: "Unassigned",
+        glyph: "unassigned-dashed",
+      },
       ...products.map((p) => ({
         productId: p.productId,
         name: p.name,
@@ -160,7 +182,9 @@ export function ProductChatDock({
     // here, not emergent from every caller re-setting it).
     setPendingIntent(null);
     setQueuedIntent(null);
-    setCardProductId(nextScope === null || nextScope === UNASSIGNED_SCOPE ? null : nextScope);
+    setCardProductId(
+      nextScope === null || nextScope === UNASSIGNED_SCOPE ? null : nextScope,
+    );
   }
 
   // ── send a chat message (ADR-001/003) ─────────────────────────────────────
@@ -261,13 +285,21 @@ export function ProductChatDock({
         <>
           {/* ── the three honest states + the transcript ──────────────────── */}
           {chat.isLoading ? (
-            <div className={styles.skel} data-testid="chat-loading" aria-busy="true">
+            <div
+              className={styles.skel}
+              data-testid="chat-loading"
+              aria-busy="true"
+            >
               <span className={`${styles.skelLine} ${styles.med}`} />
               <span className={styles.skelLine} />
               <span className={`${styles.skelLine} ${styles.short}`} />
             </div>
           ) : chat.isError ? (
-            <div className={styles.errBox} role="alert" data-testid="chat-error">
+            <div
+              className={styles.errBox}
+              role="alert"
+              data-testid="chat-error"
+            >
               <div className={styles.errTitle}>I couldn't reach this chat</div>
               <p>Something went wrong loading this conversation.</p>
               <button
@@ -348,24 +380,42 @@ export function ProductChatDock({
             </div>
           )}
 
-          {/* ── composer: chips + dual-mode input + slash hint + agent foot ── */}
+          {/* ── composer: status line ⇆ chips + dual-mode input + slash hint +
+              agent foot ── */}
           <div className={styles.composer}>
-            <div className={styles.chips}>
-              {SUGGESTION_CHIPS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className={styles.chip}
-                  data-testid="chat-chip"
-                  onClick={() => setDraft(c)}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
+            {/* The shared status line owns the row above the message box,
+                sharing ONE mutually-exclusive slot with the suggestion chips
+                (WP-005 / ADR-002 / signed contract): idle → chips; streaming →
+                "Sulis is working…"; complete → "Finished — over to you", then
+                back to the chips once read. The dock HEADER agent-status chip is
+                a separate surface and is left unchanged. */}
+            <ChatStatusLine
+              state={chat.state}
+              replyProduced={replyProduced}
+              onDismissFinished={() => setReplyProduced(false)}
+              chips={
+                <div className={styles.chips}>
+                  {SUGGESTION_CHIPS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className={styles.chip}
+                      data-testid="chat-chip"
+                      onClick={() => setDraft(c)}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              }
+            />
 
             {chat.errorMessage && (
-              <div className={styles.relayError} role="alert" data-testid="chat-send-error">
+              <div
+                className={styles.relayError}
+                role="alert"
+                data-testid="chat-send-error"
+              >
                 {chat.errorMessage}
               </div>
             )}
