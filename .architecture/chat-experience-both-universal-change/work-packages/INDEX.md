@@ -48,7 +48,7 @@ can run in parallel.
 | WP-003 | Universal chat TurnCard parity + markdown | SUBSTITUTE-Replace | done | WP-001 | — |
 | WP-004 | Composer status line + de-collision fix | REORGANISE-Refactor | done | WP-001, WP-002 | WP-006 |
 | WP-005 | Dock status line (universal) | EXPAND-Extend | done | WP-001, WP-002 | WP-006 |
-| WP-006 | Extend no-raw-colours coverage to status-line surfaces | REINFORCE-Test | in_progress | WP-002, WP-004, WP-005 | — |
+| WP-006 | Extend no-raw-colours coverage to status-line surfaces | REINFORCE-Test | done | WP-002, WP-004, WP-005 | — |
 
 ---
 
