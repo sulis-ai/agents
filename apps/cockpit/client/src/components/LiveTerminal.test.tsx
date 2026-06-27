@@ -372,6 +372,100 @@ describe("<LiveTerminal />", () => {
     ).toBeVisible();
   });
 
+  it("surfaces a 'can't reach the session' state when the connection drops BEFORE going live (CH-R5EE44 Fix 2)", async () => {
+    const fake = makeFakeTerminal();
+    // The WS-connect failure path: a SOCKET_CLOSED arrives while still
+    // connecting — never reached `live`. This is the silent-failure root cause
+    // (origin-rejected / backend down) and must NOT render the misleading
+    // "session is still running — reconnect" copy.
+    const { bridge } = makeFakeBridge({
+      attachResults: async function* () {
+        yield {
+          ok: false,
+          error: {
+            category: "protocol",
+            code: "SOCKET_CLOSED",
+            message: "terminal socket closed",
+          },
+        };
+      },
+    });
+
+    renderTerminal(bridge, fake);
+
+    const panel = await screen.findByTestId("live-terminal-unreachable");
+    expect(panel).toBeVisible();
+    // The actionable copy: name the cockpit server + the recovery step.
+    expect(panel.textContent).toMatch(/can.?t reach the session/i);
+    expect(panel.textContent).toMatch(/npm run dev/i);
+    // A reconnect affordance is still offered (it may recover once the server is up).
+    expect(
+      screen.getByRole("button", { name: /reconnect/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("surfaces 'can't reach the session' when open() rejects before any live byte (CH-R5EE44 Fix 2)", async () => {
+    const fake = makeFakeTerminal();
+    // open() rejecting on a connection-level failure (the WebSocketTransport
+    // rejects its connect() on ws.onerror) — the session was never reached.
+    const { bridge } = makeFakeBridge({
+      openError: {
+        category: "protocol",
+        code: "SOCKET_CLOSED",
+        message: "terminal socket failed to connect",
+      },
+    });
+
+    renderTerminal(bridge, fake);
+
+    const panel = await screen.findByTestId("live-terminal-unreachable");
+    expect(panel).toBeVisible();
+    expect(panel.textContent).toMatch(/can.?t reach the session/i);
+  });
+
+  it("still shows the live-then-dropped 'session still running' copy when a drop happens AFTER going live (CH-R5EE44 Fix 2 regression guard)", async () => {
+    const fake = makeFakeTerminal();
+    const { bridge } = makeFakeBridge({
+      attachResults: async function* () {
+        yield {
+          ok: true,
+          bytes: new TextEncoder().encode("hello"),
+          phase: "live",
+        };
+        yield {
+          ok: false,
+          error: {
+            category: "protocol",
+            code: "SOCKET_CLOSED",
+            message: "dropped after live",
+          },
+        };
+      },
+    });
+
+    renderTerminal(bridge, fake);
+    // Reached live first → the drop is a recoverable disconnect, NOT unreachable.
+    const panel = await screen.findByTestId("live-terminal-disconnected");
+    expect(panel).toBeVisible();
+    expect(panel.textContent).toMatch(/still running/i);
+  });
+
+  it("has no WCAG AA violations on the unreachable state (CH-R5EE44 Fix 2 a11y)", async () => {
+    const fake = makeFakeTerminal();
+    const { bridge } = makeFakeBridge({
+      openError: {
+        category: "protocol",
+        code: "SOCKET_CLOSED",
+        message: "terminal socket failed to connect",
+      },
+    });
+
+    const { container } = renderTerminal(bridge, fake);
+    await screen.findByTestId("live-terminal-unreachable");
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
   it("does not throw when a keystroke feed rejects (best-effort, §2.12.2)", async () => {
     const fake = makeFakeTerminal();
     const { bridge } = makeFakeBridge();

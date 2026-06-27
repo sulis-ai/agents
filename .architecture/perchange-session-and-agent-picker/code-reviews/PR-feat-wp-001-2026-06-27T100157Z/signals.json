@@ -1,0 +1,22 @@
+{
+  "target": "wp/fix-perchange-session-and-agent-picker/wp-001-session-and-agent-picker",
+  "base": "change/fix-perchange-session-and-agent-picker",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0, "tsc_exit": 0, "eslint_exit": 0 },
+  "hygiene": {
+    "scope": { "severity": "low", "note": "single concern: fix CH-R5EE44 (three related cockpit fixes)" },
+    "size": { "lines_added": 731, "lines_removed": 39, "files_changed": 16, "severity": "medium", "band": "501-1000 lines / 16-30 files" },
+    "safety": { "migrations": 0, "schema_idl": 0, "secrets": 0, "infra": 0, "severity": "none" },
+    "completeness": { "new_source_without_test": 0, "new_test_files": 2, "severity": "none" }
+  },
+  "findings": {
+    "in_changes": { "critical": 0, "high": 0, "medium": 0, "low": 1 },
+    "in_neighbours": { "critical": 0, "high": 0, "medium": 0, "low": 0 }
+  },
+  "lenses": {
+    "architecture": { "findings": 0, "notes": 3, "status": "complete" },
+    "security": { "findings": 0, "status": "nothing-surfaced" },
+    "quality": { "findings": 0, "notes": 1, "status": "complete" }
+  },
+  "draft_deltas": 0
+}

@@ -363,7 +363,20 @@ if (isMainModule()) {
   // attached terminal sidecar (the composition seam). A failure to ensure the
   // daemon is fatal at boot (the terminal would be dead); the HTTP surface is
   // never left bound without a daemon because they boot together here.
-  startProductionServer()
+  //
+  // CH-R5EE44 Fix 3 — wire the REAL per-change provider resolver, replacing the
+  // `() => "pty"` default. It reads the change's remembered provider (the
+  // per-change picker's PUT /api/chat/change/:id/provider persists it via the
+  // SAME on-disk chat-store substrate). A separate `LocalChatScopeStore` instance
+  // reads the same on-disk records the route writes — the adapter is a thin
+  // on-disk binding, so the two agree by the file contract (the established
+  // pattern; `buildProductionApp` constructs its own store too). The resolver
+  // applies at the NEXT session-open (applied:"new-work"), never a hot-swap.
+  const changeProviderStore = new LocalChatScopeStore();
+  startProductionServer({
+    resolveProvider: (changeId) =>
+      changeProviderStore.resolveChangeProvider(changeId),
+  })
     .then((handle) => {
       // eslint-disable-next-line no-console -- intentional: dev-runner heartbeat
       console.log(banner);

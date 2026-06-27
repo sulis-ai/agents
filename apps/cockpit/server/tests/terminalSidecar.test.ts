@@ -27,7 +27,10 @@ import { join } from "node:path";
 
 import { WebSocket } from "ws";
 
-import { createTerminalSidecar } from "../adapters/TerminalSidecar";
+import {
+  createTerminalSidecar,
+  normaliseLoopbackOrigin,
+} from "../adapters/TerminalSidecar";
 import type { TerminalSidecarLogLine } from "../adapters/TerminalSidecar";
 import { FakeChangeStoreReader } from "../adapters/FakeChangeStoreReader";
 import type { ChangeStoreRecord } from "../ports/ChangeStoreReader";
@@ -597,6 +600,37 @@ describe("WP-003 Origin validation + resource caps", () => {
     expect(endpoint.connections.length).toBe(1);
   });
 
+  it("test_accepts_localhost_origin — an Origin of http://localhost:5173 is accepted when the allow-list holds http://127.0.0.1:5173 (same loopback host, CH-R5EE44 Fix 1)", async () => {
+    // The founder opens the cockpit at localhost:5173; the dev allow-list is
+    // built from clientOrigin (http://127.0.0.1:5173). localhost and 127.0.0.1
+    // are the SAME host, so the upgrade must be accepted — the silent-session
+    // root cause was the exact-string mismatch rejecting it.
+    const { endpoint, harness } = await setup();
+    const ws = await new Promise<WebSocket>((resolve, reject) => {
+      const sock = new WebSocket(harness.url, {
+        headers: { origin: "http://localhost:5173" },
+      });
+      sock.once("open", () => resolve(sock));
+      sock.once("error", reject);
+    });
+    cleanups.push(async () => ws.close());
+
+    expect(ws.readyState).toBe(WebSocket.OPEN);
+    ws.send(JSON.stringify({ id: "1", method: "attach", params: { key: CHANGE_ID } }));
+    await until(() => endpoint.connections.length >= 1);
+    expect(endpoint.connections.length).toBe(1);
+  });
+
+  it("test_rejects_non_loopback_origin — a non-loopback origin on the SAME port is still refused (the localhost normalize must not weaken the loopback posture, CH-R5EE44 Fix 1)", async () => {
+    const { endpoint, harness } = await setup();
+    const url = `${harness.baseUrl}/terminal?changeId=${CHANGE_ID}`;
+    // 10.0.0.5 is a routable LAN host on the same port — must NOT be admitted by
+    // the localhost↔127.0.0.1 normalization.
+    const outcome = await openWsExpectClosed(url, "http://10.0.0.5:5173");
+    expect(outcome.refused).toBe(true);
+    expect(endpoint.connections.length).toBe(0);
+  });
+
   it("test_connection_cap — the N+1th concurrent WS is refused while the first N stay up", async () => {
     // Ceiling of 2: open two, the third is refused; the first two keep streaming.
     const { endpoint, harness } = await setup({
@@ -720,5 +754,47 @@ describe("WP-003 Origin validation + resource caps", () => {
     await new Promise((r) => setTimeout(r, 50));
     const refusals = harness.logLines.filter((l) => l.event === "refuse");
     expect(refusals.length).toBe(0);
+  });
+});
+
+// ── normaliseLoopbackOrigin (CH-R5EE44 Fix 1) ──────────────────────────────
+// The pure loopback-canonicalisation helper behind the widened origin gate.
+
+describe("normaliseLoopbackOrigin (CH-R5EE44 Fix 1)", () => {
+  it("maps localhost → 127.0.0.1 (same scheme + port)", () => {
+    expect(normaliseLoopbackOrigin("http://localhost:5173")).toBe(
+      "http://127.0.0.1:5173",
+    );
+  });
+
+  it("leaves 127.0.0.1 unchanged (already canonical)", () => {
+    expect(normaliseLoopbackOrigin("http://127.0.0.1:5173")).toBe(
+      "http://127.0.0.1:5173",
+    );
+  });
+
+  it("maps the IPv6 loopback [::1] → 127.0.0.1", () => {
+    expect(normaliseLoopbackOrigin("http://[::1]:5173")).toBe(
+      "http://127.0.0.1:5173",
+    );
+  });
+
+  it("preserves the https scheme while normalising the host", () => {
+    expect(normaliseLoopbackOrigin("https://localhost:5173")).toBe(
+      "https://127.0.0.1:5173",
+    );
+  });
+
+  it("leaves a non-loopback host untouched (the loopback-only posture holds)", () => {
+    expect(normaliseLoopbackOrigin("http://10.0.0.5:5173")).toBe(
+      "http://10.0.0.5:5173",
+    );
+    expect(normaliseLoopbackOrigin("http://evil.example")).toBe(
+      "http://evil.example",
+    );
+  });
+
+  it("returns an unparseable origin verbatim (fail-closed: it won't match)", () => {
+    expect(normaliseLoopbackOrigin("not a url")).toBe("not a url");
   });
 });

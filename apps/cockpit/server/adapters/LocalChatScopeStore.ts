@@ -112,13 +112,9 @@ export class LocalChatScopeStore implements ChatScopeStore {
     return join(this.threadsDir(scope), `${THREAD_ID}.messages.jsonl`);
   }
 
-  private memoryPath(scope: ChatScope): string {
-    return join(this.threadsDir(scope), `${THREAD_ID}.memory.json`);
-  }
-
   async getThread(scope: ChatScope): Promise<ChatThreadResponse> {
     const messages = await this.readMessages(scope);
-    const remembered = await this.readRememberedProvider(scope);
+    const remembered = await this.readMemoryProvider(this.threadsDir(scope));
     const provider =
       remembered && REGISTERED_PROVIDERS.includes(remembered)
         ? remembered
@@ -188,7 +184,78 @@ export class LocalChatScopeStore implements ChatScopeStore {
   }
 
   async rememberProvider(scope: ChatScope, provider: ChatProvider): Promise<void> {
-    const path = this.memoryPath(scope);
+    await this.writeMemoryProvider(this.threadsDir(scope), provider);
+  }
+
+  async resolveProvider(
+    scope: ChatScope,
+    picked: ChatProvider | null,
+  ): Promise<ChatProvider> {
+    if (picked && REGISTERED_PROVIDERS.includes(picked)) return picked;
+    const remembered = await this.readMemoryProvider(this.threadsDir(scope));
+    if (remembered && REGISTERED_PROVIDERS.includes(remembered)) return remembered;
+    return DEFAULT_PROVIDER;
+  }
+
+  // ── Change-scoped provider remember/resolve (CH-R5EE44 Fix 3) ──────────────
+  //
+  // The per-change live terminal opens on a daemon/pty provider resolved at
+  // session-open (index.ts `resolveProvider(changeId)`, previously the hardcoded
+  // `() => "pty"` literal). The per-change picker persists its choice HERE,
+  // reusing the SAME on-disk memory-record substrate as the per-product
+  // remember (`writeMemoryProvider`/`readMemoryProvider`) — only the root
+  // differs: `{chatRoot}/change/{changeId}/threads/chat.memory.json`. A change id
+  // is NOT a `ChatScope` (the `product:` wire vocabulary is unchanged — no fork),
+  // so the change path is its own pair of methods over the shared writer.
+
+  /** Remember the per-change provider choice (AI-03: applies to the next open). */
+  async rememberChangeProvider(
+    changeId: string,
+    provider: ChatProvider,
+  ): Promise<void> {
+    await this.writeMemoryProvider(this.changeThreadsDir(changeId), provider);
+  }
+
+  /** Resolve which provider to OPEN the change's session on: the remembered
+   *  choice if registered, else the safe default `pty` (ADR-003 order, minus the
+   *  per-call `picked` — the change picker persists via `rememberChangeProvider`
+   *  then the daemon path resolves the remembered value at open). */
+  async resolveChangeProvider(changeId: string): Promise<ChatProvider> {
+    const remembered = await this.readMemoryProvider(
+      this.changeThreadsDir(changeId),
+    );
+    if (remembered && REGISTERED_PROVIDERS.includes(remembered)) return remembered;
+    return DEFAULT_PROVIDER;
+  }
+
+  /** The change's memory-record dir, under a `change/` root distinct from the
+   *  per-product scope roots. `changeId` must be a safe single path component
+   *  (the same `validate_store_id` posture as the scope key) — a hostile id is
+   *  rejected before any fs touch rather than escaping the chat root. */
+  private changeThreadsDir(changeId: string): string {
+    if (
+      changeId === "" ||
+      changeId.includes("/") ||
+      changeId.includes("\\") ||
+      changeId.includes("..") ||
+      !SAFE_KEY.test(changeId)
+    ) {
+      throw new Error(`change id ${changeId} is not a safe path component`);
+    }
+    return join(this.chatRoot, "change", changeId, "threads");
+  }
+
+  /**
+   * Checkpoint-write the provider stamp onto the memory record at
+   * `{memoryDir}/chat.memory.json` (monotonic `version`, atomic temp-then-rename,
+   * mirroring the Python `put_memory`). Shared by the per-product + per-change
+   * remember paths (EP-03, extracted at the 2-consumer threshold).
+   */
+  private async writeMemoryProvider(
+    memoryDir: string,
+    provider: ChatProvider,
+  ): Promise<void> {
+    const path = join(memoryDir, `${THREAD_ID}.memory.json`);
     let existing: StoredMemory | null = null;
     try {
       existing = JSON.parse(await readFile(path, "utf8")) as StoredMemory;
@@ -208,29 +275,22 @@ export class LocalChatScopeStore implements ChatScopeStore {
       created_at: existing?.created_at ?? now,
       updated_at: now,
     };
-    await mkdir(this.threadsDir(scope), { recursive: true });
+    await mkdir(memoryDir, { recursive: true });
     // Atomic temp-then-rename (mirrors the Python store's `_write_json`).
     const tmp = `${path}.tmp`;
     await writeFile(tmp, JSON.stringify(record), "utf8");
     await rename(tmp, path);
   }
 
-  async resolveProvider(
-    scope: ChatScope,
-    picked: ChatProvider | null,
-  ): Promise<ChatProvider> {
-    if (picked && REGISTERED_PROVIDERS.includes(picked)) return picked;
-    const remembered = await this.readRememberedProvider(scope);
-    if (remembered && REGISTERED_PROVIDERS.includes(remembered)) return remembered;
-    return DEFAULT_PROVIDER;
-  }
-
-  private async readRememberedProvider(
-    scope: ChatScope,
+  /** Read the remembered provider stamp from `{memoryDir}/chat.memory.json`, or
+   *  `null` when absent/unreadable. Shared by the per-product + per-change resolve
+   *  paths (EP-03). */
+  private async readMemoryProvider(
+    memoryDir: string,
   ): Promise<ChatProvider | null> {
     try {
       const memory = JSON.parse(
-        await readFile(this.memoryPath(scope), "utf8"),
+        await readFile(join(memoryDir, `${THREAD_ID}.memory.json`), "utf8"),
       ) as StoredMemory;
       const value = memory.content.participant_context?.["provider"];
       return typeof value === "string" ? (value as ChatProvider) : null;

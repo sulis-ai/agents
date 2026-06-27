@@ -445,3 +445,34 @@ export const putChatProvider: PutChatProviderFn = (scope, provider) =>
   apiPut<ChatProviderResult>(`/api/chat/${encodeURIComponent(scope)}/provider`, {
     provider,
   });
+
+// ─── CH-R5EE44 Fix 3 — the per-CHANGE provider funnel ────────────────────────
+//
+// The per-change AgentPicker reads + writes the change's remembered provider via
+// the per-change sibling of the per-product provider routes (added to the SAME
+// allow-listed chatScope router: `/api/chat/change/:id/provider`). Switching
+// applies to the change's NEXT session-open (applied:"new-work") — the terminal
+// sidecar's `resolveProvider(changeId)` consumes the remembered value at open.
+
+/** `GET /api/chat/change/:id/provider` — the change's resolved (running) provider. */
+export type FetchChangeProviderFn = (changeId: string) => Promise<ChatProvider>;
+
+export const fetchChangeProvider: FetchChangeProviderFn = async (changeId) => {
+  const { provider } = await apiGet<{ provider: ChatProvider }>(
+    `/api/chat/change/${encodeURIComponent(changeId)}/provider`,
+  );
+  return provider;
+};
+
+/** `PUT /api/chat/change/:id/provider` — persist the per-change picker's choice
+ *  (AI-03: applies to the change's next session-open; never re-homes a live PTY). */
+export type PutChangeProviderFn = (
+  changeId: string,
+  provider: ChatProvider,
+) => Promise<ChatProviderResult>;
+
+export const putChangeProvider: PutChangeProviderFn = (changeId, provider) =>
+  apiPut<ChatProviderResult>(
+    `/api/chat/change/${encodeURIComponent(changeId)}/provider`,
+    { provider },
+  );

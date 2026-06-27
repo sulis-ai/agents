@@ -13,12 +13,18 @@
 //
 // One state-pattern set (ADR-005): loading skeleton, 404-gone, generic error.
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useChange } from "../api/useChange";
 import { useStatus } from "../api/useStatus";
-import { ApiError } from "../api/client";
+import {
+  ApiError,
+  fetchChangeProvider as defaultFetchChangeProvider,
+  putChangeProvider as defaultPutChangeProvider,
+  type FetchChangeProviderFn,
+  type PutChangeProviderFn,
+} from "../api/client";
 import { changedQuery, provenanceQuery, treeQuery } from "../api/fileQueries";
 import {
   advancedQuery,
@@ -32,13 +38,27 @@ import { Chat } from "../components/Chat";
 import { Composer } from "../components/Composer";
 import { FilesPanel } from "../components/FilesPanel";
 import { LiveTerminal } from "../components/LiveTerminal";
+import { AgentPicker } from "../components/AgentPicker";
 import { ContractLinks } from "../components/ContractLinks";
 import { ProvenanceSection } from "../components/ProvenanceSection";
 import { AdvancedView } from "../components/AdvancedView";
 import { REASON_WORD } from "../components/StatusHeader";
+import type { ChatProvider } from "../../../shared/api-types";
 import ws from "../styles/ChangeWorkspace.module.css";
 
-export function ThreadView() {
+export interface ThreadViewProps {
+  /** Read the change's remembered provider (CH-R5EE44 Fix 3). Injectable for
+   *  tests; defaults to the real per-change provider funnel. */
+  fetchChangeProvider?: FetchChangeProviderFn;
+  /** Persist the per-change picker's choice (CH-R5EE44 Fix 3). Injectable for
+   *  tests; defaults to the real per-change provider funnel. */
+  putChangeProvider?: PutChangeProviderFn;
+}
+
+export function ThreadView({
+  fetchChangeProvider = defaultFetchChangeProvider,
+  putChangeProvider = defaultPutChangeProvider,
+}: ThreadViewProps = {}) {
   const { changeId } = useParams<{ changeId: string }>();
   const id = changeId ?? "";
   const query = useChange(id);
@@ -57,6 +77,41 @@ export function ThreadView() {
   })();
   const [view, setView] = useState<ChangeView>(initialView);
   const queryClient = useQueryClient();
+
+  // CH-R5EE44 Fix 3 — the change's remembered (running) provider for the per-
+  // change AgentPicker. Keyed by change id so each change keeps its own choice.
+  const providerQuery = useQuery({
+    queryKey: ["change-provider", id],
+    queryFn: () => fetchChangeProvider(id),
+    enabled: id.length > 0,
+  });
+  // Optimistic overlay: reflect the chosen provider immediately, clearing it
+  // whenever the authoritative running provider (re)loads — so the picker never
+  // shadows the server's value across a refetch (AI-07 honest identity).
+  const [pendingProvider, setPendingProvider] = useState<ChatProvider | null>(
+    null,
+  );
+  useEffect(() => {
+    setPendingProvider(null);
+  }, [id, providerQuery.dataUpdatedAt]);
+  const runningProvider: ChatProvider =
+    pendingProvider ?? providerQuery.data ?? "pty";
+
+  const onSwitchProvider = useCallback(
+    (next: ChatProvider) => {
+      // AI-03: applies to the change's NEXT session-open (never a hot-swap). The
+      // optimistic overlay reflects the choice; a server rejection rolls back.
+      setPendingProvider(next);
+      void putChangeProvider(id, next)
+        .then(() => {
+          void queryClient.invalidateQueries({
+            queryKey: ["change-provider", id],
+          });
+        })
+        .catch(() => setPendingProvider(null));
+    },
+    [id, putChangeProvider, queryClient],
+  );
 
   // Warm a view's primary read(s) on nav hover/focus so the click lands on a
   // cache hit and the switch is instant. Each view maps to the SAME query
@@ -230,6 +285,19 @@ export function ThreadView() {
             scrollback, and connecting/disconnected/no-terminal states. */}
         {view === "terminal" && (
           <div className={ws.viewfill} data-testid="section-terminal">
+            {/* CH-R5EE44 Fix 3 — the per-change agent picker (the SAME
+                <AgentPicker> the product-wide chat uses). It names the change's
+                remembered RUNNING provider; switching applies to the change's
+                NEXT session-open (AI-03 "new work"), never a hot-swap of the live
+                PTY — the AI-03 confirm fires while the change session is live. */}
+            <div className={ws.terminalAgentBar} data-testid="change-agent-bar">
+              <AgentPicker
+                running={runningProvider}
+                selected={runningProvider}
+                sessionRunning={change.liveness.status === "running"}
+                onSwitch={onSwitchProvider}
+              />
+            </div>
             <LiveTerminal changeId={id} />
           </div>
         )}

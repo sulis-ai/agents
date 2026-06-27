@@ -41,11 +41,13 @@ const ALL_SCOPE = "product:__all__";
  *  the production adapter binds; here a fake so the routes test never shells out. */
 function fakeStore(): ChatScopeStore & {
   remembered: Map<string, ChatProvider>;
+  rememberedChange: Map<string, ChatProvider>;
   messages: Map<string, TranscriptMessage[]>;
   /** Every appendTurn the route made, in call order (the persistence assertion). */
   appended: { scope: string; role: "user" | "assistant"; content: string }[];
 } {
   const remembered = new Map<string, ChatProvider>();
+  const rememberedChange = new Map<string, ChatProvider>();
   const messages = new Map<string, TranscriptMessage[]>();
   const appended: {
     scope: string;
@@ -54,6 +56,7 @@ function fakeStore(): ChatScopeStore & {
   }[] = [];
   return {
     remembered,
+    rememberedChange,
     messages,
     appended,
     async getThread(scope) {
@@ -76,6 +79,15 @@ function fakeStore(): ChatScopeStore & {
       const REGISTERED: ChatProvider[] = ["pty", "agy"];
       if (picked && REGISTERED.includes(picked)) return picked;
       const r = remembered.get(scope);
+      if (r && REGISTERED.includes(r)) return r;
+      return "pty";
+    },
+    async rememberChangeProvider(changeId, provider) {
+      rememberedChange.set(changeId, provider);
+    },
+    async resolveChangeProvider(changeId) {
+      const REGISTERED: ChatProvider[] = ["pty", "agy"];
+      const r = rememberedChange.get(changeId);
       if (r && REGISTERED.includes(r)) return r;
       return "pty";
     },
@@ -219,6 +231,67 @@ describe("PUT /api/chat/:scope/provider", () => {
       .put(`/api/chat/${encodeURIComponent(REAL_SCOPE)}/provider`)
       .send({ provider: "gemini" });
     expect(res.status).toBe(400);
+  });
+});
+
+// ─── CH-R5EE44 Fix 3 — the per-CHANGE provider routes ───────────────────────
+
+describe("GET|PUT /api/chat/change/:id/provider (CH-R5EE44 Fix 3)", () => {
+  const CHANGE_ID = "01KW46HTT0R5EE449MT9NGWYNJ";
+
+  it("GET returns the change's resolved provider (default pty when nothing remembered)", async () => {
+    const res = await request(appWith(fakeStore(), fakeBridge())).get(
+      `/api/chat/change/${CHANGE_ID}/provider`,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ provider: "pty" });
+  });
+
+  it("PUT persists the per-change choice and returns {provider, applied:'new-work'}", async () => {
+    const store = fakeStore();
+    const res = await request(appWith(store, fakeBridge()))
+      .put(`/api/chat/change/${CHANGE_ID}/provider`)
+      .send({ provider: "agy" });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ provider: "agy", applied: "new-work" });
+    expect(store.rememberedChange.get(CHANGE_ID)).toBe("agy");
+  });
+
+  it("GET reflects a prior PUT (the remember→resolve round-trip)", async () => {
+    const store = fakeStore();
+    const app = appWith(store, fakeBridge());
+    await request(app)
+      .put(`/api/chat/change/${CHANGE_ID}/provider`)
+      .send({ provider: "agy" });
+    const res = await request(app).get(`/api/chat/change/${CHANGE_ID}/provider`);
+    expect(res.body).toEqual({ provider: "agy" });
+  });
+
+  it("PUT rejects an unregistered provider with 400 (closed union)", async () => {
+    const res = await request(appWith(fakeStore(), fakeBridge()))
+      .put(`/api/chat/change/${CHANGE_ID}/provider`)
+      .send({ provider: "gemini" });
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects a hostile change id with 400 (no traversal reaches the store)", async () => {
+    // A `change` id segment that fails the safe-id pattern → 400. (A `/` in the
+    // id would change the route shape; this asserts the dot-bearing reject.)
+    const res = await request(appWith(fakeStore(), fakeBridge())).get(
+      `/api/chat/change/${encodeURIComponent("..bad")}/provider`,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("the literal `change` segment is NOT mis-parsed as a `:scope`", async () => {
+    // Guard the route-ordering: /change/:id/provider must match the change route,
+    // not /:scope/provider with scope='change'. A change GET returns {provider}
+    // (no productId/messages) — the scope thread shape would differ.
+    const res = await request(appWith(fakeStore(), fakeBridge())).get(
+      `/api/chat/change/${CHANGE_ID}/provider`,
+    );
+    expect(res.body).toEqual({ provider: "pty" });
+    expect(res.body).not.toHaveProperty("messages");
   });
 });
 

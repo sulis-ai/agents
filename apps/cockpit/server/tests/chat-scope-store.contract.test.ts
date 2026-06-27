@@ -101,6 +101,14 @@ function fakeFactory(): ReturnType<Factory> {
       if (r && REGISTERED.includes(r)) return r;
       return "pty";
     },
+    async rememberChangeProvider(changeId, provider) {
+      remembered.set(`change:${changeId}`, provider);
+    },
+    async resolveChangeProvider(changeId) {
+      const r = remembered.get(`change:${changeId}`);
+      if (r && REGISTERED.includes(r)) return r;
+      return "pty";
+    },
   };
   return Promise.resolve({ store, cleanup: async () => {} });
 }

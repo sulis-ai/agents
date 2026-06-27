@@ -1,0 +1,1099 @@
+diff --git a/apps/cockpit/README.md b/apps/cockpit/README.md
+index bd93d029..c04567e7 100644
+--- a/apps/cockpit/README.md
++++ b/apps/cockpit/README.md
+@@ -51,6 +51,12 @@ side:
+ Open `http://127.0.0.1:5173` in your browser. The placeholder client
+ displays "cockpit booting…" — real UI lands in WP-011 and later.
+ 
++You may also open the cockpit at `http://localhost:5173`; the live
++terminal's `/terminal` WebSocket accepts both the `localhost` and the
++`127.0.0.1` loopback spellings (they name the same machine). The
++loopback-only posture is unchanged — a non-loopback origin is still
++refused.
++
+ Both ports are overridable via env (`COCKPIT_SERVER_PORT`,
+ `COCKPIT_CLIENT_PORT`). The host stays `127.0.0.1`; that is not
+ configurable.
+@@ -296,6 +302,15 @@ pairing, never a blanket waiver):
+ The terminal is its OWN bridge — added alongside chat's seams, never coupled to
+ them (it does not import the chat relay or the chat bridge).
+ 
++The change's **terminal view also carries an agent picker** (the SAME
++`<AgentPicker>` the product-wide chat uses — Claude / Antigravity). The choice is
++remembered per change via the chat-store's provider-memory substrate
++(`PUT /api/chat/change/:id/provider`, persisted under
++`~/.sulis/chat/change/{id}/threads/`) and is resolved at the change's NEXT
++session-open by the terminal sidecar's provider resolver (it replaces the former
++hardcoded `() => "pty"`). Switching applies to new work (the existing
++`applied:"new-work"` semantics) — it never hot-swaps a running PTY.
++
+ The **Settings** screen is a THIRD sanctioned write surface (ADR-019) — it
+ adds / edits / removes products, projects, and repo links. All settings
+ mutations live in one router (`routes/settings.ts`) which starts no process and
+diff --git a/apps/cockpit/client/src/api/client.ts b/apps/cockpit/client/src/api/client.ts
+index 925b24ed..4ca2282d 100644
+--- a/apps/cockpit/client/src/api/client.ts
++++ b/apps/cockpit/client/src/api/client.ts
+@@ -445,3 +445,34 @@ export const putChatProvider: PutChatProviderFn = (scope, provider) =>
+   apiPut<ChatProviderResult>(`/api/chat/${encodeURIComponent(scope)}/provider`, {
+     provider,
+   });
++
++// ─── CH-R5EE44 Fix 3 — the per-CHANGE provider funnel ────────────────────────
++//
++// The per-change AgentPicker reads + writes the change's remembered provider via
++// the per-change sibling of the per-product provider routes (added to the SAME
++// allow-listed chatScope router: `/api/chat/change/:id/provider`). Switching
++// applies to the change's NEXT session-open (applied:"new-work") — the terminal
++// sidecar's `resolveProvider(changeId)` consumes the remembered value at open.
++
++/** `GET /api/chat/change/:id/provider` — the change's resolved (running) provider. */
++export type FetchChangeProviderFn = (changeId: string) => Promise<ChatProvider>;
++
++export const fetchChangeProvider: FetchChangeProviderFn = async (changeId) => {
++  const { provider } = await apiGet<{ provider: ChatProvider }>(
++    `/api/chat/change/${encodeURIComponent(changeId)}/provider`,
++  );
++  return provider;
++};
++
++/** `PUT /api/chat/change/:id/provider` — persist the per-change picker's choice
++ *  (AI-03: applies to the change's next session-open; never re-homes a live PTY). */
++export type PutChangeProviderFn = (
++  changeId: string,
++  provider: ChatProvider,
++) => Promise<ChatProviderResult>;
++
++export const putChangeProvider: PutChangeProviderFn = (changeId, provider) =>
++  apiPut<ChatProviderResult>(
++    `/api/chat/change/${encodeURIComponent(changeId)}/provider`,
++    { provider },
++  );
+diff --git a/apps/cockpit/client/src/components/LiveTerminal.test.tsx b/apps/cockpit/client/src/components/LiveTerminal.test.tsx
+index e9d6ac4d..abc1ed15 100644
+--- a/apps/cockpit/client/src/components/LiveTerminal.test.tsx
++++ b/apps/cockpit/client/src/components/LiveTerminal.test.tsx
+@@ -372,6 +372,100 @@ describe("<LiveTerminal />", () => {
+     ).toBeVisible();
+   });
+ 
++  it("surfaces a 'can't reach the session' state when the connection drops BEFORE going live (CH-R5EE44 Fix 2)", async () => {
++    const fake = makeFakeTerminal();
++    // The WS-connect failure path: a SOCKET_CLOSED arrives while still
++    // connecting — never reached `live`. This is the silent-failure root cause
++    // (origin-rejected / backend down) and must NOT render the misleading
++    // "session is still running — reconnect" copy.
++    const { bridge } = makeFakeBridge({
++      attachResults: async function* () {
++        yield {
++          ok: false,
++          error: {
++            category: "protocol",
++            code: "SOCKET_CLOSED",
++            message: "terminal socket closed",
++          },
++        };
++      },
++    });
++
++    renderTerminal(bridge, fake);
++
++    const panel = await screen.findByTestId("live-terminal-unreachable");
++    expect(panel).toBeVisible();
++    // The actionable copy: name the cockpit server + the recovery step.
++    expect(panel.textContent).toMatch(/can.?t reach the session/i);
++    expect(panel.textContent).toMatch(/npm run dev/i);
++    // A reconnect affordance is still offered (it may recover once the server is up).
++    expect(
++      screen.getByRole("button", { name: /reconnect/i }),
++    ).toBeInTheDocument();
++  });
++
++  it("surfaces 'can't reach the session' when open() rejects before any live byte (CH-R5EE44 Fix 2)", async () => {
++    const fake = makeFakeTerminal();
++    // open() rejecting on a connection-level failure (the WebSocketTransport
++    // rejects its connect() on ws.onerror) — the session was never reached.
++    const { bridge } = makeFakeBridge({
++      openError: {
++        category: "protocol",
++        code: "SOCKET_CLOSED",
++        message: "terminal socket failed to connect",
++      },
++    });
++
++    renderTerminal(bridge, fake);
++
++    const panel = await screen.findByTestId("live-terminal-unreachable");
++    expect(panel).toBeVisible();
++    expect(panel.textContent).toMatch(/can.?t reach the session/i);
++  });
++
++  it("still shows the live-then-dropped 'session still running' copy when a drop happens AFTER going live (CH-R5EE44 Fix 2 regression guard)", async () => {
++    const fake = makeFakeTerminal();
++    const { bridge } = makeFakeBridge({
++      attachResults: async function* () {
++        yield {
++          ok: true,
++          bytes: new TextEncoder().encode("hello"),
++          phase: "live",
++        };
++        yield {
++          ok: false,
++          error: {
++            category: "protocol",
++            code: "SOCKET_CLOSED",
++            message: "dropped after live",
++          },
++        };
++      },
++    });
++
++    renderTerminal(bridge, fake);
++    // Reached live first → the drop is a recoverable disconnect, NOT unreachable.
++    const panel = await screen.findByTestId("live-terminal-disconnected");
++    expect(panel).toBeVisible();
++    expect(panel.textContent).toMatch(/still running/i);
++  });
++
++  it("has no WCAG AA violations on the unreachable state (CH-R5EE44 Fix 2 a11y)", async () => {
++    const fake = makeFakeTerminal();
++    const { bridge } = makeFakeBridge({
++      openError: {
++        category: "protocol",
++        code: "SOCKET_CLOSED",
++        message: "terminal socket failed to connect",
++      },
++    });
++
++    const { container } = renderTerminal(bridge, fake);
++    await screen.findByTestId("live-terminal-unreachable");
++    const results = await axe(container);
++    expect(results).toHaveNoViolations();
++  });
++
+   it("does not throw when a keystroke feed rejects (best-effort, §2.12.2)", async () => {
+     const fake = makeFakeTerminal();
+     const { bridge } = makeFakeBridge();
+diff --git a/apps/cockpit/client/src/components/LiveTerminal.tsx b/apps/cockpit/client/src/components/LiveTerminal.tsx
+index 7c0c245d..abe10ff6 100644
+--- a/apps/cockpit/client/src/components/LiveTerminal.tsx
++++ b/apps/cockpit/client/src/components/LiveTerminal.tsx
+@@ -72,6 +72,12 @@ type ViewState =
+   | { kind: "connecting" }
+   | { kind: "live" }
+   | { kind: "disconnected" }
++  // CH-R5EE44 Fix 2 — the connection could NOT be reached at all (the WS upgrade
++  // was rejected / the cockpit server is down / the socket dropped before a
++  // single live byte). Distinct from `disconnected` (a drop AFTER going live,
++  // where the session is still running): unreachable means there is no session to
++  // catch up to, so the copy names the recovery (start the cockpit server).
++  | { kind: "unreachable" }
+   | { kind: "no-terminal" }
+   | { kind: "error"; error: TerminalError };
+ 
+@@ -184,13 +190,20 @@ function defaultTerminalFactory(): TerminalSink {
+   };
+ }
+ 
+-/** Map a §2.15 error code onto the WPF-05 state it renders. */
+-function stateForError(error: TerminalError): ViewState {
++/** Map a §2.15 error code onto the WPF-05 state it renders.
++ *
++ *  `wasLive` is whether the attach stream had already delivered a live byte
++ *  before this error (CH-R5EE44 Fix 2): a `SOCKET_CLOSED` BEFORE going live is a
++ *  connection that could never be reached (origin-rejected / server down) — the
++ *  silent-failure root cause — so it renders the actionable `unreachable` state.
++ *  The SAME code AFTER going live is a recoverable drop of a still-running
++ *  session, which keeps the `disconnected` "reconnect to catch up" copy. */
++function stateForError(error: TerminalError, wasLive: boolean): ViewState {
+   switch (error.code) {
+     case "NOT_PTY_SESSION":
+       return { kind: "no-terminal" };
+     case "SOCKET_CLOSED":
+-      return { kind: "disconnected" };
++      return wasLive ? { kind: "disconnected" } : { kind: "unreachable" };
+     default:
+       // NO_SESSION / PTY_OPEN_FAILED — surface as a recoverable disconnect
+       // (the session may be gone or failed to spawn; reconnect re-opens).
+@@ -233,6 +246,10 @@ export function LiveTerminal({ changeId, bridge, terminalFactory }: Props) {
+     });
+ 
+     async function run() {
++      // CH-R5EE44 Fix 2 — track whether a live byte has landed, so a drop is
++      // classified as `unreachable` (never reached) vs `disconnected` (dropped
++      // after going live, session still running).
++      let wasLive = false;
+       try {
+         await activeBridge.open(changeId);
+         // The component-facing attach surface yields typed results (errors are
+@@ -250,19 +267,38 @@ export function LiveTerminal({ changeId, bridge, terminalFactory }: Props) {
+         for await (const result of stream) {
+           if (cancelled) return;
+           if (result.ok) {
++            wasLive = true;
+             setState({ kind: "live" });
+             sink.write(result.bytes);
+           } else {
+-            setState(stateForError(result.error));
++            setState(stateForError(result.error, wasLive));
+             return;
+           }
+         }
+-        // The stream ended cleanly (the session closed its end).
+-        if (!cancelled) setState({ kind: "disconnected" });
+-      } catch {
+-        // A throwing transport (the rare path) → treat as a dropped connection;
+-        // the session itself is unaffected (§2.12.3).
+-        if (!cancelled) setState({ kind: "disconnected" });
++        // The stream ended cleanly. If it never went live, the session could not
++        // be reached (unreachable); otherwise the running session simply closed
++        // its end (disconnected — reconnect to catch up).
++        if (!cancelled) {
++          setState(wasLive ? { kind: "disconnected" } : { kind: "unreachable" });
++        }
++      } catch (e) {
++        if (cancelled) return;
++        // A throwing transport: `open()`/attach rejected. A typed
++        // TerminalBridgeError carries its §2.15 code — route it through the SAME
++        // mapping the stream errors use (so a SOCKET_CLOSED-before-live → the
++        // `unreachable` WS-connect-failure state; a PTY_OPEN_FAILED stays the
++        // recoverable error). An UNtyped throw before going live is a raw
++        // connection failure (server down / refused) → unreachable; after going
++        // live it is a dropped connection of a still-running session (§2.12.3).
++        const terminalError =
++          e && typeof e === "object" && "terminalError" in e
++            ? (e as { terminalError: TerminalError }).terminalError
++            : undefined;
++        if (terminalError) {
++          setState(stateForError(terminalError, wasLive));
++        } else {
++          setState(wasLive ? { kind: "disconnected" } : { kind: "unreachable" });
++        }
+       }
+     }
+ 
+@@ -355,6 +391,20 @@ export function LiveTerminal({ changeId, bridge, terminalFactory }: Props) {
+         </div>
+       ) : null}
+ 
++      {/* CH-R5EE44 Fix 2 — the WS-connect-failure state. The session could not be
++          reached at all (the /terminal socket was rejected or the cockpit server
++          is down), so instead of an empty terminal (the silent failure) we name
++          what happened and the concrete recovery step. */}
++      {state.kind === "unreachable" ? (
++        <div className={styles.state} data-testid="live-terminal-unreachable">
++          <div className={styles.stateTitle}>Can&rsquo;t reach the session.</div>
++          <p className={styles.stateNote}>
++            The live terminal connection was refused. Is the cockpit server
++            running? Start it with <kbd>npm run dev</kbd>, then reconnect.
++          </p>
++        </div>
++      ) : null}
++
+       {state.kind === "no-terminal" ? (
+         <div className={styles.state} data-testid="live-terminal-no-terminal">
+           <div className={styles.stateTitle}>No terminal here.</div>
+diff --git a/apps/cockpit/client/src/pages/ThreadView.tsx b/apps/cockpit/client/src/pages/ThreadView.tsx
+index b68003df..6d6ff84b 100644
+--- a/apps/cockpit/client/src/pages/ThreadView.tsx
++++ b/apps/cockpit/client/src/pages/ThreadView.tsx
+@@ -13,12 +13,18 @@
+ //
+ // One state-pattern set (ADR-005): loading skeleton, 404-gone, generic error.
+ 
+-import { useCallback, useState } from "react";
++import { useCallback, useEffect, useState } from "react";
+ import { useParams, useSearchParams } from "react-router-dom";
+-import { useQueryClient } from "@tanstack/react-query";
++import { useQuery, useQueryClient } from "@tanstack/react-query";
+ import { useChange } from "../api/useChange";
+ import { useStatus } from "../api/useStatus";
+-import { ApiError } from "../api/client";
++import {
++  ApiError,
++  fetchChangeProvider as defaultFetchChangeProvider,
++  putChangeProvider as defaultPutChangeProvider,
++  type FetchChangeProviderFn,
++  type PutChangeProviderFn,
++} from "../api/client";
+ import { changedQuery, provenanceQuery, treeQuery } from "../api/fileQueries";
+ import {
+   advancedQuery,
+@@ -32,13 +38,27 @@ import { Chat } from "../components/Chat";
+ import { Composer } from "../components/Composer";
+ import { FilesPanel } from "../components/FilesPanel";
+ import { LiveTerminal } from "../components/LiveTerminal";
++import { AgentPicker } from "../components/AgentPicker";
+ import { ContractLinks } from "../components/ContractLinks";
+ import { ProvenanceSection } from "../components/ProvenanceSection";
+ import { AdvancedView } from "../components/AdvancedView";
+ import { REASON_WORD } from "../components/StatusHeader";
++import type { ChatProvider } from "../../../shared/api-types";
+ import ws from "../styles/ChangeWorkspace.module.css";
+ 
+-export function ThreadView() {
++export interface ThreadViewProps {
++  /** Read the change's remembered provider (CH-R5EE44 Fix 3). Injectable for
++   *  tests; defaults to the real per-change provider funnel. */
++  fetchChangeProvider?: FetchChangeProviderFn;
++  /** Persist the per-change picker's choice (CH-R5EE44 Fix 3). Injectable for
++   *  tests; defaults to the real per-change provider funnel. */
++  putChangeProvider?: PutChangeProviderFn;
++}
++
++export function ThreadView({
++  fetchChangeProvider = defaultFetchChangeProvider,
++  putChangeProvider = defaultPutChangeProvider,
++}: ThreadViewProps = {}) {
+   const { changeId } = useParams<{ changeId: string }>();
+   const id = changeId ?? "";
+   const query = useChange(id);
+@@ -58,6 +78,41 @@ export function ThreadView() {
+   const [view, setView] = useState<ChangeView>(initialView);
+   const queryClient = useQueryClient();
+ 
++  // CH-R5EE44 Fix 3 — the change's remembered (running) provider for the per-
++  // change AgentPicker. Keyed by change id so each change keeps its own choice.
++  const providerQuery = useQuery({
++    queryKey: ["change-provider", id],
++    queryFn: () => fetchChangeProvider(id),
++    enabled: id.length > 0,
++  });
++  // Optimistic overlay: reflect the chosen provider immediately, clearing it
++  // whenever the authoritative running provider (re)loads — so the picker never
++  // shadows the server's value across a refetch (AI-07 honest identity).
++  const [pendingProvider, setPendingProvider] = useState<ChatProvider | null>(
++    null,
++  );
++  useEffect(() => {
++    setPendingProvider(null);
++  }, [id, providerQuery.dataUpdatedAt]);
++  const runningProvider: ChatProvider =
++    pendingProvider ?? providerQuery.data ?? "pty";
++
++  const onSwitchProvider = useCallback(
++    (next: ChatProvider) => {
++      // AI-03: applies to the change's NEXT session-open (never a hot-swap). The
++      // optimistic overlay reflects the choice; a server rejection rolls back.
++      setPendingProvider(next);
++      void putChangeProvider(id, next)
++        .then(() => {
++          void queryClient.invalidateQueries({
++            queryKey: ["change-provider", id],
++          });
++        })
++        .catch(() => setPendingProvider(null));
++    },
++    [id, putChangeProvider, queryClient],
++  );
++
+   // Warm a view's primary read(s) on nav hover/focus so the click lands on a
+   // cache hit and the switch is instant. Each view maps to the SAME query
+   // definitions its hook consumes (fileQueries / viewQueries — DRY/EP-03), so
+@@ -230,6 +285,19 @@ export function ThreadView() {
+             scrollback, and connecting/disconnected/no-terminal states. */}
+         {view === "terminal" && (
+           <div className={ws.viewfill} data-testid="section-terminal">
++            {/* CH-R5EE44 Fix 3 — the per-change agent picker (the SAME
++                <AgentPicker> the product-wide chat uses). It names the change's
++                remembered RUNNING provider; switching applies to the change's
++                NEXT session-open (AI-03 "new work"), never a hot-swap of the live
++                PTY — the AI-03 confirm fires while the change session is live. */}
++            <div className={ws.terminalAgentBar} data-testid="change-agent-bar">
++              <AgentPicker
++                running={runningProvider}
++                selected={runningProvider}
++                sessionRunning={change.liveness.status === "running"}
++                onSwitch={onSwitchProvider}
++              />
++            </div>
+             <LiveTerminal changeId={id} />
+           </div>
+         )}
+diff --git a/apps/cockpit/client/src/styles/ChangeWorkspace.module.css b/apps/cockpit/client/src/styles/ChangeWorkspace.module.css
+index d9e795f7..75c0488f 100644
+--- a/apps/cockpit/client/src/styles/ChangeWorkspace.module.css
++++ b/apps/cockpit/client/src/styles/ChangeWorkspace.module.css
+@@ -239,6 +239,19 @@
+   overflow: hidden;
+ }
+ 
++/* CH-R5EE44 Fix 3 — the per-change agent picker bar above the live terminal.
++   A slim, right-aligned strip so the picker reads as terminal chrome (real
++   tokens only; the picker owns its own a11y model). */
++.terminalAgentBar {
++  flex: 0 0 auto;
++  display: flex;
++  justify-content: flex-end;
++  align-items: center;
++  padding: 8px 12px;
++  border-bottom: 1px solid var(--border);
++  background: var(--bg-subtle);
++}
++
+ /* slim sticky stage/status bar at the top of the conversation */
+ .stickybar {
+   flex: 0 0 auto;
+diff --git a/apps/cockpit/client/src/tests/apiClient.test.tsx b/apps/cockpit/client/src/tests/apiClient.test.tsx
+index b39a324a..c5767ab2 100644
+--- a/apps/cockpit/client/src/tests/apiClient.test.tsx
++++ b/apps/cockpit/client/src/tests/apiClient.test.tsx
+@@ -9,7 +9,12 @@
+ //   - query string serialised from params (omitted when no params).
+ 
+ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+-import { apiGet, ApiError } from "../api/client";
++import {
++  apiGet,
++  ApiError,
++  fetchChangeProvider,
++  putChangeProvider,
++} from "../api/client";
+ 
+ function jsonResponse(status: number, body: unknown): Response {
+   return new Response(JSON.stringify(body), {
+@@ -76,3 +81,41 @@ describe("apiGet", () => {
+     });
+   });
+ });
++
++describe("per-change provider funnel (CH-R5EE44 Fix 3)", () => {
++  beforeEach(() => {
++    vi.spyOn(globalThis, "fetch").mockReset();
++  });
++  afterEach(() => {
++    vi.restoreAllMocks();
++  });
++
++  it("fetchChangeProvider GETs the change's provider and unwraps it", async () => {
++    const fetchMock = vi
++      .spyOn(globalThis, "fetch")
++      .mockResolvedValue(jsonResponse(200, { provider: "agy" }));
++
++    const provider = await fetchChangeProvider("abc:def");
++
++    const [url, init] = fetchMock.mock.calls[0]!;
++    expect(url).toBe("/api/chat/change/abc%3Adef/provider");
++    expect((init as RequestInit | undefined)?.method ?? "GET").toBe("GET");
++    expect(provider).toBe("agy");
++  });
++
++  it("putChangeProvider PUTs the chosen provider and returns the result", async () => {
++    const fetchMock = vi
++      .spyOn(globalThis, "fetch")
++      .mockResolvedValue(jsonResponse(200, { provider: "agy", applied: "new-work" }));
++
++    const result = await putChangeProvider("abc", "agy");
++
++    const [url, init] = fetchMock.mock.calls[0]!;
++    expect(url).toBe("/api/chat/change/abc/provider");
++    expect((init as RequestInit).method).toBe("PUT");
++    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
++      provider: "agy",
++    });
++    expect(result).toEqual({ provider: "agy", applied: "new-work" });
++  });
++});
+diff --git a/apps/cockpit/client/src/tests/setup.ts b/apps/cockpit/client/src/tests/setup.ts
+index 3ad403b5..0967db2a 100644
+--- a/apps/cockpit/client/src/tests/setup.ts
++++ b/apps/cockpit/client/src/tests/setup.ts
+@@ -29,6 +29,21 @@ if (typeof window !== "undefined" && !window.matchMedia) {
+     }) as MediaQueryList;
+ }
+ 
++// jsdom does not implement ResizeObserver; xterm.js's fit-addon wiring (mounted
++// by <LiveTerminal/>) observes its container with one. Provide a no-op stub so
++// terminal-view tests that let the lazy xterm sink resolve render cleanly
++// (CH-R5EE44 Fix 3 — the ThreadView agent-picker test mounts the real
++// LiveTerminal and waits long enough for the async sink to attach).
++if (typeof globalThis !== "undefined" && !("ResizeObserver" in globalThis)) {
++  class ResizeObserverStub {
++    observe(): void {}
++    unobserve(): void {}
++    disconnect(): void {}
++  }
++  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver =
++    ResizeObserverStub;
++}
++
+ afterEach(() => {
+   cleanup();
+ });
+diff --git a/apps/cockpit/server/adapters/LocalChatScopeStore.ts b/apps/cockpit/server/adapters/LocalChatScopeStore.ts
+index b5d9e80f..80b24dba 100644
+--- a/apps/cockpit/server/adapters/LocalChatScopeStore.ts
++++ b/apps/cockpit/server/adapters/LocalChatScopeStore.ts
+@@ -112,13 +112,9 @@ export class LocalChatScopeStore implements ChatScopeStore {
+     return join(this.threadsDir(scope), `${THREAD_ID}.messages.jsonl`);
+   }
+ 
+-  private memoryPath(scope: ChatScope): string {
+-    return join(this.threadsDir(scope), `${THREAD_ID}.memory.json`);
+-  }
+-
+   async getThread(scope: ChatScope): Promise<ChatThreadResponse> {
+     const messages = await this.readMessages(scope);
+-    const remembered = await this.readRememberedProvider(scope);
++    const remembered = await this.readMemoryProvider(this.threadsDir(scope));
+     const provider =
+       remembered && REGISTERED_PROVIDERS.includes(remembered)
+         ? remembered
+@@ -188,7 +184,78 @@ export class LocalChatScopeStore implements ChatScopeStore {
+   }
+ 
+   async rememberProvider(scope: ChatScope, provider: ChatProvider): Promise<void> {
+-    const path = this.memoryPath(scope);
++    await this.writeMemoryProvider(this.threadsDir(scope), provider);
++  }
++
++  async resolveProvider(
++    scope: ChatScope,
++    picked: ChatProvider | null,
++  ): Promise<ChatProvider> {
++    if (picked && REGISTERED_PROVIDERS.includes(picked)) return picked;
++    const remembered = await this.readMemoryProvider(this.threadsDir(scope));
++    if (remembered && REGISTERED_PROVIDERS.includes(remembered)) return remembered;
++    return DEFAULT_PROVIDER;
++  }
++
++  // ── Change-scoped provider remember/resolve (CH-R5EE44 Fix 3) ──────────────
++  //
++  // The per-change live terminal opens on a daemon/pty provider resolved at
++  // session-open (index.ts `resolveProvider(changeId)`, previously the hardcoded
++  // `() => "pty"` literal). The per-change picker persists its choice HERE,
++  // reusing the SAME on-disk memory-record substrate as the per-product
++  // remember (`writeMemoryProvider`/`readMemoryProvider`) — only the root
++  // differs: `{chatRoot}/change/{changeId}/threads/chat.memory.json`. A change id
++  // is NOT a `ChatScope` (the `product:` wire vocabulary is unchanged — no fork),
++  // so the change path is its own pair of methods over the shared writer.
++
++  /** Remember the per-change provider choice (AI-03: applies to the next open). */
++  async rememberChangeProvider(
++    changeId: string,
++    provider: ChatProvider,
++  ): Promise<void> {
++    await this.writeMemoryProvider(this.changeThreadsDir(changeId), provider);
++  }
++
++  /** Resolve which provider to OPEN the change's session on: the remembered
++   *  choice if registered, else the safe default `pty` (ADR-003 order, minus the
++   *  per-call `picked` — the change picker persists via `rememberChangeProvider`
++   *  then the daemon path resolves the remembered value at open). */
++  async resolveChangeProvider(changeId: string): Promise<ChatProvider> {
++    const remembered = await this.readMemoryProvider(
++      this.changeThreadsDir(changeId),
++    );
++    if (remembered && REGISTERED_PROVIDERS.includes(remembered)) return remembered;
++    return DEFAULT_PROVIDER;
++  }
++
++  /** The change's memory-record dir, under a `change/` root distinct from the
++   *  per-product scope roots. `changeId` must be a safe single path component
++   *  (the same `validate_store_id` posture as the scope key) — a hostile id is
++   *  rejected before any fs touch rather than escaping the chat root. */
++  private changeThreadsDir(changeId: string): string {
++    if (
++      changeId === "" ||
++      changeId.includes("/") ||
++      changeId.includes("\\") ||
++      changeId.includes("..") ||
++      !SAFE_KEY.test(changeId)
++    ) {
++      throw new Error(`change id ${changeId} is not a safe path component`);
++    }
++    return join(this.chatRoot, "change", changeId, "threads");
++  }
++
++  /**
++   * Checkpoint-write the provider stamp onto the memory record at
++   * `{memoryDir}/chat.memory.json` (monotonic `version`, atomic temp-then-rename,
++   * mirroring the Python `put_memory`). Shared by the per-product + per-change
++   * remember paths (EP-03, extracted at the 2-consumer threshold).
++   */
++  private async writeMemoryProvider(
++    memoryDir: string,
++    provider: ChatProvider,
++  ): Promise<void> {
++    const path = join(memoryDir, `${THREAD_ID}.memory.json`);
+     let existing: StoredMemory | null = null;
+     try {
+       existing = JSON.parse(await readFile(path, "utf8")) as StoredMemory;
+@@ -208,29 +275,22 @@ export class LocalChatScopeStore implements ChatScopeStore {
+       created_at: existing?.created_at ?? now,
+       updated_at: now,
+     };
+-    await mkdir(this.threadsDir(scope), { recursive: true });
++    await mkdir(memoryDir, { recursive: true });
+     // Atomic temp-then-rename (mirrors the Python store's `_write_json`).
+     const tmp = `${path}.tmp`;
+     await writeFile(tmp, JSON.stringify(record), "utf8");
+     await rename(tmp, path);
+   }
+ 
+-  async resolveProvider(
+-    scope: ChatScope,
+-    picked: ChatProvider | null,
+-  ): Promise<ChatProvider> {
+-    if (picked && REGISTERED_PROVIDERS.includes(picked)) return picked;
+-    const remembered = await this.readRememberedProvider(scope);
+-    if (remembered && REGISTERED_PROVIDERS.includes(remembered)) return remembered;
+-    return DEFAULT_PROVIDER;
+-  }
+-
+-  private async readRememberedProvider(
+-    scope: ChatScope,
++  /** Read the remembered provider stamp from `{memoryDir}/chat.memory.json`, or
++   *  `null` when absent/unreadable. Shared by the per-product + per-change resolve
++   *  paths (EP-03). */
++  private async readMemoryProvider(
++    memoryDir: string,
+   ): Promise<ChatProvider | null> {
+     try {
+       const memory = JSON.parse(
+-        await readFile(this.memoryPath(scope), "utf8"),
++        await readFile(join(memoryDir, `${THREAD_ID}.memory.json`), "utf8"),
+       ) as StoredMemory;
+       const value = memory.content.participant_context?.["provider"];
+       return typeof value === "string" ? (value as ChatProvider) : null;
+diff --git a/apps/cockpit/server/adapters/TerminalSidecar.ts b/apps/cockpit/server/adapters/TerminalSidecar.ts
+index c8288e2d..366baca6 100644
+--- a/apps/cockpit/server/adapters/TerminalSidecar.ts
++++ b/apps/cockpit/server/adapters/TerminalSidecar.ts
+@@ -99,6 +99,35 @@ const WS_POLICY_VIOLATION = 1008;
+ // imported above — the same value the client transport derives against, so the
+ // two ends cannot drift (WP-006 Blue).
+ 
++/** The loopback host spellings that name the SAME machine (CH-R5EE44 Fix 1). */
++const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
++
++/**
++ * Canonicalise the loopback host inside an `Origin` so the same loopback machine
++ * compares equal whether it was spelled `localhost`, `127.0.0.1`, or `[::1]`
++ * (CH-R5EE44 Fix 1). The scheme + port are preserved; ONLY a loopback hostname is
++ * rewritten to the canonical `127.0.0.1`. A non-loopback host (`evil.example`,
++ * `10.0.0.5`) is returned unchanged, so normalising never widens the allow-list
++ * beyond loopback — the loopback-only security posture is preserved.
++ *
++ * Parsed via `URL`; an unparseable origin is returned verbatim (it will simply
++ * fail to match a well-formed allow-list entry, i.e. refuse — fail closed).
++ */
++export function normaliseLoopbackOrigin(origin: string): string {
++  let url: URL;
++  try {
++    url = new URL(origin);
++  } catch {
++    return origin;
++  }
++  if (LOOPBACK_HOSTS.has(url.hostname.toLowerCase())) {
++    url.hostname = "127.0.0.1";
++  }
++  // `url.origin` drops a trailing slash and lowercases the scheme — the stable
++  // canonical form to compare on.
++  return url.origin;
++}
++
+ export interface TerminalSidecar {
+   /** Wire the WS endpoint to an HTTP server's `upgrade` event. */
+   attach(httpServer: Server): void;
+@@ -131,11 +160,26 @@ export function createTerminalSidecar(
+   let onUpgrade: ((req: IncomingMessage, socket: Duplex, head: Buffer) => void) | undefined;
+   let openConnections = 0;
+ 
++  // Pre-normalise the allow-list once so each upgrade compares against the
++  // loopback-canonical form (CH-R5EE44 Fix 1).
++  const normalisedAllowList = opts.originAllowList.map(normaliseLoopbackOrigin);
++
+   /** Origin gate (TDD §3.2): accept only the cockpit's own client origin. A
+-   *  mismatched / absent Origin → refuse the upgrade, no socket opened. */
++   *  mismatched / absent Origin → refuse the upgrade, no socket opened.
++   *
++   *  CH-R5EE44 Fix 1 — the founder opens the cockpit at `localhost:5173` but the
++   *  dev allow-list is built from `clientOrigin` (`http://127.0.0.1:5173`).
++   *  `localhost` and `127.0.0.1` (and `[::1]`) are the SAME loopback host, so an
++   *  exact-string compare wrongly rejected the `localhost` origin → the
++   *  per-change session's `/terminal` WS was refused, silently. We normalise the
++   *  loopback host in BOTH the origin and the allow-list before comparing, so the
++   *  two loopback spellings match while the loopback-only security posture holds:
++   *  a non-loopback host (e.g. `10.0.0.5`) is left untouched and so still cannot
++   *  match a loopback allow-list entry. */
+   function originAllowed(req: IncomingMessage): boolean {
+     const origin = req.headers.origin;
+-    return typeof origin === "string" && opts.originAllowList.includes(origin);
++    if (typeof origin !== "string") return false;
++    return normalisedAllowList.includes(normaliseLoopbackOrigin(origin));
+   }
+ 
+   /** Resolve the changeId the WS is opened for from its connection URL
+diff --git a/apps/cockpit/server/index.ts b/apps/cockpit/server/index.ts
+index f2ae0deb..c3b56328 100644
+--- a/apps/cockpit/server/index.ts
++++ b/apps/cockpit/server/index.ts
+@@ -363,7 +363,20 @@ if (isMainModule()) {
+   // attached terminal sidecar (the composition seam). A failure to ensure the
+   // daemon is fatal at boot (the terminal would be dead); the HTTP surface is
+   // never left bound without a daemon because they boot together here.
+-  startProductionServer()
++  //
++  // CH-R5EE44 Fix 3 — wire the REAL per-change provider resolver, replacing the
++  // `() => "pty"` default. It reads the change's remembered provider (the
++  // per-change picker's PUT /api/chat/change/:id/provider persists it via the
++  // SAME on-disk chat-store substrate). A separate `LocalChatScopeStore` instance
++  // reads the same on-disk records the route writes — the adapter is a thin
++  // on-disk binding, so the two agree by the file contract (the established
++  // pattern; `buildProductionApp` constructs its own store too). The resolver
++  // applies at the NEXT session-open (applied:"new-work"), never a hot-swap.
++  const changeProviderStore = new LocalChatScopeStore();
++  startProductionServer({
++    resolveProvider: (changeId) =>
++      changeProviderStore.resolveChangeProvider(changeId),
++  })
+     .then((handle) => {
+       // eslint-disable-next-line no-console -- intentional: dev-runner heartbeat
+       console.log(banner);
+diff --git a/apps/cockpit/server/ports/ChatScopeStore.ts b/apps/cockpit/server/ports/ChatScopeStore.ts
+index 4c4f0069..271979be 100644
+--- a/apps/cockpit/server/ports/ChatScopeStore.ts
++++ b/apps/cockpit/server/ports/ChatScopeStore.ts
+@@ -76,4 +76,20 @@ export interface ChatScopeStore {
+     scope: ChatScope,
+     picked: ChatProvider | null,
+   ): Promise<ChatProvider>;
++
++  /**
++   * Remember the per-CHANGE picker's chosen provider (CH-R5EE44 Fix 3, AI-03:
++   * applies to the change's next session-open, never a hot-swap). A change id is
++   * NOT a `ChatScope` — the per-change provider memory reuses the SAME on-disk
++   * substrate as `rememberProvider` under a distinct `change/` root.
++   */
++  rememberChangeProvider(changeId: string, provider: ChatProvider): Promise<void>;
++
++  /**
++   * Resolve which provider to OPEN a CHANGE's session on (CH-R5EE44 Fix 3): the
++   * change's remembered choice if registered, else the safe default `pty`. This
++   * is the value the terminal sidecar's `resolveProvider(changeId)` consumes at
++   * session-open (replacing the hardcoded `() => "pty"` literal).
++   */
++  resolveChangeProvider(changeId: string): Promise<ChatProvider>;
+ }
+diff --git a/apps/cockpit/server/routes/chatScope.ts b/apps/cockpit/server/routes/chatScope.ts
+index c0ac6e73..5ac80e0b 100644
+--- a/apps/cockpit/server/routes/chatScope.ts
++++ b/apps/cockpit/server/routes/chatScope.ts
+@@ -77,6 +77,20 @@ export function createChatScopeRouter(deps: ChatScopeRouterDeps): Router {
+   // Body parsing scoped to the write verbs (the GET read route never parses).
+   router.use(jsonBody());
+ 
++  // CH-R5EE44 Fix 3 — the per-CHANGE provider seam (the per-change sibling of the
++  // per-product PUT /:scope/provider). Registered BEFORE the `/:scope/...` routes
++  // so the literal `change` segment is matched here, never as a `:scope` value.
++  // GET reads the change's remembered (resolved) provider for the picker; PUT
++  // persists the picker's choice (AI-03: applies to the change's NEXT
++  // session-open — the terminal sidecar's `resolveProvider(changeId)` consumes
++  // it). A change id is NOT a `ChatScope` — no chat-scope wire vocabulary fork.
++  router.get("/change/:id/provider", (req, res, next) => {
++    void handleChangeProviderGet(req, res, deps).catch(next);
++  });
++  router.put("/change/:id/provider", (req, res, next) => {
++    void handleChangeProviderPut(req, res, deps).catch(next);
++  });
++
+   // GET /:scope/thread — the scope's durable transcript + resolved provider.
+   router.get("/:scope/thread", (req, res, next) => {
+     void handleThread(req, res, deps).catch(next);
+@@ -150,6 +164,65 @@ async function handleProvider(
+   res.status(200).json(result);
+ }
+ 
++/** A safe change-id path component (no traversal, no separators). The store has
++ *  its own backstop, but we reject hostile ids at the wire too. */
++const SAFE_CHANGE_ID = /^[A-Za-z0-9_-]+$/;
++
++function requireChangeId(
++  req: import("express").Request,
++  res: import("express").Response,
++): string | null {
++  const raw = (req.params as { id?: string }).id ?? "";
++  const id = decodeURIComponent(raw);
++  if (id === "" || !SAFE_CHANGE_ID.test(id)) {
++    res.status(400).json({ error: "invalid change id", code: "BAD_REQUEST" });
++    return null;
++  }
++  return id;
++}
++
++/** GET /change/:id/provider — the change's resolved (remembered → default)
++ *  provider, the value the per-change picker shows as RUNNING (CH-R5EE44 Fix 3). */
++async function handleChangeProviderGet(
++  req: import("express").Request,
++  res: import("express").Response,
++  deps: ChatScopeRouterDeps,
++): Promise<void> {
++  const id = requireChangeId(req, res);
++  if (id === null) return;
++  const provider = await deps.store.resolveChangeProvider(id);
++  res.status(200).json({ provider });
++}
++
++/** PUT /change/:id/provider — persist the per-change picker's choice (AI-03:
++ *  applies to the change's NEXT session-open; never re-homes a running PTY). */
++async function handleChangeProviderPut(
++  req: import("express").Request,
++  res: import("express").Response,
++  deps: ChatScopeRouterDeps,
++): Promise<void> {
++  const id = requireChangeId(req, res);
++  if (id === null) return;
++
++  const provider = (req.body as { provider?: unknown })?.provider;
++  if (
++    typeof provider !== "string" ||
++    !REGISTERED_PROVIDERS.includes(provider as ChatProvider)
++  ) {
++    res
++      .status(400)
++      .json({ error: "provider must be one of: pty, agy", code: "BAD_REQUEST" });
++    return;
++  }
++
++  await deps.store.rememberChangeProvider(id, provider as ChatProvider);
++  const result: ChatProviderResult = {
++    provider: provider as ChatProvider,
++    applied: "new-work",
++  };
++  res.status(200).json(result);
++}
++
+ async function handleMessage(
+   req: import("express").Request,
+   res: import("express").Response,
+diff --git a/apps/cockpit/server/tests/chat-scope-store.contract.test.ts b/apps/cockpit/server/tests/chat-scope-store.contract.test.ts
+index e2ffb3fb..a6950354 100644
+--- a/apps/cockpit/server/tests/chat-scope-store.contract.test.ts
++++ b/apps/cockpit/server/tests/chat-scope-store.contract.test.ts
+@@ -101,6 +101,14 @@ function fakeFactory(): ReturnType<Factory> {
+       if (r && REGISTERED.includes(r)) return r;
+       return "pty";
+     },
++    async rememberChangeProvider(changeId, provider) {
++      remembered.set(`change:${changeId}`, provider);
++    },
++    async resolveChangeProvider(changeId) {
++      const r = remembered.get(`change:${changeId}`);
++      if (r && REGISTERED.includes(r)) return r;
++      return "pty";
++    },
+   };
+   return Promise.resolve({ store, cleanup: async () => {} });
+ }
+diff --git a/apps/cockpit/server/tests/chatRoutes.test.ts b/apps/cockpit/server/tests/chatRoutes.test.ts
+index 4e1a2f4f..8d0c2b57 100644
+--- a/apps/cockpit/server/tests/chatRoutes.test.ts
++++ b/apps/cockpit/server/tests/chatRoutes.test.ts
+@@ -41,11 +41,13 @@ const ALL_SCOPE = "product:__all__";
+  *  the production adapter binds; here a fake so the routes test never shells out. */
+ function fakeStore(): ChatScopeStore & {
+   remembered: Map<string, ChatProvider>;
++  rememberedChange: Map<string, ChatProvider>;
+   messages: Map<string, TranscriptMessage[]>;
+   /** Every appendTurn the route made, in call order (the persistence assertion). */
+   appended: { scope: string; role: "user" | "assistant"; content: string }[];
+ } {
+   const remembered = new Map<string, ChatProvider>();
++  const rememberedChange = new Map<string, ChatProvider>();
+   const messages = new Map<string, TranscriptMessage[]>();
+   const appended: {
+     scope: string;
+@@ -54,6 +56,7 @@ function fakeStore(): ChatScopeStore & {
+   }[] = [];
+   return {
+     remembered,
++    rememberedChange,
+     messages,
+     appended,
+     async getThread(scope) {
+@@ -79,6 +82,15 @@ function fakeStore(): ChatScopeStore & {
+       if (r && REGISTERED.includes(r)) return r;
+       return "pty";
+     },
++    async rememberChangeProvider(changeId, provider) {
++      rememberedChange.set(changeId, provider);
++    },
++    async resolveChangeProvider(changeId) {
++      const REGISTERED: ChatProvider[] = ["pty", "agy"];
++      const r = rememberedChange.get(changeId);
++      if (r && REGISTERED.includes(r)) return r;
++      return "pty";
++    },
+   };
+ }
+ 
+@@ -222,6 +234,67 @@ describe("PUT /api/chat/:scope/provider", () => {
+   });
+ });
+ 
++// ─── CH-R5EE44 Fix 3 — the per-CHANGE provider routes ───────────────────────
++
++describe("GET|PUT /api/chat/change/:id/provider (CH-R5EE44 Fix 3)", () => {
++  const CHANGE_ID = "01KW46HTT0R5EE449MT9NGWYNJ";
++
++  it("GET returns the change's resolved provider (default pty when nothing remembered)", async () => {
++    const res = await request(appWith(fakeStore(), fakeBridge())).get(
++      `/api/chat/change/${CHANGE_ID}/provider`,
++    );
++    expect(res.status).toBe(200);
++    expect(res.body).toEqual({ provider: "pty" });
++  });
++
++  it("PUT persists the per-change choice and returns {provider, applied:'new-work'}", async () => {
++    const store = fakeStore();
++    const res = await request(appWith(store, fakeBridge()))
++      .put(`/api/chat/change/${CHANGE_ID}/provider`)
++      .send({ provider: "agy" });
++    expect(res.status).toBe(200);
++    expect(res.body).toEqual({ provider: "agy", applied: "new-work" });
++    expect(store.rememberedChange.get(CHANGE_ID)).toBe("agy");
++  });
++
++  it("GET reflects a prior PUT (the remember→resolve round-trip)", async () => {
++    const store = fakeStore();
++    const app = appWith(store, fakeBridge());
++    await request(app)
++      .put(`/api/chat/change/${CHANGE_ID}/provider`)
++      .send({ provider: "agy" });
++    const res = await request(app).get(`/api/chat/change/${CHANGE_ID}/provider`);
++    expect(res.body).toEqual({ provider: "agy" });
++  });
++
++  it("PUT rejects an unregistered provider with 400 (closed union)", async () => {
++    const res = await request(appWith(fakeStore(), fakeBridge()))
++      .put(`/api/chat/change/${CHANGE_ID}/provider`)
++      .send({ provider: "gemini" });
++    expect(res.status).toBe(400);
++  });
++
++  it("rejects a hostile change id with 400 (no traversal reaches the store)", async () => {
++    // A `change` id segment that fails the safe-id pattern → 400. (A `/` in the
++    // id would change the route shape; this asserts the dot-bearing reject.)
++    const res = await request(appWith(fakeStore(), fakeBridge())).get(
++      `/api/chat/change/${encodeURIComponent("..bad")}/provider`,
++    );
++    expect(res.status).toBe(400);
++  });
++
++  it("the literal `change` segment is NOT mis-parsed as a `:scope`", async () => {
++    // Guard the route-ordering: /change/:id/provider must match the change route,
++    // not /:scope/provider with scope='change'. A change GET returns {provider}
++    // (no productId/messages) — the scope thread shape would differ.
++    const res = await request(appWith(fakeStore(), fakeBridge())).get(
++      `/api/chat/change/${CHANGE_ID}/provider`,
++    );
++    expect(res.body).toEqual({ provider: "pty" });
++    expect(res.body).not.toHaveProperty("messages");
++  });
++});
++
+ // ─── POST /message (SSE) ────────────────────────────────────────────────────
+ 
+ describe("POST /api/chat/:scope/message", () => {
+diff --git a/apps/cockpit/server/tests/terminalSidecar.test.ts b/apps/cockpit/server/tests/terminalSidecar.test.ts
+index 31fae508..6af44b1d 100644
+--- a/apps/cockpit/server/tests/terminalSidecar.test.ts
++++ b/apps/cockpit/server/tests/terminalSidecar.test.ts
+@@ -27,7 +27,10 @@ import { join } from "node:path";
+ 
+ import { WebSocket } from "ws";
+ 
+-import { createTerminalSidecar } from "../adapters/TerminalSidecar";
++import {
++  createTerminalSidecar,
++  normaliseLoopbackOrigin,
++} from "../adapters/TerminalSidecar";
+ import type { TerminalSidecarLogLine } from "../adapters/TerminalSidecar";
+ import { FakeChangeStoreReader } from "../adapters/FakeChangeStoreReader";
+ import type { ChangeStoreRecord } from "../ports/ChangeStoreReader";
+@@ -597,6 +600,37 @@ describe("WP-003 Origin validation + resource caps", () => {
+     expect(endpoint.connections.length).toBe(1);
+   });
+ 
++  it("test_accepts_localhost_origin — an Origin of http://localhost:5173 is accepted when the allow-list holds http://127.0.0.1:5173 (same loopback host, CH-R5EE44 Fix 1)", async () => {
++    // The founder opens the cockpit at localhost:5173; the dev allow-list is
++    // built from clientOrigin (http://127.0.0.1:5173). localhost and 127.0.0.1
++    // are the SAME host, so the upgrade must be accepted — the silent-session
++    // root cause was the exact-string mismatch rejecting it.
++    const { endpoint, harness } = await setup();
++    const ws = await new Promise<WebSocket>((resolve, reject) => {
++      const sock = new WebSocket(harness.url, {
++        headers: { origin: "http://localhost:5173" },
++      });
++      sock.once("open", () => resolve(sock));
++      sock.once("error", reject);
++    });
++    cleanups.push(async () => ws.close());
++
++    expect(ws.readyState).toBe(WebSocket.OPEN);
++    ws.send(JSON.stringify({ id: "1", method: "attach", params: { key: CHANGE_ID } }));
++    await until(() => endpoint.connections.length >= 1);
++    expect(endpoint.connections.length).toBe(1);
++  });
++
++  it("test_rejects_non_loopback_origin — a non-loopback origin on the SAME port is still refused (the localhost normalize must not weaken the loopback posture, CH-R5EE44 Fix 1)", async () => {
++    const { endpoint, harness } = await setup();
++    const url = `${harness.baseUrl}/terminal?changeId=${CHANGE_ID}`;
++    // 10.0.0.5 is a routable LAN host on the same port — must NOT be admitted by
++    // the localhost↔127.0.0.1 normalization.
++    const outcome = await openWsExpectClosed(url, "http://10.0.0.5:5173");
++    expect(outcome.refused).toBe(true);
++    expect(endpoint.connections.length).toBe(0);
++  });
++
+   it("test_connection_cap — the N+1th concurrent WS is refused while the first N stay up", async () => {
+     // Ceiling of 2: open two, the third is refused; the first two keep streaming.
+     const { endpoint, harness } = await setup({
+@@ -722,3 +756,45 @@ describe("WP-003 Origin validation + resource caps", () => {
+     expect(refusals.length).toBe(0);
+   });
+ });
++
++// ── normaliseLoopbackOrigin (CH-R5EE44 Fix 1) ──────────────────────────────
++// The pure loopback-canonicalisation helper behind the widened origin gate.
++
++describe("normaliseLoopbackOrigin (CH-R5EE44 Fix 1)", () => {
++  it("maps localhost → 127.0.0.1 (same scheme + port)", () => {
++    expect(normaliseLoopbackOrigin("http://localhost:5173")).toBe(
++      "http://127.0.0.1:5173",
++    );
++  });
++
++  it("leaves 127.0.0.1 unchanged (already canonical)", () => {
++    expect(normaliseLoopbackOrigin("http://127.0.0.1:5173")).toBe(
++      "http://127.0.0.1:5173",
++    );
++  });
++
++  it("maps the IPv6 loopback [::1] → 127.0.0.1", () => {
++    expect(normaliseLoopbackOrigin("http://[::1]:5173")).toBe(
++      "http://127.0.0.1:5173",
++    );
++  });
++
++  it("preserves the https scheme while normalising the host", () => {
++    expect(normaliseLoopbackOrigin("https://localhost:5173")).toBe(
++      "https://127.0.0.1:5173",
++    );
++  });
++
++  it("leaves a non-loopback host untouched (the loopback-only posture holds)", () => {
++    expect(normaliseLoopbackOrigin("http://10.0.0.5:5173")).toBe(
++      "http://10.0.0.5:5173",
++    );
++    expect(normaliseLoopbackOrigin("http://evil.example")).toBe(
++      "http://evil.example",
++    );
++  });
++
++  it("returns an unparseable origin verbatim (fail-closed: it won't match)", () => {
++    expect(normaliseLoopbackOrigin("not a url")).toBe("not a url");
++  });
++});
