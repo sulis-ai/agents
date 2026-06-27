@@ -239,6 +239,19 @@
   overflow: hidden;
 }
 
+/* CH-R5EE44 Fix 3 — the per-change agent picker bar above the live terminal.
+   A slim, right-aligned strip so the picker reads as terminal chrome (real
+   tokens only; the picker owns its own a11y model). */
+.terminalAgentBar {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+
 /* slim sticky stage/status bar at the top of the conversation */
 .stickybar {
   flex: 0 0 auto;

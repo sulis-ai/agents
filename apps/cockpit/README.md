@@ -51,6 +51,12 @@ side:
 Open `http://127.0.0.1:5173` in your browser. The placeholder client
 displays "cockpit booting…" — real UI lands in WP-011 and later.
 
+You may also open the cockpit at `http://localhost:5173`; the live
+terminal's `/terminal` WebSocket accepts both the `localhost` and the
+`127.0.0.1` loopback spellings (they name the same machine). The
+loopback-only posture is unchanged — a non-loopback origin is still
+refused.
+
 Both ports are overridable via env (`COCKPIT_SERVER_PORT`,
 `COCKPIT_CLIENT_PORT`). The host stays `127.0.0.1`; that is not
 configurable.
@@ -295,6 +301,15 @@ pairing, never a blanket waiver):
 
 The terminal is its OWN bridge — added alongside chat's seams, never coupled to
 them (it does not import the chat relay or the chat bridge).
+
+The change's **terminal view also carries an agent picker** (the SAME
+`<AgentPicker>` the product-wide chat uses — Claude / Antigravity). The choice is
+remembered per change via the chat-store's provider-memory substrate
+(`PUT /api/chat/change/:id/provider`, persisted under
+`~/.sulis/chat/change/{id}/threads/`) and is resolved at the change's NEXT
+session-open by the terminal sidecar's provider resolver (it replaces the former
+hardcoded `() => "pty"`). Switching applies to new work (the existing
+`applied:"new-work"` semantics) — it never hot-swaps a running PTY.
 
 The **Settings** screen is a THIRD sanctioned write surface (ADR-019) — it
 adds / edits / removes products, projects, and repo links. All settings

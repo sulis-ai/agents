@@ -99,6 +99,35 @@ const WS_POLICY_VIOLATION = 1008;
 // imported above — the same value the client transport derives against, so the
 // two ends cannot drift (WP-006 Blue).
 
+/** The loopback host spellings that name the SAME machine (CH-R5EE44 Fix 1). */
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/**
+ * Canonicalise the loopback host inside an `Origin` so the same loopback machine
+ * compares equal whether it was spelled `localhost`, `127.0.0.1`, or `[::1]`
+ * (CH-R5EE44 Fix 1). The scheme + port are preserved; ONLY a loopback hostname is
+ * rewritten to the canonical `127.0.0.1`. A non-loopback host (`evil.example`,
+ * `10.0.0.5`) is returned unchanged, so normalising never widens the allow-list
+ * beyond loopback — the loopback-only security posture is preserved.
+ *
+ * Parsed via `URL`; an unparseable origin is returned verbatim (it will simply
+ * fail to match a well-formed allow-list entry, i.e. refuse — fail closed).
+ */
+export function normaliseLoopbackOrigin(origin: string): string {
+  let url: URL;
+  try {
+    url = new URL(origin);
+  } catch {
+    return origin;
+  }
+  if (LOOPBACK_HOSTS.has(url.hostname.toLowerCase())) {
+    url.hostname = "127.0.0.1";
+  }
+  // `url.origin` drops a trailing slash and lowercases the scheme — the stable
+  // canonical form to compare on.
+  return url.origin;
+}
+
 export interface TerminalSidecar {
   /** Wire the WS endpoint to an HTTP server's `upgrade` event. */
   attach(httpServer: Server): void;
@@ -131,11 +160,26 @@ export function createTerminalSidecar(
   let onUpgrade: ((req: IncomingMessage, socket: Duplex, head: Buffer) => void) | undefined;
   let openConnections = 0;
 
+  // Pre-normalise the allow-list once so each upgrade compares against the
+  // loopback-canonical form (CH-R5EE44 Fix 1).
+  const normalisedAllowList = opts.originAllowList.map(normaliseLoopbackOrigin);
+
   /** Origin gate (TDD §3.2): accept only the cockpit's own client origin. A
-   *  mismatched / absent Origin → refuse the upgrade, no socket opened. */
+   *  mismatched / absent Origin → refuse the upgrade, no socket opened.
+   *
+   *  CH-R5EE44 Fix 1 — the founder opens the cockpit at `localhost:5173` but the
+   *  dev allow-list is built from `clientOrigin` (`http://127.0.0.1:5173`).
+   *  `localhost` and `127.0.0.1` (and `[::1]`) are the SAME loopback host, so an
+   *  exact-string compare wrongly rejected the `localhost` origin → the
+   *  per-change session's `/terminal` WS was refused, silently. We normalise the
+   *  loopback host in BOTH the origin and the allow-list before comparing, so the
+   *  two loopback spellings match while the loopback-only security posture holds:
+   *  a non-loopback host (e.g. `10.0.0.5`) is left untouched and so still cannot
+   *  match a loopback allow-list entry. */
   function originAllowed(req: IncomingMessage): boolean {
     const origin = req.headers.origin;
-    return typeof origin === "string" && opts.originAllowList.includes(origin);
+    if (typeof origin !== "string") return false;
+    return normalisedAllowList.includes(normaliseLoopbackOrigin(origin));
   }
 
   /** Resolve the changeId the WS is opened for from its connection URL

@@ -76,4 +76,20 @@ export interface ChatScopeStore {
     scope: ChatScope,
     picked: ChatProvider | null,
   ): Promise<ChatProvider>;
+
+  /**
+   * Remember the per-CHANGE picker's chosen provider (CH-R5EE44 Fix 3, AI-03:
+   * applies to the change's next session-open, never a hot-swap). A change id is
+   * NOT a `ChatScope` — the per-change provider memory reuses the SAME on-disk
+   * substrate as `rememberProvider` under a distinct `change/` root.
+   */
+  rememberChangeProvider(changeId: string, provider: ChatProvider): Promise<void>;
+
+  /**
+   * Resolve which provider to OPEN a CHANGE's session on (CH-R5EE44 Fix 3): the
+   * change's remembered choice if registered, else the safe default `pty`. This
+   * is the value the terminal sidecar's `resolveProvider(changeId)` consumes at
+   * session-open (replacing the hardcoded `() => "pty"` literal).
+   */
+  resolveChangeProvider(changeId: string): Promise<ChatProvider>;
 }

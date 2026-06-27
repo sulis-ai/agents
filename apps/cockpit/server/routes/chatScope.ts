@@ -77,6 +77,20 @@ export function createChatScopeRouter(deps: ChatScopeRouterDeps): Router {
   // Body parsing scoped to the write verbs (the GET read route never parses).
   router.use(jsonBody());
 
+  // CH-R5EE44 Fix 3 — the per-CHANGE provider seam (the per-change sibling of the
+  // per-product PUT /:scope/provider). Registered BEFORE the `/:scope/...` routes
+  // so the literal `change` segment is matched here, never as a `:scope` value.
+  // GET reads the change's remembered (resolved) provider for the picker; PUT
+  // persists the picker's choice (AI-03: applies to the change's NEXT
+  // session-open — the terminal sidecar's `resolveProvider(changeId)` consumes
+  // it). A change id is NOT a `ChatScope` — no chat-scope wire vocabulary fork.
+  router.get("/change/:id/provider", (req, res, next) => {
+    void handleChangeProviderGet(req, res, deps).catch(next);
+  });
+  router.put("/change/:id/provider", (req, res, next) => {
+    void handleChangeProviderPut(req, res, deps).catch(next);
+  });
+
   // GET /:scope/thread — the scope's durable transcript + resolved provider.
   router.get("/:scope/thread", (req, res, next) => {
     void handleThread(req, res, deps).catch(next);
@@ -143,6 +157,65 @@ async function handleProvider(
   // AI-03: persist the choice for NEW work. We touch no live session — the
   // choice applies to the next open, never re-homing a running run.
   await deps.store.rememberProvider(scope, provider as ChatProvider);
+  const result: ChatProviderResult = {
+    provider: provider as ChatProvider,
+    applied: "new-work",
+  };
+  res.status(200).json(result);
+}
+
+/** A safe change-id path component (no traversal, no separators). The store has
+ *  its own backstop, but we reject hostile ids at the wire too. */
+const SAFE_CHANGE_ID = /^[A-Za-z0-9_-]+$/;
+
+function requireChangeId(
+  req: import("express").Request,
+  res: import("express").Response,
+): string | null {
+  const raw = (req.params as { id?: string }).id ?? "";
+  const id = decodeURIComponent(raw);
+  if (id === "" || !SAFE_CHANGE_ID.test(id)) {
+    res.status(400).json({ error: "invalid change id", code: "BAD_REQUEST" });
+    return null;
+  }
+  return id;
+}
+
+/** GET /change/:id/provider — the change's resolved (remembered → default)
+ *  provider, the value the per-change picker shows as RUNNING (CH-R5EE44 Fix 3). */
+async function handleChangeProviderGet(
+  req: import("express").Request,
+  res: import("express").Response,
+  deps: ChatScopeRouterDeps,
+): Promise<void> {
+  const id = requireChangeId(req, res);
+  if (id === null) return;
+  const provider = await deps.store.resolveChangeProvider(id);
+  res.status(200).json({ provider });
+}
+
+/** PUT /change/:id/provider — persist the per-change picker's choice (AI-03:
+ *  applies to the change's NEXT session-open; never re-homes a running PTY). */
+async function handleChangeProviderPut(
+  req: import("express").Request,
+  res: import("express").Response,
+  deps: ChatScopeRouterDeps,
+): Promise<void> {
+  const id = requireChangeId(req, res);
+  if (id === null) return;
+
+  const provider = (req.body as { provider?: unknown })?.provider;
+  if (
+    typeof provider !== "string" ||
+    !REGISTERED_PROVIDERS.includes(provider as ChatProvider)
+  ) {
+    res
+      .status(400)
+      .json({ error: "provider must be one of: pty, agy", code: "BAD_REQUEST" });
+    return;
+  }
+
+  await deps.store.rememberChangeProvider(id, provider as ChatProvider);
   const result: ChatProviderResult = {
     provider: provider as ChatProvider,
     applied: "new-work",

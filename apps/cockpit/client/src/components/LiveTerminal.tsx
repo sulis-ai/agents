@@ -72,6 +72,12 @@ type ViewState =
   | { kind: "connecting" }
   | { kind: "live" }
   | { kind: "disconnected" }
+  // CH-R5EE44 Fix 2 — the connection could NOT be reached at all (the WS upgrade
+  // was rejected / the cockpit server is down / the socket dropped before a
+  // single live byte). Distinct from `disconnected` (a drop AFTER going live,
+  // where the session is still running): unreachable means there is no session to
+  // catch up to, so the copy names the recovery (start the cockpit server).
+  | { kind: "unreachable" }
   | { kind: "no-terminal" }
   | { kind: "error"; error: TerminalError };
 
@@ -184,13 +190,20 @@ function defaultTerminalFactory(): TerminalSink {
   };
 }
 
-/** Map a §2.15 error code onto the WPF-05 state it renders. */
-function stateForError(error: TerminalError): ViewState {
+/** Map a §2.15 error code onto the WPF-05 state it renders.
+ *
+ *  `wasLive` is whether the attach stream had already delivered a live byte
+ *  before this error (CH-R5EE44 Fix 2): a `SOCKET_CLOSED` BEFORE going live is a
+ *  connection that could never be reached (origin-rejected / server down) — the
+ *  silent-failure root cause — so it renders the actionable `unreachable` state.
+ *  The SAME code AFTER going live is a recoverable drop of a still-running
+ *  session, which keeps the `disconnected` "reconnect to catch up" copy. */
+function stateForError(error: TerminalError, wasLive: boolean): ViewState {
   switch (error.code) {
     case "NOT_PTY_SESSION":
       return { kind: "no-terminal" };
     case "SOCKET_CLOSED":
-      return { kind: "disconnected" };
+      return wasLive ? { kind: "disconnected" } : { kind: "unreachable" };
     default:
       // NO_SESSION / PTY_OPEN_FAILED — surface as a recoverable disconnect
       // (the session may be gone or failed to spawn; reconnect re-opens).
@@ -233,6 +246,10 @@ export function LiveTerminal({ changeId, bridge, terminalFactory }: Props) {
     });
 
     async function run() {
+      // CH-R5EE44 Fix 2 — track whether a live byte has landed, so a drop is
+      // classified as `unreachable` (never reached) vs `disconnected` (dropped
+      // after going live, session still running).
+      let wasLive = false;
       try {
         await activeBridge.open(changeId);
         // The component-facing attach surface yields typed results (errors are
@@ -250,19 +267,38 @@ export function LiveTerminal({ changeId, bridge, terminalFactory }: Props) {
         for await (const result of stream) {
           if (cancelled) return;
           if (result.ok) {
+            wasLive = true;
             setState({ kind: "live" });
             sink.write(result.bytes);
           } else {
-            setState(stateForError(result.error));
+            setState(stateForError(result.error, wasLive));
             return;
           }
         }
-        // The stream ended cleanly (the session closed its end).
-        if (!cancelled) setState({ kind: "disconnected" });
-      } catch {
-        // A throwing transport (the rare path) → treat as a dropped connection;
-        // the session itself is unaffected (§2.12.3).
-        if (!cancelled) setState({ kind: "disconnected" });
+        // The stream ended cleanly. If it never went live, the session could not
+        // be reached (unreachable); otherwise the running session simply closed
+        // its end (disconnected — reconnect to catch up).
+        if (!cancelled) {
+          setState(wasLive ? { kind: "disconnected" } : { kind: "unreachable" });
+        }
+      } catch (e) {
+        if (cancelled) return;
+        // A throwing transport: `open()`/attach rejected. A typed
+        // TerminalBridgeError carries its §2.15 code — route it through the SAME
+        // mapping the stream errors use (so a SOCKET_CLOSED-before-live → the
+        // `unreachable` WS-connect-failure state; a PTY_OPEN_FAILED stays the
+        // recoverable error). An UNtyped throw before going live is a raw
+        // connection failure (server down / refused) → unreachable; after going
+        // live it is a dropped connection of a still-running session (§2.12.3).
+        const terminalError =
+          e && typeof e === "object" && "terminalError" in e
+            ? (e as { terminalError: TerminalError }).terminalError
+            : undefined;
+        if (terminalError) {
+          setState(stateForError(terminalError, wasLive));
+        } else {
+          setState(wasLive ? { kind: "disconnected" } : { kind: "unreachable" });
+        }
       }
     }
 
@@ -351,6 +387,20 @@ export function LiveTerminal({ changeId, bridge, terminalFactory }: Props) {
           <div className={styles.stateTitle}>Lost the live connection.</div>
           <p className={styles.stateNote}>
             The session is still running — reconnect to catch up.
+          </p>
+        </div>
+      ) : null}
+
+      {/* CH-R5EE44 Fix 2 — the WS-connect-failure state. The session could not be
+          reached at all (the /terminal socket was rejected or the cockpit server
+          is down), so instead of an empty terminal (the silent failure) we name
+          what happened and the concrete recovery step. */}
+      {state.kind === "unreachable" ? (
+        <div className={styles.state} data-testid="live-terminal-unreachable">
+          <div className={styles.stateTitle}>Can&rsquo;t reach the session.</div>
+          <p className={styles.stateNote}>
+            The live terminal connection was refused. Is the cockpit server
+            running? Start it with <kbd>npm run dev</kbd>, then reconnect.
           </p>
         </div>
       ) : null}

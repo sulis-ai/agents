@@ -9,7 +9,12 @@
 //   - query string serialised from params (omitted when no params).
 
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { apiGet, ApiError } from "../api/client";
+import {
+  apiGet,
+  ApiError,
+  fetchChangeProvider,
+  putChangeProvider,
+} from "../api/client";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -74,5 +79,43 @@ describe("apiGet", () => {
       status: 500,
       code: null,
     });
+  });
+});
+
+describe("per-change provider funnel (CH-R5EE44 Fix 3)", () => {
+  beforeEach(() => {
+    vi.spyOn(globalThis, "fetch").mockReset();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("fetchChangeProvider GETs the change's provider and unwraps it", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(jsonResponse(200, { provider: "agy" }));
+
+    const provider = await fetchChangeProvider("abc:def");
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("/api/chat/change/abc%3Adef/provider");
+    expect((init as RequestInit | undefined)?.method ?? "GET").toBe("GET");
+    expect(provider).toBe("agy");
+  });
+
+  it("putChangeProvider PUTs the chosen provider and returns the result", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(jsonResponse(200, { provider: "agy", applied: "new-work" }));
+
+    const result = await putChangeProvider("abc", "agy");
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("/api/chat/change/abc/provider");
+    expect((init as RequestInit).method).toBe("PUT");
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      provider: "agy",
+    });
+    expect(result).toEqual({ provider: "agy", applied: "new-work" });
   });
 });

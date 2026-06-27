@@ -29,6 +29,21 @@ if (typeof window !== "undefined" && !window.matchMedia) {
     }) as MediaQueryList;
 }
 
+// jsdom does not implement ResizeObserver; xterm.js's fit-addon wiring (mounted
+// by <LiveTerminal/>) observes its container with one. Provide a no-op stub so
+// terminal-view tests that let the lazy xterm sink resolve render cleanly
+// (CH-R5EE44 Fix 3 — the ThreadView agent-picker test mounts the real
+// LiveTerminal and waits long enough for the async sink to attach).
+if (typeof globalThis !== "undefined" && !("ResizeObserver" in globalThis)) {
+  class ResizeObserverStub {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver =
+    ResizeObserverStub;
+}
+
 afterEach(() => {
   cleanup();
 });
