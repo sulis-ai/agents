@@ -1,11 +1,12 @@
-// <Composer /> — the floating chat dock (chat-B2 signed contract).
+// <Composer /> — the floating chat dock (chat-B2 + chat-both-status contracts).
 //
-// Lifted off the bottom edge: a centred, rounded, shadowed box with a
-// "Working · pause · stop" status chip just above it (so the live action and
-// the input sit in the same comfortable reach — the founder's "hard to look to
-// the bottom" fix). Suggestion chips + free text + a slash hint (AI-02), Enter
-// sends / Shift+Enter newlines, a live streamed reply with a caret, pause/stop
-// controls while replying (AI-03).
+// Lifted off the bottom edge: a centred, rounded, shadowed box with ONE calm
+// row directly above it. That row is a single mutually-exclusive slot shared by
+// the suggestion chips and the working↔finished status line (the shared
+// <ChatStatusLine>, WP-002): idle → the chips; on send → "Sulis is working…";
+// on complete → "Finished — over to you", returning to the chips once read.
+// Suggestion chips + free text + a slash hint (AI-02), Enter sends / Shift+Enter
+// newlines, a live streamed reply with a caret while replying (AI-03).
 //
 // It holds NO chat state of its own — `useChatStream` is the one source of
 // truth (WPF-04). It reflects honest lifecycle states in plain English (FR-23),
@@ -14,10 +15,17 @@
 // clear failure WITHOUT marking delivered when unreachable (FR-19), and shows
 // an honest "resumed" indication on a resume (FR-26).
 //
+// De-collision (the reported overlap bug): the honest notes no longer crowd one
+// strip. The resumed note (FR-26) lives ONLY inside the idle slot and ONLY while
+// state is ready/your-turn — the instant a new turn starts the working line owns
+// the slot and the resumed note is gone (not stacked). Interrupted (FR-22) and
+// failed (FR-19) notes render as their own bands ABOVE the slot, paired with the
+// preserved partial. One row, one thing at a time.
+//
 // Tokens only — no raw hex. Heroicons for the controls. `streamChat` is
 // injectable for tests (defaults to the real relay funnel).
 
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import {
   PaperAirplaneIcon,
   ArrowsPointingOutIcon,
@@ -25,6 +33,7 @@ import {
 } from "@heroicons/react/20/solid";
 
 import { useChatStream } from "../api/useChatStream";
+import { ChatStatusLine } from "./ChatStatusLine";
 import type { StreamChatFn } from "../api/client";
 import styles from "../styles/Composer.module.css";
 
@@ -57,6 +66,24 @@ export function Composer({ changeId, streamChat }: Props) {
   // showing the reply twice.
   const active = chat.state !== "ready";
 
+  // "A reply was produced this session" — the presentational latch the status
+  // line uses to show "Finished — over to you" (ADR-002). It does NOT live in
+  // the hook (which keeps its single source of truth, WPF-04); the Composer
+  // derives it from the hook's observable transitions:
+  //   - reset the instant a new turn starts (state leaves "ready"), so a fresh
+  //     send always begins from the working line, never a stale "finished";
+  //   - set when a turn lands back on "ready" with a non-empty reply that was
+  //     NOT a resume. A resumed turn carries its own honest signal (the resumed
+  //     note in the idle slot), so it routes to the chips slot, not "finished".
+  const [replyProduced, setReplyProduced] = useState(false);
+  useEffect(() => {
+    if (chat.state !== "ready") {
+      setReplyProduced(false);
+    } else if (chat.replyText.length > 0 && !chat.resumed) {
+      setReplyProduced(true);
+    }
+  }, [chat.state, chat.replyText, chat.resumed]);
+
   // Grow the textarea to fit its content (capped), the way Slack's draft does.
   const autosize = () => {
     const el = taRef.current;
@@ -86,6 +113,34 @@ export function Composer({ changeId, streamChat }: Props) {
     chat.state === "replying" ||
     chat.state === "interrupted";
 
+  // The idle/your-turn slot the shared <ChatStatusLine> renders when it is not
+  // working/finished: the honest resumed note (FR-26), shown ONLY here and ONLY
+  // while state is ready, stacked above the suggestion chips. Extracted for
+  // readability — the status-slot decision itself lives in <ChatStatusLine>.
+  const idleSlot = (
+    <div className={styles.slotIdle}>
+      {chat.resumed && chat.state === "ready" && (
+        <div className={styles.resumedNote} data-testid="resumed-note">
+          This change was resumed — it picked up where it left off.
+        </div>
+      )}
+      <div className={styles.chips}>
+        {SUGGESTION_CHIPS.map((chip) => (
+          <button
+            key={chip}
+            type="button"
+            className={styles.sugchip}
+            data-testid="suggestion-chip"
+            disabled={busy}
+            onClick={() => setDraft(chip)}
+          >
+            {chip}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className={styles.composerDock} data-testid="composer">
       {/* The live in-flight turn — shown in the dock only WHILE the send is
@@ -114,12 +169,9 @@ export function Composer({ changeId, streamChat }: Props) {
       )}
 
       <div className={styles.composerInner}>
-        {/* Honest "resumed" indication (FR-26). */}
-        {chat.resumed && chat.state === "ready" && (
-          <div className={styles.resumedNote} data-testid="resumed-note">
-            This change was resumed — it picked up where it left off.
-          </div>
-        )}
+        {/* Above-slot bands — the honest broken-turn states (FR-22 / FR-19),
+            paired with the preserved partial above. They render as their own
+            band ABOVE the single slot, never crowding it (de-collision). */}
 
         {/* Mid-stream break (FR-22): the partial above is preserved. */}
         {chat.state === "interrupted" && (
@@ -136,21 +188,20 @@ export function Composer({ changeId, streamChat }: Props) {
           </div>
         )}
 
-        {/* Suggestion chips (AI-02). */}
-        <div className={styles.chips}>
-          {SUGGESTION_CHIPS.map((chip) => (
-            <button
-              key={chip}
-              type="button"
-              className={styles.sugchip}
-              data-testid="suggestion-chip"
-              disabled={busy}
-              onClick={() => setDraft(chip)}
-            >
-              {chip}
-            </button>
-          ))}
-        </div>
+        {/* The single mutually-exclusive slot directly above the message box:
+            chips ↔ "Sulis is working…" ↔ "Finished — over to you". The shared
+            <ChatStatusLine> (WP-002) decides which one shows from the hook's
+            existing state + the reply-produced latch; it owns the live region.
+            The idle/your-turn slot carries the honest resumed note (FR-26) — so
+            the resumed note is shown ONLY here, ONLY while state is ready. The
+            instant a new turn starts the working line owns the slot and the
+            resumed note is not rendered (de-collision: stepped aside, not
+            buried). */}
+        <ChatStatusLine
+          state={chat.state}
+          replyProduced={replyProduced}
+          chips={idleSlot}
+        />
 
         {/* The floating composer card — bigger, Slack-style expandable draft. */}
         <div

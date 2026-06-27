@@ -1,0 +1,20 @@
+{
+  "pr": "feat/wp-004-composer-status-line-decollision",
+  "base": "change/feat-chat-experience-both-universal-change",
+  "verdict": "PASS",
+  "build_verification": { "pr_introduced_errors": 0 },
+  "hygiene": {
+    "scope": { "commit_type_spread": ["feat/refactor (single WP)"], "module_fan_out": 1, "severity": "low" },
+    "size": { "lines_added": 237, "lines_removed": 29, "files_changed": 3, "severity": "low" },
+    "safety": { "migration_count": 0, "schema_idl_count": 0, "infra_files": 0, "secret_pattern_hits": 0, "severity": "low" },
+    "completeness": { "new_source_without_test": 0, "tests_added": true, "severity": "low" }
+  },
+  "lenses": {
+    "architecture": { "in_changes": 0, "in_neighbours": 0, "top_concern": null },
+    "security": { "in_changes": 0, "in_neighbours": 0, "top_concern": null },
+    "quality": { "in_changes": 0, "in_neighbours": 0, "top_concern": null }
+  },
+  "findings": { "critical": 0, "high": 0, "medium": 0, "low": 0 },
+  "draft_fixes": 0,
+  "dispatch": "three lenses dispatched concurrently (CR-02; 266 changed lines)"
+}

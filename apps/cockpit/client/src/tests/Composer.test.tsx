@@ -187,3 +187,150 @@ describe("<Composer /> — the docked write surface (signed contract)", () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 });
+
+// WP-004 — the shared status line + the bottom-dock de-collision fix.
+//
+// The single row directly above the message box is ONE mutually-exclusive slot
+// shared by the suggestion chips and the working↔finished status line (the
+// shared <ChatStatusLine> from WP-002). On send that row becomes "Sulis is
+// working…"; on complete it reads "Finished — over to you", then returns to the
+// chips once the founder dismisses it. The chips and the status line are never
+// both present.
+//
+// The de-collision fix: the honest "resumed" note (FR-26) lives ONLY in that
+// idle slot and ONLY while state is `ready`/your-turn. The instant a new turn
+// starts (`state !== "ready"`) the working line owns the slot and the resumed
+// note is gone — NOT stacked under it (the reported overlap bug). Interrupted
+// (FR-22) / failed (FR-19) notes render as their own bands ABOVE the slot.
+describe("<Composer /> — status line + bottom-dock de-collision (WP-004)", () => {
+  it("shows the working line and NO suggestion chips while replying (mutually exclusive)", async () => {
+    renderComposer(
+      <Composer changeId="01CHAT" streamChat={fakeStream(MIDSTREAM, { hang: true })} />,
+    );
+    // Idle: the chips own the slot, no working line.
+    expect(screen.getAllByTestId("suggestion-chip").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("status-working")).not.toBeInTheDocument();
+
+    const box = screen.getByLabelText(/message this change's agent/i);
+    fireEvent.change(box, { target: { value: "wire it" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+
+    // Replying: the working line owns the slot; the chips are gone (not both).
+    await waitFor(() =>
+      expect(screen.getByTestId("status-working")).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("suggestion-chip")).not.toBeInTheDocument();
+  });
+
+  it("reads 'Finished — over to you' on complete, then returns to chips on dismiss (never both)", async () => {
+    renderComposer(
+      <Composer changeId="01CHAT" streamChat={fakeStream(HAPPY)} />,
+    );
+    const box = screen.getByLabelText(/message this change's agent/i);
+    fireEvent.change(box, { target: { value: "ship it" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+
+    // On a clean complete (replying → ready, a reply was produced this session)
+    // the slot reads "Finished — over to you" and the chips are NOT shown.
+    const finished = await screen.findByTestId("status-finished");
+    expect(finished.textContent).toMatch(/finished — over to you/i);
+    expect(screen.queryByTestId("suggestion-chip")).not.toBeInTheDocument();
+
+    // The founder dismisses it → the slot returns to the chips; the finished
+    // line is gone (never both at once).
+    fireEvent.click(screen.getByTestId("status-finished-dismiss"));
+    await waitFor(() =>
+      expect(screen.getAllByTestId("suggestion-chip").length).toBeGreaterThan(0),
+    );
+    expect(screen.queryByTestId("status-finished")).not.toBeInTheDocument();
+  });
+
+  it("de-collision: a new send steps the resumed note aside — the working line holds the slot, the resumed note is NOT in the document", async () => {
+    // Two turns, one injected funnel: the FIRST send completes cleanly as a
+    // RESUME (so the dock returns to idle and the honest resumed note shows in
+    // the slot); the SECOND send holds the working line (never resolves) so we
+    // can assert the slot at the instant a fresh turn starts.
+    const RESUMED_COMPLETE: ChatStreamEvent[] = [
+      { type: "state", state: "resuming" },
+      { type: "chunk", text: "picked up where it left off" },
+      { type: "complete", resumed: true },
+    ];
+    const WORKING: ChatStreamEvent[] = [{ type: "state", state: "replying" }];
+    let call = 0;
+    const streamChat = vi.fn(
+      async (
+        _changeId: string,
+        _prompt: string,
+        onEvent: (e: ChatStreamEvent) => void,
+      ) => {
+        const events = call === 0 ? RESUMED_COMPLETE : WORKING;
+        call += 1;
+        for (const e of events) onEvent(e);
+        if (call > 1) await new Promise(() => {}); // 2nd send hangs on "working"
+      },
+    );
+
+    renderComposer(<Composer changeId="01CHAT" streamChat={streamChat} />);
+    const box = screen.getByLabelText(/message this change's agent/i);
+    fireEvent.change(box, { target: { value: "continue" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+
+    // The resumed note is shown in the idle slot once the turn is ready.
+    await waitFor(() =>
+      expect(screen.getByTestId("resumed-note")).toBeInTheDocument(),
+    );
+
+    // A NEW send starts a turn → the working line takes the slot and the
+    // resumed note is GONE (stepped aside, not buried under it).
+    fireEvent.change(box, { target: { value: "now do the next thing" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("status-working")).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("resumed-note")).not.toBeInTheDocument();
+  });
+
+  it("interrupted/failed notes render as their own bands ABOVE the slot, never inside the chips/working slot", async () => {
+    // Interrupted (FR-22): the band shows; the working line does NOT claim the
+    // slot as "finished", and the chips are not shown alongside the band.
+    renderComposer(
+      <Composer
+        changeId="01CHAT"
+        streamChat={fakeStream([
+          { type: "state", state: "replying" },
+          { type: "chunk", text: "partial answer" },
+          { type: "state", state: "interrupted" },
+        ], { hang: true })}
+      />,
+    );
+    const box = screen.getByLabelText(/message this change's agent/i);
+    fireEvent.change(box, { target: { value: "hi" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("interrupted-note")).toBeInTheDocument(),
+    );
+    // The slot stays empty on a broken turn — never "finished", never chips
+    // crowding the band.
+    expect(screen.queryByTestId("status-finished")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("suggestion-chip")).not.toBeInTheDocument();
+    // The preserved partial is still shown (FR-22).
+    expect(screen.getByTestId("agent-reply").textContent).toContain(
+      "partial answer",
+    );
+  });
+
+  it("has no axe a11y violations while the working line holds the slot (WPF-06 / UXD-07)", async () => {
+    const { container } = renderComposer(
+      <Composer changeId="01CHAT" streamChat={fakeStream(MIDSTREAM, { hang: true })} />,
+    );
+    const box = screen.getByLabelText(/message this change's agent/i);
+    fireEvent.change(box, { target: { value: "hi" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    await waitFor(() =>
+      expect(screen.getByTestId("status-working")).toBeInTheDocument(),
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+});
