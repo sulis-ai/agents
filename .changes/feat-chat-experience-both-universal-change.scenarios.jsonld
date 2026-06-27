@@ -1,0 +1,336 @@
+{
+  "scenarios": [
+    {
+      "exercises": "dna:design:WM4V1DQ3H7RJXANZZ01XX74SC6",
+      "id": "dna:scenario:84N8KQFF8K82RKSHFXEVTNEPZH",
+      "journey": "dna:workflow:A2BKBSD88FQ7QGASF8V96VEZ8H",
+      "name": "Universal chat shows turn-summary cards",
+      "state": "draft",
+      "surface": "ui",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:0BMR0TJ7ED12Q154YEKX0M4ES3"
+      ]
+    },
+    {
+      "exercises": "dna:design:WM4V1DQ3H7RJXANZZ01XX74SC6",
+      "id": "dna:scenario:MV89PJSHYXHJ4B5Z1EC188GJXR",
+      "journey": "dna:workflow:1N3VDQ59ZY040NC37GMZ01PQQG",
+      "name": "Agent replies render markdown and code as formatted HTML in both chats",
+      "state": "draft",
+      "surface": "ui",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:7N1YGC03NF1JEEVAVV8EB1VKV8"
+      ]
+    },
+    {
+      "exercises": "dna:design:WM4V1DQ3H7RJXANZZ01XX74SC6",
+      "id": "dna:scenario:9ZN6W2JRZG47CDY44M2TDAW8YW",
+      "journey": "dna:workflow:WT3P6TB052E55H3EQY5WVTCJC8",
+      "name": "A clear working/finished status line above the message box",
+      "state": "draft",
+      "surface": "ui",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:1M04B3P8P8YAQ82QXA727FBN0H"
+      ]
+    },
+    {
+      "exercises": "dna:design:WM4V1DQ3H7RJXANZZ01XX74SC6",
+      "id": "dna:scenario:19VZF1E7N7WH2S4MVKQNK7SZ8R",
+      "journey": "dna:workflow:R43T2PTYRZT50YE62TAX832346",
+      "name": "A new turn is never buried under the resumed note",
+      "state": "draft",
+      "surface": "ui",
+      "sys_status": "active",
+      "verifies": [
+        "dna:requirement:8PQP41K9AAX8BRX4R3Y3VWJ7JT"
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "agent_instructions": "Open the product-wide (universal) chat and send a message to the agent.",
+      "for_domain": "dna:tenant:X5YSB0RWB5YEEQRK04S5NZ6Y9B",
+      "for_process": "verification",
+      "id": "dna:step:VQ20J42ZG4PGVAKXQGJX8ZR4H7",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "000gzbq0-open-the-product-wide-universal-chat-and-1",
+      "output_artifacts": [
+        "000gzbq0-open-the-product-wide-universal-chat-and-1-result"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "The agent replies.",
+      "for_domain": "dna:tenant:X5YSB0RWB5YEEQRK04S5NZ6Y9B",
+      "for_process": "verification",
+      "id": "dna:step:73HSYMEARJV7TTYT8CHWG6ZV7E",
+      "input_artifacts": [
+        "000gzbq0-open-the-product-wide-universal-chat-and-1-result"
+      ],
+      "mechanism": "human",
+      "name": "000gzbq0-the-agent-replies-2",
+      "output_artifacts": [
+        "000gzbq0-the-agent-replies-2-result"
+      ],
+      "postconditions": [
+        "the reply appears as a short summary card, not a raw wall of text",
+        "a 'show full reply' control is visible on the card"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Click 'show full reply'.",
+      "for_domain": "dna:tenant:X5YSB0RWB5YEEQRK04S5NZ6Y9B",
+      "for_process": "verification",
+      "id": "dna:step:E3WBCMK2JPFNRQ22ACZKEQC1VG",
+      "input_artifacts": [
+        "000gzbq0-the-agent-replies-2-result"
+      ],
+      "mechanism": "human",
+      "name": "000gzbq0-click-show-full-reply-3",
+      "output_artifacts": [
+        "000gzbq0-click-show-full-reply-3-result"
+      ],
+      "postconditions": [
+        "the agent's complete reply is shown below the summary"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "In either chat, the agent replies with markdown (a heading, a bold word, a list) and a fenced code block.",
+      "for_domain": "dna:tenant:X5YSB0RWB5YEEQRK04S5NZ6Y9B",
+      "for_process": "verification",
+      "id": "dna:step:PQXEAMHN123EKJV5KGQGKNS35E",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "91jv30gt-in-either-chat-the-agent-replies-with-ma-1",
+      "output_artifacts": [
+        "91jv30gt-in-either-chat-the-agent-replies-with-ma-1-result"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Read the reply.",
+      "for_domain": "dna:tenant:X5YSB0RWB5YEEQRK04S5NZ6Y9B",
+      "for_process": "verification",
+      "id": "dna:step:0D91A0FXJ2CGK1J6V0DE2H2QND",
+      "input_artifacts": [
+        "91jv30gt-in-either-chat-the-agent-replies-with-ma-1-result"
+      ],
+      "mechanism": "human",
+      "name": "91jv30gt-read-the-reply-2",
+      "output_artifacts": [
+        "91jv30gt-read-the-reply-2-result"
+      ],
+      "postconditions": [
+        "the heading, bold text, and list render as formatted text, not raw markdown symbols",
+        "the code appears inside a formatted code block, not raw backticks"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Send a message in the chat.",
+      "for_domain": "dna:tenant:X5YSB0RWB5YEEQRK04S5NZ6Y9B",
+      "for_process": "verification",
+      "id": "dna:step:7PZ404B4XZ4Z7C601MWEGRC3S5",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "w9xtdz9g-send-a-message-in-the-chat-1",
+      "output_artifacts": [
+        "w9xtdz9g-send-a-message-in-the-chat-1-result"
+      ],
+      "postconditions": [
+        "the row directly above the message box reads 'Sulis is working\u2026' while the reply streams"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Wait for the turn to finish.",
+      "for_domain": "dna:tenant:X5YSB0RWB5YEEQRK04S5NZ6Y9B",
+      "for_process": "verification",
+      "id": "dna:step:TM30K5FGT6WXDNGFR9T4GRPAXZ",
+      "input_artifacts": [
+        "w9xtdz9g-send-a-message-in-the-chat-1-result"
+      ],
+      "mechanism": "human",
+      "name": "w9xtdz9g-wait-for-the-turn-to-finish-2",
+      "output_artifacts": [
+        "w9xtdz9g-wait-for-the-turn-to-finish-2-result"
+      ],
+      "postconditions": [
+        "the row reads 'Finished \u2014 over to you' when the turn completes"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "After reading the reply.",
+      "for_domain": "dna:tenant:X5YSB0RWB5YEEQRK04S5NZ6Y9B",
+      "for_process": "verification",
+      "id": "dna:step:6ZC219FW3VBV0V947MYNGVS20S",
+      "input_artifacts": [
+        "w9xtdz9g-wait-for-the-turn-to-finish-2-result"
+      ],
+      "mechanism": "human",
+      "name": "w9xtdz9g-after-reading-the-reply-3",
+      "output_artifacts": [
+        "w9xtdz9g-after-reading-the-reply-3-result"
+      ],
+      "postconditions": [
+        "the row returns to showing the suggestion chips",
+        "the suggestion chips and the status line are never shown at the same time"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Open a change that shows the 'This change was resumed \u2014 it picked up where it left off.' note.",
+      "for_domain": "dna:tenant:X5YSB0RWB5YEEQRK04S5NZ6Y9B",
+      "for_process": "verification",
+      "id": "dna:step:03FZWSZRMZWE8ZER9W0HBZP07T",
+      "input_artifacts": [
+        "test-target"
+      ],
+      "mechanism": "human",
+      "name": "941csmt9-open-a-change-that-shows-the-this-change-1",
+      "output_artifacts": [
+        "941csmt9-open-a-change-that-shows-the-this-change-1-result"
+      ],
+      "postconditions": [
+        "the resumed note is visible above the message box"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    },
+    {
+      "agent_instructions": "Send a new message.",
+      "for_domain": "dna:tenant:X5YSB0RWB5YEEQRK04S5NZ6Y9B",
+      "for_process": "verification",
+      "id": "dna:step:YWVJGDGTF4MKQJ7TXNBVX539X4",
+      "input_artifacts": [
+        "941csmt9-open-a-change-that-shows-the-this-change-1-result"
+      ],
+      "mechanism": "human",
+      "name": "941csmt9-send-a-new-message-2",
+      "output_artifacts": [
+        "941csmt9-send-a-new-message-2-result"
+      ],
+      "postconditions": [
+        "the new message and the streaming reply get clear space",
+        "the resumed note steps aside and no text is hidden under it"
+      ],
+      "state": "draft",
+      "sys_status": "active"
+    }
+  ],
+  "workflows": [
+    {
+      "for_domain": "dna:tenant:X5YSB0RWB5YEEQRK04S5NZ6Y9B",
+      "for_process": "verification",
+      "id": "dna:workflow:A2BKBSD88FQ7QGASF8V96VEZ8H",
+      "initial_steps": [
+        "000gzbq0-open-the-product-wide-universal-chat-and-1"
+      ],
+      "name": "Universal chat shows turn-summary cards",
+      "state": "draft",
+      "steps": [
+        "000gzbq0-open-the-product-wide-universal-chat-and-1",
+        "000gzbq0-the-agent-replies-2",
+        "000gzbq0-click-show-full-reply-3"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "000gzbq0-click-show-full-reply-3"
+      ],
+      "transitions": [
+        "000gzbq0-open-the-product-wide-universal-chat-and-1 -> 000gzbq0-the-agent-replies-2",
+        "000gzbq0-the-agent-replies-2 -> 000gzbq0-click-show-full-reply-3"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:X5YSB0RWB5YEEQRK04S5NZ6Y9B",
+      "for_process": "verification",
+      "id": "dna:workflow:1N3VDQ59ZY040NC37GMZ01PQQG",
+      "initial_steps": [
+        "91jv30gt-in-either-chat-the-agent-replies-with-ma-1"
+      ],
+      "name": "Agent replies render markdown and code as formatted HTML in both chats",
+      "state": "draft",
+      "steps": [
+        "91jv30gt-in-either-chat-the-agent-replies-with-ma-1",
+        "91jv30gt-read-the-reply-2"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "91jv30gt-read-the-reply-2"
+      ],
+      "transitions": [
+        "91jv30gt-in-either-chat-the-agent-replies-with-ma-1 -> 91jv30gt-read-the-reply-2"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:X5YSB0RWB5YEEQRK04S5NZ6Y9B",
+      "for_process": "verification",
+      "id": "dna:workflow:WT3P6TB052E55H3EQY5WVTCJC8",
+      "initial_steps": [
+        "w9xtdz9g-send-a-message-in-the-chat-1"
+      ],
+      "name": "A clear working/finished status line above the message box",
+      "state": "draft",
+      "steps": [
+        "w9xtdz9g-send-a-message-in-the-chat-1",
+        "w9xtdz9g-wait-for-the-turn-to-finish-2",
+        "w9xtdz9g-after-reading-the-reply-3"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "w9xtdz9g-after-reading-the-reply-3"
+      ],
+      "transitions": [
+        "w9xtdz9g-send-a-message-in-the-chat-1 -> w9xtdz9g-wait-for-the-turn-to-finish-2",
+        "w9xtdz9g-wait-for-the-turn-to-finish-2 -> w9xtdz9g-after-reading-the-reply-3"
+      ],
+      "type": "review"
+    },
+    {
+      "for_domain": "dna:tenant:X5YSB0RWB5YEEQRK04S5NZ6Y9B",
+      "for_process": "verification",
+      "id": "dna:workflow:R43T2PTYRZT50YE62TAX832346",
+      "initial_steps": [
+        "941csmt9-open-a-change-that-shows-the-this-change-1"
+      ],
+      "name": "A new turn is never buried under the resumed note",
+      "state": "draft",
+      "steps": [
+        "941csmt9-open-a-change-that-shows-the-this-change-1",
+        "941csmt9-send-a-new-message-2"
+      ],
+      "sys_status": "active",
+      "terminal_steps": [
+        "941csmt9-send-a-new-message-2"
+      ],
+      "transitions": [
+        "941csmt9-open-a-change-that-shows-the-this-change-1 -> 941csmt9-send-a-new-message-2"
+      ],
+      "type": "review"
+    }
+  ]
+}

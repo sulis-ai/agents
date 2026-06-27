@@ -1,0 +1,17 @@
+id: arch:chat-experience-both-universal-change
+change: CH-9642DA
+primitive: feat
+status: decomposed            # draft → designed → decomposed → implemented → verified
+sourced_from:
+  spec: .changes/feat-chat-experience-both-universal-change.SPEC.md
+  scenarios: .changes/feat-chat-experience-both-universal-change.scenarios.jsonld
+  visual_contract: .architecture/chat-experience-both-universal-change/contracts/visual/chat-both-status.contract.md
+tier: S
+adrs:
+  - ADR-001-reuse-turncard-not-extract-primitive
+  - ADR-002-status-line-derives-from-existing-lifecycle
+  - ADR-003-universal-summary-fallback
+  - ADR-004-status-line-colour-coverage
+documents:
+  tdd: .architecture/chat-experience-both-universal-change/TDD.md
+  work_packages: .architecture/chat-experience-both-universal-change/work-packages/INDEX.md
