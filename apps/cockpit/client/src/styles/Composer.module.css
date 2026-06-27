@@ -84,6 +84,16 @@
   color: var(--foreground);
 }
 
+/* The idle/your-turn slot content the shared <ChatStatusLine> renders when it
+ * is NOT working/finished: the honest resumed note (FR-26) stacked above the
+ * suggestion chips, with the dock's own gap rhythm. No colour of its own — it
+ * is layout only; the resumed note and chips carry their own (token) styling. */
+.slotIdle {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* suggestion chips — subtle, above the box. */
 .chips {
   display: flex;
