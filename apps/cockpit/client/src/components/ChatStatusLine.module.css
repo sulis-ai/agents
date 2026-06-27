@@ -1,0 +1,101 @@
+/* WP-002 — <ChatStatusLine> styles (ADR-004 + the signed visual contract).
+ *
+ * Tokens only — no raw hex, no rgb(), no named colour. Every colour is the
+ * exact token the signed contract names, used via var(--*) or color-mix over
+ * tokens (the 9%/28% tints). Theme-aware for free (the tokens carry light/dark).
+ *
+ *   working line:  --accent text + a 9% (border) / 28%-feel --accent-over-card
+ *                  tile. The pulse icon honours prefers-reduced-motion.
+ *   finished line: --bg-positive / --bg-positive-border tile with a NEUTRAL
+ *                  --foreground label; the green rides the --positive tick only
+ *                  (small green text is below AA, so the words stay neutral —
+ *                  the contract's WCAG AA decision, carried verbatim).
+ *
+ * working vs finished differ by icon AND wording, never by colour alone. */
+
+.line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.label {
+  font-weight: 500;
+}
+
+.icon,
+.tick {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+/* ---- working: --accent text over a 9%/28% --accent-over-card tile ---- */
+.working {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, var(--card));
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--card));
+}
+
+.working .icon {
+  color: var(--accent);
+  animation: chatStatusPulse 1.4s ease-in-out infinite;
+}
+
+/* ---- finished: neutral label, green only on the tick + tint ---- */
+.finished {
+  color: var(--foreground); /* neutral label — AA-safe */
+  background: var(--bg-positive);
+  border-color: var(--bg-positive-border);
+  /* it is a real <button> for the dismiss interaction — reset its chrome */
+  margin: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.finished .tick {
+  color: var(--positive); /* the only green — graphical, not text */
+}
+
+/* Inline "Got it" affordance — a quiet text button that returns to chips. */
+.dismiss {
+  margin-left: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--bg-positive-border);
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dismiss:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The pulse is live texture, not information — disable it when the founder
+ * asked for reduced motion (the icon + wording still carry the meaning). */
+@keyframes chatStatusPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .working .icon {
+    animation: none;
+  }
+}
